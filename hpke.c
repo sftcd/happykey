@@ -86,7 +86,7 @@ static unsigned char *aead_enc(
      * We'll allocate this much extra for ciphertext and check the AEAD doesn't require more
      * If it does, we'll fail.
      */
-    size_t alloced_oh=264;
+    size_t alloced_oh=EVP_GCM_TLS_TAG_LEN;
 
     if (tag_len > alloced_oh) {
         goto err;
@@ -231,10 +231,11 @@ int hpke_enc(
      * 2. run DH KEM to get zz
      * 3. create context buffer
      * 4. extracts and expands as needed
-     * 5. AEAD 
+     * 5. call the AEAD 
      *
      * We'll follow the names used in the test vectors from the draft.
      * For now, we're replicating the setup from Appendix A.2
+     * TODO: 1) generalise and 2) refactor to reduce LOC
      */
 
     /* declare vars - done early so goto err works ok */
@@ -350,6 +351,12 @@ int hpke_enc(
      *    (stdin)= 55c4040629c64c5efec2f7230407d612d16289d7c5d7afcf9340280abd2de1ab
      *
      * The above generates the Hash(info) used in Appendix A.2
+     *
+     * If you'd like to regenerate the zero_sha256 value above, feel free
+     *    $ echo -n "" | openssl sha256 
+     *    echo -n "" | openssl sha256
+     *    (stadin)= e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855
+     *
      */
     if (info==NULL) {
         memcpy(cp,zero_sha256,SHA256_DIGEST_LENGTH); cp+=SHA256_DIGEST_LENGTH; CHECK_HPKE_CTX;
