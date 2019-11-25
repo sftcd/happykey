@@ -29,21 +29,26 @@
 
 #define HPKE_MAXSIZE (640*1024) ///< 640k is more than enough for anyone (using this program:-)
 
+static int verbose=0; ///< global var for verbosity
+
 static void usage(char *prog,char *errmsg) 
 {
     if (errmsg) fprintf(stderr,"\nError! %s\n\n",errmsg);
     fprintf(stderr,"Usage: %s [-h|-v|-e|-d] [-P public] [-p private] [-a aad] [-I info] [-i input] [-o output]\n",prog);
-    fprintf(stderr,"HPKE (draft-irtf-cfrg-hpke tester, options are:\n");
+    fprintf(stderr,"HPKE (draft-irtf-cfrg-hpke) tester, options are:\n");
     fprintf(stderr,"\t-h help\n");
     fprintf(stderr,"\t-v verbose output\n");
     fprintf(stderr,"\t-e encrypt\n");
     fprintf(stderr,"\t-d decrypt\n");
-    fprintf(stderr,"\t-P public key file name or base64 encoded value\n");
-    fprintf(stderr,"\t-p private key file name or base64 encoded value\n");
-    fprintf(stderr,"\t-a additional authenticated data file name or base64 encoded value\n");
-    fprintf(stderr,"\t-I additional info to bind to key - file name or base64 encoded value\n");
-    fprintf(stderr,"\t-i input file name or base64 encoded value (stdin if not specified)\n");
-    fprintf(stderr,"\t-o output file name (base64 to stdout if not specified) \n");
+    fprintf(stderr,"\t-P public key file name or base64 or ascii-hex encoded value\n");
+    fprintf(stderr,"\t-p private key file name or base64 or ascii-hex encoded value\n");
+    fprintf(stderr,"\t-a additional authenticated data file name or actual value\n");
+    fprintf(stderr,"\t-I additional info to bind to key - file name or actual value\n");
+    fprintf(stderr,"\t-i input file name or actual value (stdin if not specified)\n");
+    fprintf(stderr,"\t-o output file name (output to stdout if not specified) \n");
+    fprintf(stderr,"\n");
+    fprintf(stderr,"note that sometimes base64 or ascii-hex decoding might work when you don't want it to\n");
+    fprintf(stderr,"(sorry about that;-)\n");
     exit(1);
 }
 
@@ -117,9 +122,10 @@ static void strip_newlines(size_t *len, unsigned char *buf)
  * @param inp is the input ptr
  * @param outlen is an output length of buffer
  * @param outbuf is an output buffer
+ * @param strip whether to strip newlines from input 
  * @return 1 for good, not 1 for bad
  */
-static int map_input(char *inp, size_t *outlen, unsigned char **outbuf)
+static int map_input(char *inp, size_t *outlen, unsigned char **outbuf, int strip)
 {
     if (!outlen || !outbuf) return(__LINE__);
     /* on-stack buffer/length to handle various cases */
@@ -135,42 +141,53 @@ static int map_input(char *inp, size_t *outlen, unsigned char **outbuf)
     /* if no input, try stdin */
     if (!inp) {
         toutlen=fread(tbuf,1,HPKE_MAXSIZE,stdin);
+        if (verbose) fprintf(stderr,"got %ld bytes from stdin\n",toutlen);
         if (!feof(stdin)) return(__LINE__);
     } else {
         toutlen=strlen(inp);
+        if (toutlen>HPKE_MAXSIZE) return(__LINE__);
         FILE *fp=fopen(inp,"rb"); /* check if inp is file name */
         if (fp) {
             /* that worked - so read file up to max into buffer */
             toutlen=fread(tbuf,1,HPKE_MAXSIZE,fp);
+            if (verbose) fprintf(stderr,"got %ld bytes from file %s\n",toutlen,inp);
             if (ferror(fp)) { fclose(fp); return(__LINE__); }
             fclose(fp);
         } else {
-            toutlen=strlen(inp);
-            if (toutlen>=HPKE_MAXSIZE) return(__LINE__);
+            if (verbose) fprintf(stderr,"got %ld bytes direct from commandline %s\n",toutlen,inp);
             memcpy(tbuf,inp,toutlen);
         }
     }
-    if (toutlen>=HPKE_MAXSIZE) return(__LINE__);
-    strip_newlines(&toutlen,tbuf);
+    if (toutlen>HPKE_MAXSIZE) return(__LINE__);
 
     /* ascii-hex or b64 decode as needed */
     /* try from most constrained to least in that order */
-    if (toutlen<=strspn(tbuf,AH_alphabet)) {
-        int adr=ah_decode(toutlen,tbuf,outlen,outbuf);
-        if (!adr) return(__LINE__);
-        if (adr==1) return(1);
-    } 
-    if (toutlen<=strspn(tbuf,B64_alphabet)) {
-        *outbuf=OPENSSL_malloc(toutlen);
-        if (!*outbuf) return(__LINE__);
-        *outlen=EVP_DecodeBlock(*outbuf, (unsigned char *)tbuf, toutlen);
-        if (*outlen!=-1) {
-            return(1);
-        } else {
-            /* base64 decode failed so maybe the content was good as-is */
-            OPENSSL_free(*outbuf);
-            *outbuf=NULL;
+    if (strip) {
+        strip_newlines(&toutlen,tbuf);
+        if (toutlen<=strspn(tbuf,AH_alphabet)) {
+            int adr=ah_decode(toutlen,tbuf,outlen,outbuf);
+            if (!adr) return(__LINE__);
+            if (adr==1) {
+	            if (verbose) fprintf(stderr,"ah_decode worked for %s - going with that\n",tbuf);
+	            return(1);
+	        }
+	    } 
+	    if (toutlen<=strspn(tbuf,B64_alphabet)) {
+	        *outbuf=OPENSSL_malloc(toutlen);
+	        if (!*outbuf) return(__LINE__);
+	        *outlen=EVP_DecodeBlock(*outbuf, (unsigned char *)tbuf, toutlen);
+	        if (*outlen!=-1) {
+	            if (verbose) fprintf(stderr,"base64 decode worked for %s - going with the %ld bytes that provided\n",tbuf,*outlen);
+	            return(1);
+	        } else {
+	            /* base64 decode failed so maybe the content was good as-is */
+	            OPENSSL_free(*outbuf);
+	            *outbuf=NULL;
+	        }
         }
+        if (verbose) fprintf(stderr,"decodes failed for %s - going with original\n",tbuf);
+    } else {
+        if (verbose) fprintf(stderr,"going with original: %s\n",tbuf);
     } 
     /* fallback to assuming input is good, as-is */
     *outbuf=OPENSSL_malloc(toutlen);
@@ -183,7 +200,6 @@ static int map_input(char *inp, size_t *outlen, unsigned char **outbuf)
 int main(int argc, char **argv)
 {
     int doing_enc=1; // may as well assume that
-    int verbose=0;
     /*
      * the xxx_in vars could be a filename or b64 value, we'll check later
      */
@@ -202,7 +218,7 @@ int main(int argc, char **argv)
 
     int opt;
 
-    while((opt = getopt(argc, argv, "?hedP:p:a:I:i:o:")) != -1) {
+    while((opt = getopt(argc, argv, "?hedvP:p:a:I:i:o:")) != -1) {
         switch(opt) {
             case 'h':
             case '?': usage(argv[0],NULL); break;
@@ -229,15 +245,15 @@ int main(int argc, char **argv)
      * Map from command line args (or the lack thereof) to buffers
      */
     size_t publen=0; unsigned char *pub=NULL;
-    if (doing_enc && map_input(pub_in,&publen,&pub)!=1) usage(argv[0],"bad -P value");
+    if (doing_enc && map_input(pub_in,&publen,&pub,1)!=1) usage(argv[0],"bad -P value");
     size_t privlen=0; unsigned char *priv=NULL;
-    if (!doing_enc && map_input(priv_in,&privlen,&priv)!=1) usage(argv[0],"bad -p value");
+    if (!doing_enc && map_input(priv_in,&privlen,&priv,1)!=1) usage(argv[0],"bad -p value");
     size_t aadlen=0; unsigned char *aad=NULL;
-    if (aad_in && map_input(aad_in,&aadlen,&aad)!=1) usage(argv[0],"bad -a value");
+    if (aad_in && map_input(aad_in,&aadlen,&aad,0)!=1) usage(argv[0],"bad -a value");
     size_t infolen=0; unsigned char *info=NULL;
-    if (info_in && map_input(info_in,&infolen,&info)!=1) usage(argv[0],"bad -I value");
+    if (info_in && map_input(info_in,&infolen,&info,0)!=1) usage(argv[0],"bad -I value");
     size_t plainlen=0; unsigned char *plain=NULL;
-    if (doing_enc && map_input(inp_in,&plainlen,&plain)!=1) usage(argv[0],"bad -i value");
+    if (doing_enc && map_input(inp_in,&plainlen,&plain,0)!=1) usage(argv[0],"bad -i value");
 
     /*
      * Init OpenSSL stuff - copied from lighttpd
