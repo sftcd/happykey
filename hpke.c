@@ -62,19 +62,22 @@ static int figure_context_len(hpke_suite_t suite)
  * the aad wrong at one stage to keep it for now.
  * Most parameters obvious but...
  *
- * @param cipher_len is an output
+ * @param cipher_len is an input/output, better be big enough on input, exact on output
+ * @param cipher is an output
+ * @return 1 for good otherwise bad
  * @returns NULL (on error) or pointer to alloced buffer for ciphertext
  */
-static unsigned char *aead_enc(
+static int aead_enc(
             unsigned char *key, size_t key_len,
             unsigned char *iv, size_t iv_len,
             unsigned char *aad, size_t aad_len,
             unsigned char *plain, size_t plain_len,
-            size_t *cipher_len)
+            unsigned char *cipher, size_t *cipher_len)
 {
     /*
      * From https://wiki.openssl.org/index.php/EVP_Authenticated_Encryption_and_Decryption
      */
+    int erv=1;
     EVP_CIPHER_CTX *ctx=NULL;
     int len;
     size_t ciphertext_len;
@@ -82,72 +85,59 @@ static unsigned char *aead_enc(
     size_t tag_len=EVP_GCM_TLS_TAG_LEN;
     unsigned char tag[EVP_GCM_TLS_TAG_LEN]; 
 
+    if (tag_len+plain_len>*cipher_len) {
+        erv=__LINE__; goto err;
+    }
     /*
      * We'll allocate this much extra for ciphertext and check the AEAD doesn't require more
      * If it does, we'll fail.
      */
-    size_t alloced_oh=EVP_GCM_TLS_TAG_LEN;
-
-    if (tag_len > alloced_oh) {
-        goto err;
-    }
-    ciphertext=OPENSSL_malloc(plain_len+alloced_oh);
+    ciphertext=OPENSSL_malloc(plain_len+tag_len);
     if (ciphertext==NULL) {
-        goto err;
+        erv=__LINE__; goto err;
     }
-
     /* Create and initialise the context */
     if(!(ctx = EVP_CIPHER_CTX_new())) {
-        goto err;
+        erv=__LINE__; goto err;
     }
-
     /* Initialise the encryption operation. */
     const EVP_CIPHER *enc = EVP_aes_128_gcm();
     if (enc == NULL) {
-        goto err;
+        erv=__LINE__; goto err;
     }
-
     if(1 != EVP_EncryptInit_ex(ctx, enc, NULL, NULL, NULL)) {
-        goto err;
+        erv=__LINE__; goto err;
     }
-
     /* Set IV length if default 12 bytes (96 bits) is not appropriate */
     if(1 != EVP_CIPHER_CTX_ctrl(ctx, EVP_CTRL_GCM_SET_IVLEN, iv_len, NULL)) {
-        goto err;
+        erv=__LINE__; goto err;
     }
-
     /* Initialise key and IV */
     if(1 != EVP_EncryptInit_ex(ctx, NULL, NULL, key, iv))  {
-        goto err;
+        erv=__LINE__; goto err;
     }
-
     /* Provide any AAD data. This can be called zero or more times as
      * required
      */
     if (aad_len!=0 && aad!=NULL) {
         if(1 != EVP_EncryptUpdate(ctx, NULL, &len, aad, aad_len)) {
-            goto err;
+            erv=__LINE__; goto err;
         }
     }
-
     /* Provide the message to be encrypted, and obtain the encrypted output.
      * EVP_EncryptUpdate can be called multiple times if necessary
      */
     if(1 != EVP_EncryptUpdate(ctx, ciphertext, &len, plain, plain_len)) {
-        goto err;
+        erv=__LINE__; goto err;
     }
-
     ciphertext_len = len;
-
     /* Finalise the encryption. Normally ciphertext bytes may be written at
      * this stage, but this does not occur in GCM mode
      */
     if(1 != EVP_EncryptFinal_ex(ctx, ciphertext + len, &len))  {
-        goto err;
+        erv=__LINE__; goto err;
     }
-
     ciphertext_len += len;
-
     /*
      * Get the tag
      * This isn't a duplicate so needs to be added to the ciphertext
@@ -167,22 +157,20 @@ static unsigned char *aead_enc(
      * TODO(ESNI): follow up on this
      */
     if(1 != EVP_CIPHER_CTX_ctrl(ctx, EVP_CTRL_AEAD_GET_TAG, tag_len, tag)) {
-        goto err;
+        erv=__LINE__; goto err;
     }
     memcpy(ciphertext+ciphertext_len,tag,tag_len);
     ciphertext_len += tag_len;
-
     /* Clean up */
-    EVP_CIPHER_CTX_free(ctx);
-
+    if (ciphertext_len>*cipher_len) {
+        erv=__LINE__; goto err;
+    }
     *cipher_len=ciphertext_len;
-
-    return ciphertext;
-
+    memcpy(cipher,ciphertext,ciphertext_len);
 err:
-    EVP_CIPHER_CTX_free(ctx);
+    if (ctx) EVP_CIPHER_CTX_free(ctx);
     if (ciphertext!=NULL) OPENSSL_free(ciphertext);
-    return NULL;
+    return erv;
 }
 
 /*
@@ -482,14 +470,16 @@ int hpke_enc(
     EVP_PKEY_CTX_free(pctx); pctx=NULL;
 
     /* step 5 */
-    size_t lcipherlen=0;
-    unsigned char *lcipher=aead_enc(key,key_len,
+    size_t lcipherlen=HPKE_MAXSIZE;
+    unsigned char lcipher[HPKE_MAXSIZE];
+    int arv=aead_enc(
+                key,key_len,
                 nonce,nonce_len,
                 aad,aadlen,
                 clear,clearlen,
-                &lcipherlen);
-    if (lcipher==NULL) {
-        erv=__LINE__; goto err;
+                lcipher,&lcipherlen);
+    if (arv!=1) {
+        erv=arv; goto err;
     }
     if (lcipherlen > *cipherlen) {
         erv=__LINE__; goto err;

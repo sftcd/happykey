@@ -19,6 +19,9 @@
 #ifndef HPKE_H_INCLUDED
 #define HPKE_H_INCLUDED
 
+/* biggest/default buffer we use */
+#define HPKE_MAXSIZE (640*1024) ///< 640k is more than enough for anyone (using this program:-)
+
 /*
  * The HPKE modes 
  * We only support base for now

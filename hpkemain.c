@@ -27,8 +27,6 @@
 
 #include "hpke.h"
 
-#define HPKE_MAXSIZE (640*1024) ///< 640k is more than enough for anyone (using this program:-)
-
 static int verbose=0; ///< global var for verbosity
 
 static void usage(char *prog,char *errmsg) 
