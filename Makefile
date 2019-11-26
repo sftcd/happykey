@@ -12,7 +12,13 @@
 
 OSSL=${HOME}/code/openssl
 INCL=${HOME}/code/openssl/include
-CFLAGS="-g" 
+# There are testvectors for this - see comments in hpketv.h
+# if you don't want to compile in test vector checks then
+# comment out the next line
+testvectors=-D TESTVECTORS
+
+CFLAGS=-g ${testvectors}
+
 CC=gcc
 
 all: hpkemain
@@ -27,8 +33,18 @@ hpke.o: hpke.c hpke.h
 hpkemain.o: hpkemain.c hpke.h
 	${CC} ${CFLAGS} -I ${INCL} -c $<
 
-hpkemain: hpkemain.o hpke.o
+ifdef testvectors
+hpketv.o: hpketv.c hpketv.h hpke.h
+	${CC} ${CFLAGS} -I ${INCL} -c $<
+endif
+
+ifdef testvectors
+hpkemain: hpkemain.o hpke.o hpketv.o
+	${CC} ${CFLAGS} -o $@ hpkemain.o hpke.o hpketv.o -L ${OSSL} -lssl -lcrypto
+else
+hpkemain: hpkemain.o hpke.o 
 	${CC} ${CFLAGS} -o $@ hpkemain.o hpke.o -L ${OSSL} -lssl -lcrypto
+endif
 
 doc: 
 	- doxygen hpke.doxy
@@ -38,4 +54,4 @@ docclean:
 	- rm -rf doxy
 
 clean:
-	- rm -f hpkemain.o hpke.o hpkemain 
+	- rm -f hpkemain.o hpke.o hpketv.o hpkemain 

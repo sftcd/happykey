@@ -27,12 +27,20 @@
 
 #include "hpke.h"
 
+#ifdef TESTVECTORS
+#include "hpketv.h"
+#endif
+
 static int verbose=0; ///< global var for verbosity
 
 static void usage(char *prog,char *errmsg) 
 {
     if (errmsg) fprintf(stderr,"\nError! %s\n\n",errmsg);
+#ifdef TESTVECTORS
+    fprintf(stderr,"Usage: %s [-h|-v|-e|-d] [-P public] [-p private] [-a aad] [-I info] [-i input] [-o output] [-T tvspec]\n",prog);
+#else
     fprintf(stderr,"Usage: %s [-h|-v|-e|-d] [-P public] [-p private] [-a aad] [-I info] [-i input] [-o output]\n",prog);
+#endif
     fprintf(stderr,"HPKE (draft-irtf-cfrg-hpke) tester, options are:\n");
     fprintf(stderr,"\t-h help\n");
     fprintf(stderr,"\t-v verbose output\n");
@@ -44,9 +52,16 @@ static void usage(char *prog,char *errmsg)
     fprintf(stderr,"\t-I additional info to bind to key - file name or actual value\n");
     fprintf(stderr,"\t-i input file name or actual value (stdin if not specified)\n");
     fprintf(stderr,"\t-o output file name (output to stdout if not specified) \n");
+#ifdef TESTVECTORS
+    fprintf(stderr,"\t-T run a testvector for mode/suite, e.g. \"-T 0,1,1,2\"\n");
+#endif
     fprintf(stderr,"\n");
     fprintf(stderr,"note that sometimes base64 or ascii-hex decoding might work when you don't want it to\n");
     fprintf(stderr,"(sorry about that;-)\n");
+#ifdef TESTVECTORS
+    fprintf(stderr,"This version is built with TESTVECTORS\n");
+    fprintf(stderr,"You should either choose \"normal\" inputs or use \"-T\" not both.\n");
+#endif
     exit(1);
 }
 
@@ -207,6 +222,9 @@ int main(int argc, char **argv)
     char *info_in=NULL;
     char *inp_in=NULL;
     char *out_in=NULL;
+#ifdef TESTVECTORS
+    char *tvspec=NULL;
+#endif
 
     /*
      * Mode and ciphersuites - we're not parameterising this yet
@@ -216,7 +234,11 @@ int main(int argc, char **argv)
 
     int opt;
 
+#ifdef TESTVECTORS
+    while((opt = getopt(argc, argv, "?hedvP:p:a:I:i:o:T:")) != -1) {
+#else
     while((opt = getopt(argc, argv, "?hedvP:p:a:I:i:o:")) != -1) {
+#endif
         switch(opt) {
             case 'h':
             case '?': usage(argv[0],NULL); break;
@@ -229,6 +251,7 @@ int main(int argc, char **argv)
             case 'I': info_in=optarg; break;
             case 'i': inp_in=optarg; break;
             case 'o': out_in=optarg; break;
+            case 'T': tvspec=optarg; break;
             default:
                 usage(argv[0],"unknown arg");
         }
@@ -236,8 +259,16 @@ int main(int argc, char **argv)
     /*
      * barf if something obviously missing
      */
+#ifdef TESTVECTORS
+    if (tvspec!=NULL) {
+        printf("Doing testvector for %s\n",tvspec);
+    } else {
+#endif
     if (doing_enc && !pub_in) usage(argv[0],"No recipient public key (\"-P\") provided"); 
     if (!doing_enc && !priv_in) usage(argv[0],"No recipient private key (\"-p\") provided"); 
+#ifdef TESTVECTORS
+    }
+#endif
 
     /*
      * Map from command line args (or the lack thereof) to buffers
@@ -261,6 +292,27 @@ int main(int argc, char **argv)
     OPENSSL_init_crypto(OPENSSL_INIT_ADD_ALL_CIPHERS
                        |OPENSSL_INIT_ADD_ALL_DIGESTS
                        |OPENSSL_INIT_LOAD_CONFIG, NULL);
+
+#ifdef TESTVECTORS
+    /*
+     * Load up and choose a testvector if asked to (and compiled
+     * that way)
+     * File name for this doesn't need to be parameterised yet.
+     */
+    char *tvfname="test-vectors.json";
+    int nelems=0;
+    hpke_tv_t *tvarr=NULL;
+    int trv=hpke_tv_load(tvfname,&nelems,&tvarr);
+    if (trv!=1) {
+        fprintf(stderr,"Can't load %s - exiting\n",tvfname);
+    }
+    hpke_tv_t *tv=NULL;
+    trv=hpke_tv_pick(nelems,tvarr,tvspec,tv);
+    if (trv!=1) {
+        fprintf(stderr,"Can't load %s - exiting\n",tvfname);
+    }
+#endif
+
     /*
      * Call one of our functions
      */
