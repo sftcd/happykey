@@ -19,6 +19,10 @@
 #ifndef HPKE_H_INCLUDED
 #define HPKE_H_INCLUDED
 
+#ifdef TESTVECTORS
+#include "hpketv.h"
+#endif
+
 /* biggest/default buffer we use */
 #define HPKE_MAXSIZE (640*1024) ///< 640k is more than enough for anyone (using this program:-)
 
@@ -101,7 +105,11 @@ int hpke_enc(
         size_t *senderpublen,
         unsigned char *senderpub,
         size_t *cipherlen,
-        unsigned char *cipher);
+        unsigned char *cipher
+#ifdef TESTVECTORS
+        , hpke_tv_t *tv
+#endif
+        );
 
 /*
  * @brief HPKE single-shot decryption function

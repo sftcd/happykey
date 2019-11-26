@@ -259,6 +259,11 @@ int main(int argc, char **argv)
     /*
      * barf if something obviously missing
      */
+    size_t publen=0; unsigned char *pub=NULL;
+    size_t privlen=0; unsigned char *priv=NULL;
+    size_t aadlen=0; unsigned char *aad=NULL;
+    size_t infolen=0; unsigned char *info=NULL;
+    size_t plainlen=0; unsigned char *plain=NULL;
 #ifdef TESTVECTORS
     if (tvspec!=NULL) {
         printf("Doing testvector for %s\n",tvspec);
@@ -266,23 +271,19 @@ int main(int argc, char **argv)
 #endif
     if (doing_enc && !pub_in) usage(argv[0],"No recipient public key (\"-P\") provided"); 
     if (!doing_enc && !priv_in) usage(argv[0],"No recipient private key (\"-p\") provided"); 
-#ifdef TESTVECTORS
-    }
-#endif
 
     /*
      * Map from command line args (or the lack thereof) to buffers
      */
-    size_t publen=0; unsigned char *pub=NULL;
     if (doing_enc && map_input(pub_in,&publen,&pub,1)!=1) usage(argv[0],"bad -P value");
-    size_t privlen=0; unsigned char *priv=NULL;
     if (!doing_enc && map_input(priv_in,&privlen,&priv,1)!=1) usage(argv[0],"bad -p value");
-    size_t aadlen=0; unsigned char *aad=NULL;
     if (aad_in && map_input(aad_in,&aadlen,&aad,0)!=1) usage(argv[0],"bad -a value");
-    size_t infolen=0; unsigned char *info=NULL;
     if (info_in && map_input(info_in,&infolen,&info,0)!=1) usage(argv[0],"bad -I value");
-    size_t plainlen=0; unsigned char *plain=NULL;
     if (doing_enc && map_input(inp_in,&plainlen,&plain,0)!=1) usage(argv[0],"bad -i value");
+#ifdef TESTVECTORS
+    }
+#endif
+
 
     /*
      * Init OpenSSL stuff - copied from lighttpd
@@ -302,14 +303,18 @@ int main(int argc, char **argv)
     char *tvfname="test-vectors.json";
     int nelems=0;
     hpke_tv_t *tvarr=NULL;
-    int trv=hpke_tv_load(tvfname,&nelems,&tvarr);
-    if (trv!=1) {
-        fprintf(stderr,"Can't load %s - exiting\n",tvfname);
-    }
     hpke_tv_t *tv=NULL;
-    trv=hpke_tv_pick(nelems,tvarr,tvspec,tv);
-    if (trv!=1) {
-        fprintf(stderr,"Can't load %s - exiting\n",tvfname);
+    if (tvspec!=NULL) {
+        int trv=hpke_tv_load(tvfname,&nelems,&tvarr);
+        if (trv!=1) {
+            fprintf(stderr,"Can't load %s - exiting\n",tvfname);
+            exit(1);
+        }
+        trv=hpke_tv_pick(nelems,tvarr,tvspec,tv);
+        if (trv!=1) {
+            fprintf(stderr,"Failed selecting test vector for %s - exiting\n",tvspec);
+            exit(2);
+        }
     }
 #endif
 
@@ -326,7 +331,11 @@ int main(int argc, char **argv)
             aadlen, aad,
             infolen, info,
             &senderpublen, senderpub,
-            &cipherlen, cipher);
+            &cipherlen, cipher
+#ifdef TESTVECTORS
+            ,tv
+#endif
+            );
         if (rv!=1) {
             fprintf(stderr,"Error (%d) from hpke_enc\n",rv);
         }

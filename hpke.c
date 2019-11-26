@@ -27,6 +27,10 @@
 
 #include "hpke.h"
 
+#ifdef TESTVECTORS
+#include "hpketv.h"
+#endif
+
 /*
  * @brief Check if ciphersuite is ok/known to us
  * @param suite is the externally supplied cipheruite
@@ -205,7 +209,11 @@ int hpke_enc(
         size_t *senderpublen,
         unsigned char *senderpub,
         size_t *cipherlen,
-        unsigned char *cipher)
+        unsigned char *cipher
+#ifdef TESTVECTORS
+        , hpke_tv_t *tv
+#endif
+        )
 {
     if (mode!=HPKE_MODE_BASE) return(__LINE__);
     if (!hpke_suite_check(suite)) return(__LINE__);
