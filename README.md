@@ -14,3 +14,16 @@ if that's correct or not, so I'm currently working on a way to integrate the
 Once that seems to be doing something (and I've yet to load the JSON into some
 C struct;-) then I'll start to refactor the ``hpke_enc()`` code to be more
 sensible.
+
+In this attempt, I'm checking to see if the [json-c](https://github.com/json-c/json-c)
+library is good enough for what I need. The [Makefile](Makefile) here 
+assumes that you've build that as a sibling directory to this one.
+
+So the setup here assumes you have:
+- $HOME/code/happykey with this repo
+- $HOME/code/openssl with a clone of https://github.com/sftcd/openssl
+- $HOME/code/json-c with a clone of https://github.com/json-c/json-c
+
+As of now, the JSON file is being loaded into an array of ``hpke_tv_t``
+but there's some screwey memory issue somewhere even though most
+values look ok.

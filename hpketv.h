@@ -32,33 +32,34 @@
 #ifdef TESTVECTORS
 
 typedef struct hpke_tv_encs_s {
-    char *aad;
-    char *plaintext;
-    char *ciphertext;
+    const char *aad;
+    const char *plaintext;
+    const char *ciphertext;
 } hpke_tv_encs_t;
 
 typedef struct hpke_tv_s {
+    uint8_t mode;
     uint16_t kdfID;
     uint16_t aeadID;
     uint16_t kemID;
-    uint8_t mode;
-    char *context;
-    char *skI;
-    char *pkI;
-    char *zz;
-    char *secret;
-    char *enc;
-    char *info;
-    char *pskID;
-    char *nonce;
-    char *key;
-    char *pkR;
-    char *pkE;
-    char *skR;
-    char *skE;
-    char *psk;
+    const char *context;
+    const char *skI;
+    const char *pkI;
+    const char *zz;
+    const char *secret;
+    const char *enc;
+    const char *info;
+    const char *pskID;
+    const char *nonce;
+    const char *key;
+    const char *pkR;
+    const char *pkE;
+    const char *skR;
+    const char *skE;
+    const char *psk;
     int nencs;
     hpke_tv_encs_t *encs;
+    void *jobj; 
 } hpke_tv_t;
 
 /*

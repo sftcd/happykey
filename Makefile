@@ -15,10 +15,9 @@ INCL=${HOME}/code/openssl/include
 # There are testvectors for this - see comments in hpketv.h
 # if you don't want to compile in test vector checks then
 # comment out the next line
-testvectors=-D TESTVECTORS
+testvectors=-D TESTVECTORS -I ../json-c
 
 CFLAGS=-g ${testvectors}
-
 CC=gcc
 
 all: hpkemain
@@ -40,7 +39,7 @@ endif
 
 ifdef testvectors
 hpkemain: hpkemain.o hpke.o hpketv.o
-	${CC} ${CFLAGS} -o $@ hpkemain.o hpke.o hpketv.o -L ${OSSL} -lssl -lcrypto
+	${CC} ${CFLAGS} -o $@ hpkemain.o hpke.o hpketv.o -L ${OSSL} -lssl -lcrypto -L ../json-c/.libs -ljson-c
 else
 hpkemain: hpkemain.o hpke.o 
 	${CC} ${CFLAGS} -o $@ hpkemain.o hpke.o -L ${OSSL} -lssl -lcrypto

@@ -792,6 +792,8 @@ WARN_LOGFILE           =
 
 INPUT                  = hpke.h
 INPUT                  += hpke.c 
+INPUT                  += hpketv.h 
+INPUT                  += hpketv.c 
 INPUT                  += hpkemain.c 
 
 # This tag can be used to specify the character encoding of the source files
