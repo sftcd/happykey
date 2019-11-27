@@ -239,8 +239,8 @@ int main(int argc, char **argv)
      */
     if (doing_enc && map_input(pub_in,&publen,&pub,1)!=1) usage(argv[0],"bad -P value");
     if (!doing_enc && map_input(priv_in,&privlen,&priv,1)!=1) usage(argv[0],"bad -p value");
-    if (aad_in && map_input(aad_in,&aadlen,&aad,0)!=1) usage(argv[0],"bad -a value");
-    if (info_in && map_input(info_in,&infolen,&info,0)!=1) usage(argv[0],"bad -I value");
+    if (aad_in && map_input(aad_in,&aadlen,&aad,1)!=1) usage(argv[0],"bad -a value");
+    if (info_in && map_input(info_in,&infolen,&info,1)!=1) usage(argv[0],"bad -I value");
     if (doing_enc && map_input(inp_in,&plainlen,&plain,0)!=1) usage(argv[0],"bad -i value");
 #ifdef TESTVECTORS
     }
@@ -279,13 +279,15 @@ int main(int argc, char **argv)
         }
         hpke_tv_print(1,tv);
         /*
-         * Assign inputs from tv 
+         * Assign inputs from tv - note that the strip/decode things here are not
+         * exactly the same as real command line args - plaintext in particular 
+         * needs to be decoded here but MUST NOT in the normal case.
          */
         if (doing_enc && map_input(tv->pkR,&publen,&pub,1)!=1) usage(argv[0],"bad -P value");
         if (!doing_enc && map_input(tv->skI,&privlen,&priv,1)!=1) usage(argv[0],"bad -p value");
-        if (tv->encs && map_input(tv->encs[0].aad,&aadlen,&aad,0)!=1) usage(argv[0],"bad -a value");
-        if (tv->info && map_input(tv->info,&infolen,&info,0)!=1) usage(argv[0],"bad -I value");
-        if (tv->encs && map_input(tv->encs[0].plaintext,&plainlen,&plain,0)!=1) usage(argv[0],"bad -i value");
+        if (tv->encs && map_input(tv->encs[0].aad,&aadlen,&aad,1)!=1) usage(argv[0],"bad -a value");
+        if (tv->info && map_input(tv->info,&infolen,&info,1)!=1) usage(argv[0],"bad -I value");
+        if (tv->encs && map_input(tv->encs[0].plaintext,&plainlen,&plain,1)!=1) usage(argv[0],"bad -i value");
     }
 #endif
 
@@ -326,10 +328,10 @@ int main(int argc, char **argv)
                 if (bcipherlen!=cipherlen) {
                     printf("Ciphertext output lengths differ: %ld vs %ld\n",
                             bcipherlen,cipherlen);
-                } else if (memcmp(cipher,cipher,bcipherlen)) {
-                    printf("Ciphertexxt outpuas differ, sorry\n");
+                } else if (memcmp(cipher,tv->encs[0].ciphertext,bcipherlen)) {
+                    printf("Ciphertext outputs differ, sorry\n");
                 } else {
-                    printf("Ciphertexxt outputs the same! Yay!\n");
+                    printf("Ciphertext outputs the same! Yay!\n");
                 }
             }
 #else
