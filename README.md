@@ -25,5 +25,4 @@ So the setup here assumes you have:
 - $HOME/code/json-c with a clone of https://github.com/json-c/json-c
 
 As of now, the JSON file is being loaded into an array of ``hpke_tv_t``
-but there's some screwey memory issue somewhere even though most
-values look ok.
+but we're not getting the same output yet. Getting there though.

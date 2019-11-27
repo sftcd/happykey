@@ -1,4 +1,4 @@
-/*
+/**
  * Copyright 2019 Stephen Farrell. All Rights Reserved.
  *
  * Licensed under the OpenSSL license (the "License").  You may not use
@@ -72,15 +72,6 @@ typedef struct hpke_tv_s {
 int hpke_tv_load(char *fname, int *nelems, hpke_tv_t **array);
 
 /*
- * @brief free up test vector array
- * @param array is a guess what?
- * @return 1 for good, other for bad
- *
- * Caller should free "parent" array
- */
-int hpke_tv_free(hpke_tv_t *array);
-
-/*
  * @brief select a test vector to use based on mode and suite
  * @param nelems is the number of array elements
  * @param array is the elements
@@ -94,7 +85,25 @@ int hpke_tv_free(hpke_tv_t *array);
  * The string to use is like "0,1,1,2" specifying the 
  * mode and suite in the (sorta:-) obvious manner.
  */
-int hpke_tv_pick(int nelems, hpke_tv_t *arr, char *selector, hpke_tv_t *tv);
+int hpke_tv_pick(int nelems, hpke_tv_t *arr, char *selector, hpke_tv_t **tv);
+
+/*
+ * @brief free up test vector array
+ * @param nelems is the number of array elements
+ * @param array is a guess what?
+ * @return 1 for good, other for bad
+ *
+ * Caller should free "parent" array
+ */
+void hpke_tv_free(int nelems, hpke_tv_t *array);
+
+/*
+ * @brief print test vectors
+ * @param nelems is the number of array elements
+ * @param array is the elements
+ * @return 1 for good, other for bad
+ */
+void hpke_tv_print(int nelems, hpke_tv_t *array);
 
 #endif // TESTVECTORS
 

@@ -31,6 +31,44 @@
 #include "hpketv.h"
 #endif
 
+/* Map ascii to binary */
+#define HPKE_A2B(__c__) (__c__>='0'&&__c__<='9'?(__c__-'0'):\
+                        (__c__>='A'&&__c__<='F'?(__c__-'A'+10):\
+                        (__c__>='a'&&__c__<='f'?(__c__-'a'+10):0)))
+
+/**
+ * @brief decode ascii hex to a binary buffer
+ *
+ * @param ahlen is the ascii hex string length
+ * @param ahstr is the ascii hex string
+ * @param blen is a pointer to the returned binary length
+ * @param buf is a pointer to the internally allocated binary buffer
+ * @return zero for error, 1 for success 
+ */
+int hpke_ah_decode(size_t ahlen, const char *ah, size_t *blen, unsigned char **buf)
+{
+    size_t lblen=0;
+    unsigned char *lbuf=NULL;
+    if (ahlen <=0 || ah==NULL || blen==NULL || buf==NULL) {
+        return 0;
+    }
+    if (ahlen%1) {
+        return 0;
+    }
+    lblen=ahlen/2;
+    lbuf=OPENSSL_malloc(lblen);
+    if (lbuf==NULL) {
+        return 0;
+    }
+    int i=0;
+    for (i=0;i!=lblen;i++) {
+        lbuf[i]=HPKE_A2B(ah[2*i])*16+HPKE_A2B(ah[2*i+1]);
+    }
+    *blen=lblen;
+    *buf=lbuf;
+    return 1;
+}
+
 /*
  * @brief Check if ciphersuite is ok/known to us
  * @param suite is the externally supplied cipheruite
@@ -260,6 +298,16 @@ int hpke_enc(
     }
 
     /* step 1 */
+#ifdef TESTVECTORS
+    unsigned char *bin_skE=NULL;
+    size_t bin_skE_len=0;
+    hpke_ah_decode(strlen(tv->skE),tv->skE,&bin_skE_len,&bin_skE);
+    EVP_PKEY *bin_pkR = EVP_PKEY_new_raw_private_key(EVP_PKEY_X25519,NULL,bin_skE,bin_skE_len);
+    if (!bin_pkR) {
+        erv=__LINE__; goto err;
+    }
+    OPENSSL_free(bin_skE);
+#endif
     pctx = EVP_PKEY_CTX_new(pkR, NULL);
     if (pctx == NULL) {
         erv=__LINE__; goto err;

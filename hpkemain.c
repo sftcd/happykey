@@ -66,44 +66,6 @@ static void usage(char *prog,char *errmsg)
 }
 
 
-/* Map ascii to binary */
-#define HPKE_A2B(__c__) (__c__>='0'&&__c__<='9'?(__c__-'0'):\
-                        (__c__>='A'&&__c__<='F'?(__c__-'A'+10):\
-                        (__c__>='a'&&__c__<='f'?(__c__-'a'+10):0)))
-
-/**
- * @brief decode ascii hex to a binary buffer
- *
- * @param ahlen is the ascii hex string length
- * @param ahstr is the ascii hex string
- * @param blen is a pointer to the returned binary length
- * @param buf is a pointer to the internally allocated binary buffer
- * @return zero for error, 1 for success 
- */
-static int ah_decode(size_t ahlen, const char *ah, size_t *blen, unsigned char **buf)
-{
-    size_t lblen=0;
-    unsigned char *lbuf=NULL;
-    if (ahlen <=0 || ah==NULL || blen==NULL || buf==NULL) {
-        return 0;
-    }
-    if (ahlen%1) {
-        return 0;
-    }
-    lblen=ahlen/2;
-    lbuf=OPENSSL_malloc(lblen);
-    if (lbuf==NULL) {
-        return 0;
-    }
-    int i=0;
-    for (i=0;i!=lblen;i++) {
-        lbuf[i]=HPKE_A2B(ah[2*i])*16+HPKE_A2B(ah[2*i+1]);
-    }
-    *blen=lblen;
-    *buf=lbuf;
-    return 1;
-}
-
 /*
  * @brief strip out newlines from input
  * @param len is the string length on input and output
@@ -138,7 +100,7 @@ static void strip_newlines(size_t *len, unsigned char *buf)
  * @param strip whether to strip newlines from input 
  * @return 1 for good, not 1 for bad
  */
-static int map_input(char *inp, size_t *outlen, unsigned char **outbuf, int strip)
+static int map_input(const char *inp, size_t *outlen, unsigned char **outbuf, int strip)
 {
     if (!outlen || !outbuf) return(__LINE__);
     /* on-stack buffer/length to handle various cases */
@@ -178,7 +140,7 @@ static int map_input(char *inp, size_t *outlen, unsigned char **outbuf, int stri
     if (strip) {
         strip_newlines(&toutlen,tbuf);
         if (toutlen<=strspn(tbuf,AH_alphabet)) {
-            int adr=ah_decode(toutlen,tbuf,outlen,outbuf);
+            int adr=hpke_ah_decode(toutlen,tbuf,outlen,outbuf);
             if (!adr) return(__LINE__);
             if (adr==1) {
 	            if (verbose) fprintf(stderr,"ah_decode worked for %s - going with that\n",tbuf);
@@ -310,11 +272,20 @@ int main(int argc, char **argv)
             fprintf(stderr,"Can't load %s - exiting\n",tvfname);
             exit(1);
         }
-        trv=hpke_tv_pick(nelems,tvarr,tvspec,tv);
+        trv=hpke_tv_pick(nelems,tvarr,tvspec,&tv);
         if (trv!=1) {
             fprintf(stderr,"Failed selecting test vector for %s - exiting\n",tvspec);
             exit(2);
         }
+        hpke_tv_print(1,tv);
+        /*
+         * Assign inputs from tv 
+         */
+        if (doing_enc && map_input(tv->pkR,&publen,&pub,1)!=1) usage(argv[0],"bad -P value");
+        if (!doing_enc && map_input(tv->skI,&privlen,&priv,1)!=1) usage(argv[0],"bad -p value");
+        if (tv->encs && map_input(tv->encs[0].aad,&aadlen,&aad,0)!=1) usage(argv[0],"bad -a value");
+        if (tv->info && map_input(tv->info,&infolen,&info,0)!=1) usage(argv[0],"bad -I value");
+        if (tv->encs && map_input(tv->encs[0].plaintext,&plainlen,&plain,0)!=1) usage(argv[0],"bad -i value");
     }
 #endif
 
@@ -336,28 +307,53 @@ int main(int argc, char **argv)
             ,tv
 #endif
             );
-        if (rv!=1) {
-            fprintf(stderr,"Error (%d) from hpke_enc\n",rv);
-        }
         if (pub!=NULL) OPENSSL_free(pub);
         if (plain!=NULL) OPENSSL_free(plain);
         if (info!=NULL) OPENSSL_free(info);
         if (aad!=NULL) OPENSSL_free(aad);
-        FILE *fout=NULL;
-        if (out_in==NULL) {
-            fout=stdout;
+
+        if (rv!=1) {
+            fprintf(stderr,"Error (%d) from hpke_enc\n",rv);
         } else {
-            fout=fopen(out_in,"w");
+#ifdef TESTVECTORS
+            if (tv->encs) {
+                unsigned char *bcipher=NULL;
+                size_t bcipherlen=0;
+                hpke_ah_decode( strlen(tv->encs[0].ciphertext),
+                            tv->encs[0].ciphertext,
+                            &bcipherlen,
+                            &bcipher);
+                if (bcipherlen!=cipherlen) {
+                    printf("Ciphertext output lengths differ: %ld vs %ld\n",
+                            bcipherlen,cipherlen);
+                } else if (memcmp(cipher,cipher,bcipherlen)) {
+                    printf("Ciphertexxt outpuas differ, sorry\n");
+                } else {
+                    printf("Ciphertexxt outputs the same! Yay!\n");
+                }
+            }
+#else
+            FILE *fout=NULL;
+            if (out_in==NULL) {
+                fout=stdout;
+            } else {
+                fout=fopen(out_in,"w");
+            }
+            if (fout==NULL) {
+                fprintf(stderr,"Error writing %ld bytes of output to %s\n",cipherlen,out_in);
+            }
+            size_t rrv=fwrite(cipher,1,cipherlen,fout);
+            if (rrv!=cipherlen) {
+                fprintf(stderr,"Error writing %ld bytes of output to %s (only %ld written)\n",cipherlen,out_in,rrv);
+            }
+            fclose(fout);
+#endif
         }
-        if (fout==NULL) {
-            fprintf(stderr,"Error writing %ld bytes of output to %s\n",cipherlen,out_in);
-        }
-        size_t rrv=fwrite(cipher,1,cipherlen,fout);
-        if (rrv!=cipherlen) {
-            fprintf(stderr,"Error writing %ld bytes of output to %s (only %ld written)\n",cipherlen,out_in,rrv);
-        }
-        fclose(fout);
     } 
 
+#ifdef TESTVECTORS
+    hpke_tv_free(nelems,tvarr);
+#endif
+    return(0);
 }
 

@@ -70,6 +70,17 @@ typedef struct {
  */
 #define HPKE_SUITE_DEFAULT { HPKE_KEM_ID_25519, HPKE_KDF_ID_HKDF_SHA256, HPKE_AEAD_ID_AES_GCM_128 }
 
+/**
+ * @brief decode ascii hex to a binary buffer
+ *
+ * @param ahlen is the ascii hex string length
+ * @param ahstr is the ascii hex string
+ * @param blen is a pointer to the returned binary length
+ * @param buf is a pointer to the internally allocated binary buffer
+ * @return zero for error, 1 for success 
+ */
+int hpke_ah_decode(size_t ahlen, const char *ah, size_t *blen, unsigned char **buf);
+
 /*
  * @brief HPKE single-shot encryption function
  * @param mode is the HPKE mode

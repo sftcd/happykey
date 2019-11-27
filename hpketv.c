@@ -65,13 +65,14 @@ int hpke_tv_load(char *fname, int *nelems, hpke_tv_t **array)
      */
     struct json_tokener* tok=json_tokener_new();
     json_object *jobj = NULL;
-    char mystring[1025];
+    char *mystring;
+    mystring=malloc(640*1024);
     int stringlen = 0;
     enum json_tokener_error jerr;
     do {
-        memset(mystring,0,1025);
         if (!feof(fp)) {
-            fread(mystring,1024,1,fp);
+            memset(mystring,0,640*1024);
+            fread(mystring,640*1024,1,fp);
         } else {
             fprintf(stderr, "Error: reached EOF of %s before json decode done - exiting\n",fname);
             return(__LINE__);
@@ -79,6 +80,7 @@ int hpke_tv_load(char *fname, int *nelems, hpke_tv_t **array)
         stringlen = strlen(mystring);
         jobj = json_tokener_parse_ex(tok, mystring, stringlen);
     } while ((jerr = json_tokener_get_error(tok)) == json_tokener_continue);
+    free(mystring);
     if (jerr != json_tokener_success) {
         fprintf(stderr, "Error: %s\n", json_tokener_error_desc(jerr));
         // Handle errors, as appropriate for your application.
@@ -97,7 +99,7 @@ int hpke_tv_load(char *fname, int *nelems, hpke_tv_t **array)
 
 #define grabnum(_xx)  if (!strcmp(key,""#_xx"")) { \
                         thearr[i]._xx=json_object_get_int(val); \
-                      }
+                      } 
 #define grabstr(_xx)  if (!strcmp(key,""#_xx"")) { \
                         thearr[i]._xx=json_object_get_string(val); \
                       }
@@ -107,13 +109,14 @@ int hpke_tv_load(char *fname, int *nelems, hpke_tv_t **array)
 
     hpke_tv_t *thearr=NULL;
     int i,j;
-	for (i = 0; i < json_object_array_length(jobj); i++) {
+    for (i = 0; i < json_object_array_length(jobj); i++) {
         hpke_tv_encs_t *encs=NULL;
         thearr=realloc(thearr,(i+1)*sizeof(hpke_tv_t));
         memset(&thearr[i],0,sizeof(hpke_tv_t));
         thearr[i].jobj=(void*)jobj;
-		json_object *tmp = json_object_array_get_idx(jobj, i);
+        json_object *tmp = json_object_array_get_idx(jobj, i);
         json_object_object_foreach(tmp, key, val) {
+
             grabnum(mode)
             grabnum(kdfID)
             grabnum(aeadID)
@@ -133,11 +136,12 @@ int hpke_tv_load(char *fname, int *nelems, hpke_tv_t **array)
             grabstr(skR)
             grabstr(skE)
             grabstr(psk)
+
             if (!strcmp(key,"encryptions")) {
-	            for (j = 0; j < json_object_array_length(val); j++) {
+                for (j = 0; j < json_object_array_length(val); j++) {
                     encs=realloc(encs,(j+1)*sizeof(hpke_tv_encs_t));
                     memset(&encs[j],0,sizeof(hpke_tv_encs_t));
-		            json_object *tmp1 = json_object_array_get_idx(val, j);
+                    json_object *tmp1 = json_object_array_get_idx(val, j);
                     json_object_object_foreach(tmp1, key1, val1) {
                         grabestr(aad)
                         grabestr(plaintext)
@@ -160,16 +164,84 @@ int hpke_tv_load(char *fname, int *nelems, hpke_tv_t **array)
 
 /*
  * @brief free up test vector array
+ * @param nelems is the number of array elements
  * @param array is a guess what?
  * @return 1 for good, other for bad
  *
  * Caller should free "parent" array
  */
-int hpke_tv_free(hpke_tv_t *array)
+void hpke_tv_free(int nelems, hpke_tv_t *array)
 {
-    return(0);
+    if (!array) return;
+    json_object *jobj=(json_object*)array[0].jobj;
+    for (int i=0;i!=nelems;i++) {
+       if (array[i].encs) free(array[i].encs); 
+    }
+    free(array);
+    json_object_put(jobj);
+    return;
 }
 
+#define PRINTIT(_xx) printf("\t"#_xx": %s\n",a->_xx);
+
+/*
+ * @brief print test vectors
+ * @param nelems is the number of array elements
+ * @param array is the elements
+ * @return 1 for good, other for bad
+ */
+void hpke_tv_print(int nelems, hpke_tv_t *array)
+{
+    hpke_tv_t *a=array;
+    if (!array) return;
+    for (int i=0;i!=nelems;i++) {
+        printf("Test Vector Element %d\n",i);
+        printf("\tmode: %d, suite: %d,%d,%d\n",a->mode,a->kdfID,a->kemID,a->aeadID);
+        PRINTIT(pkR);
+        PRINTIT(context);
+        PRINTIT(skI)
+        PRINTIT(pkI)
+        PRINTIT(zz)
+        PRINTIT(secret)
+        PRINTIT(enc)
+        PRINTIT(info)
+        PRINTIT(pskID)
+        PRINTIT(nonce)
+        PRINTIT(key)
+        PRINTIT(pkR)
+        PRINTIT(pkE)
+        PRINTIT(skR)
+        PRINTIT(skE)
+        PRINTIT(psk)
+        if (a->encs) {
+            printf("\taad: %s\n",a->encs[0].aad);
+            printf("\tplaintext: %s\n",a->encs[0].plaintext);
+            printf("\tciphertext: %s\n",a->encs[0].ciphertext);
+        }
+
+        a++;
+    }
+    return;
+}
+
+
+/* 
+ * @brief check if test vector matches selector
+ * @param a is a test vector
+ * @param is a selector (currently unused)
+ * @return 1 for match zero otherwise
+ *
+ * For now, this just matches the first base,default-suite
+ * test vecctor.
+ */
+static int hpke_tv_match(hpke_tv_t *a, char *selector)
+{
+    if (a && a->mode==HPKE_MODE_BASE &&
+        a->kdfID==HPKE_KDF_ID_HKDF_SHA256 &&
+        a->kemID==HPKE_KEM_ID_25519 &&
+        a->aeadID==HPKE_AEAD_ID_AES_GCM_128) return(1);
+    return(0);
+}
 
 /*
  * @brief select a test vector to use based on mode and suite
@@ -179,14 +251,24 @@ int hpke_tv_free(hpke_tv_t *array)
  * @param tv is the chosen test vector (doesn't need to be freed)
  * @return 1 for good, other for bad
  *
- * This function will randomly pick a matching test vector
- * that matches the specified criteria.
+ * This function will pick the first matching test vector
+ * that matches the specified criteria. 
+ *
+ * TODO: Change to random later, when stuff works.
  *
  * The string to use is like "0,1,1,2" specifying the 
  * mode and suite in the (sorta:-) obvious manner.
  */
-int hpke_tv_pick(int nelems, hpke_tv_t *arr, char *selector, hpke_tv_t *tv)
+int hpke_tv_pick(int nelems, hpke_tv_t *arr, char *selector, hpke_tv_t **tv)
 {
+    hpke_tv_t *a=arr;
+    for (int i=0;i!=nelems;i++) {
+        if (hpke_tv_match(a,selector)) {
+            *tv=a;
+            return(1);
+        }
+        a++;
+    }
     return(0);
 }
 
