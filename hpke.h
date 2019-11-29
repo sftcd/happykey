@@ -128,6 +128,8 @@ int hpke_enc(
  * @param suite is the ciphersuite to use
  * @param privlen is the length of the private key
  * @param priv is the encoded private key
+ * @param enclen is the length of the peer's public value
+ * @param enc is the peer's public value
  * @param cipherlen is the length of the ciphertext 
  * @param cipher is the ciphertext
  * @param aadlen is the lenght of the additional data
@@ -141,6 +143,8 @@ int hpke_dec(
         hpke_suite_t suite,
         size_t privlen, 
         unsigned char *priv,
+        size_t enclen,
+        unsigned char *enc,
         size_t cipherlen,
         unsigned char *cipher,
         size_t aadlen,

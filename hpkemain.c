@@ -162,7 +162,7 @@ static int map_input(const char *inp, size_t *outlen, unsigned char **outbuf, in
         }
         if (verbose) fprintf(stderr,"decodes failed for %s - going with original\n",tbuf);
     } else {
-        if (verbose) fprintf(stderr,"going with original: %s\n",tbuf);
+        if (verbose>1) fprintf(stderr,"going with original: %s\n",tbuf);
     } 
     /* fallback to assuming input is good, as-is */
     *outbuf=OPENSSL_malloc(toutlen);
@@ -204,7 +204,7 @@ int main(int argc, char **argv)
         switch(opt) {
             case 'h':
             case '?': usage(argv[0],NULL); break;
-            case 'v': verbose=1; break;
+            case 'v': verbose++; break;
             case 'e': doing_enc=1; break;
             case 'd': doing_enc=0; break;
             case 'P': pub_in=optarg; break;
@@ -346,16 +346,38 @@ int main(int argc, char **argv)
             if (fout==NULL) {
                 fprintf(stderr,"Error writing %ld bytes of output to %s\n",cipherlen,out_in);
             }
-            size_t rrv=fwrite(cipher,1,cipherlen,fout);
-            if (rrv!=cipherlen) {
+
+#define START_SP "-----BEGIN SENDERPUB-----"
+#define END_SP "-----END SENDERPUB-----"
+#define START_CP "-----BEGIN CIPHERTEXT-----"
+#define END_CP "-----END CIPHERTEXT-----"
+
+            char eb[HPKE_MAXSIZE];
+            size_t eblen=HPKE_MAXSIZE;
+	        eblen=EVP_EncodeBlock(eb, senderpub, senderpublen);
+            fprintf(fout,"%s\n",START_SP);
+            size_t rrv=fwrite(eb,1,eblen,fout);
+            if (rrv!=eblen) {
                 fprintf(stderr,"Error writing %ld bytes of output to %s (only %ld written)\n",cipherlen,out_in,rrv);
             }
+            fprintf(fout,"\n%s\n",END_SP);
+            fprintf(fout,"%s\n",START_CP);
+	        eblen=EVP_EncodeBlock(eb, cipher, cipherlen);
+            rrv=fwrite(eb,1,eblen,fout);
+            if (rrv!=eblen) {
+                fprintf(stderr,"Error writing %ld bytes of output to %s (only %ld written)\n",cipherlen,out_in,rrv);
+            }
+            fprintf(fout,"\n%s\n",END_CP);
             fclose(fout);
 #ifdef TESTVECTORS
             }
 #endif
              
         }
+    } else {
+        /*
+         * decrypt so
+         */
     } 
 
 #ifdef TESTVECTORS

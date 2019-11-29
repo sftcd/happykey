@@ -12,10 +12,11 @@
 
 OSSL=../openssl
 INCL=../openssl/include
-# There are testvectors for this - see comments in hpketv.h
-# if you don't want to compile in test vector checks then
-# comment out the next line
-# testvectors=-D TESTVECTORS -I ../json-c
+
+# There are test vectors for this - see comments in hpketv.h.
+# If you want to compile in test vector checks then uncomment 
+# the next line:
+testvectors=-D TESTVECTORS -I ../json-c
 
 CFLAGS=-g ${testvectors}
 CC=gcc

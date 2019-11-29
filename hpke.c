@@ -40,6 +40,33 @@ static const unsigned char zero_buf[SHA256_DIGEST_LENGTH] = {
         0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
         0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00 };
 
+/*
+ * Bash command line hashing starting from ascii hex example:
+ *
+ *    $ echo -e "4f6465206f6e2061204772656369616e2055726e" | xxd -r -p | openssl sha256
+ *    (stdin)= 55c4040629c64c5efec2f7230407d612d16289d7c5d7afcf9340280abd2de1ab
+ *
+ * The above generates the Hash(info) used in Appendix A.2
+ *
+ * If you'd like to regenerate the zero_sha256 value above, feel free
+ *    $ echo -n "" | openssl sha256 
+ *    echo -n "" | openssl sha256
+ *    (stdin)= e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855
+ * Or if you'd like to re-caclulate the sha256 of nothing...
+ *  SHA256_CTX sha256;
+ *  SHA256_Init(&sha256);
+ *  char* buffer = NULL;
+ *  int bytesRead = 0;
+ *  SHA256_Update(&sha256, buffer, bytesRead);
+ *  SHA256_Final(zero_sha256, &sha256);
+ * ...but I've done it for you, so no need:-)
+ */
+static const unsigned char zero_sha256[SHA256_DIGEST_LENGTH] = {
+    0xe3, 0xb0, 0xc4, 0x42, 0x98, 0xfc, 0x1c, 0x14, 
+    0x9a, 0xfb, 0xf4, 0xc8, 0x99, 0x6f, 0xb9, 0x24, 
+    0x27, 0xae, 0x41, 0xe4, 0x64, 0x9b, 0x93, 0x4c, 
+    0xa4, 0x95, 0x99, 0x1b, 0x78, 0x52, 0xb8, 0x55};
+
 /* Map ascii to binary */
 #define HPKE_A2B(__c__) (__c__>='0'&&__c__<='9'?(__c__-'0'):\
                         (__c__>='A'&&__c__<='F'?(__c__-'A'+10):\
@@ -78,25 +105,28 @@ int hpke_ah_decode(size_t ahlen, const char *ah, size_t *blen, unsigned char **b
     return 1;
 }
 
-#ifdef TESTVECTORS
 /**
- * @brief stdout version of esni_pbuf - just for odd/occasional debugging
+ * @brief for odd/occasional debugging
+ *
+ * @param fout is a FILE * to use
+ * @param msg is prepended to print
+ * @param buf is the buffer to print
+ * @param blen is the length of the buffer
+ * @return 1 for success 
  */
-static void hpke_pbuf(char *msg,unsigned char *buf,size_t blen) 
+static int hpke_pbuf(FILE *fout, char *msg,unsigned char *buf,size_t blen) 
 {
-    if (buf==NULL) {
-        printf("%s is NULL\n",msg);
-        return;
+    if (!fout || !buf || !msg) {
+        return 0;
     }
-    printf("%s: ",msg);
+    fprintf(fout,"%s: ",msg);
     int i;
     for (i=0;i!=blen;i++) {
-        printf("%02x",buf[i]);
+        fprintf(fout,"%02x",buf[i]);
     }
-    printf("\n");
-    return;
+    fprintf(fout,"\n");
+    return 1;
 }
-#endif
 
 /*
  * @brief encode binary to ascii hex
@@ -458,6 +488,48 @@ static int hpke_test_expand_extract(void)
 }
 #endif
 
+/*!
+ * @brief Create context for input to extract/expand
+ */
+static int hpke_make_context(
+            int mode, hpke_suite_t suite,
+            const unsigned char *enc, const size_t enc_len,
+            const unsigned char *recippub, const size_t recippublen,
+            const unsigned char *zb, const size_t zblen,
+            const unsigned char *info, const size_t infolen,
+            unsigned char **context, size_t *context_len) 
+{
+    int erv=1;
+#define CHECK_HPKE_CTX if ((cp-*context)>*context_len) { erv=__LINE__; goto err; }
+    *context_len=figure_context_len(suite);
+    /* allocate space incl. some o/h just in case */
+    *context=OPENSSL_malloc(*context_len+1024);
+    if (*context==NULL) {
+        erv=__LINE__; goto err;
+    }
+    unsigned char *cp=*context;
+    *cp++=mode; CHECK_HPKE_CTX;
+    *cp++=(suite.kem_id&0xff00)>>8; *cp++=(suite.kem_id&0xff);  CHECK_HPKE_CTX;
+    *cp++=(suite.kdf_id&0xff00)>>8; *cp++=(suite.kdf_id&0xff);  CHECK_HPKE_CTX;
+    *cp++=(suite.aead_id&0xff00)>>8; *cp++=(suite.aead_id&0xff); 
+    memcpy(cp,enc,enc_len); cp+=enc_len; CHECK_HPKE_CTX
+    memcpy(cp,recippub,recippublen); cp+=recippublen; CHECK_HPKE_CTX;
+    memcpy(cp,zero_buf,SHA256_DIGEST_LENGTH); cp+=SHA256_DIGEST_LENGTH; CHECK_HPKE_CTX;
+    memcpy(cp,zero_sha256,SHA256_DIGEST_LENGTH); cp+=SHA256_DIGEST_LENGTH; CHECK_HPKE_CTX;
+    if (info==NULL) {
+        memcpy(cp,zero_sha256,SHA256_DIGEST_LENGTH); cp+=SHA256_DIGEST_LENGTH; CHECK_HPKE_CTX;
+    } else {
+        unsigned char infohash[SHA256_DIGEST_LENGTH];
+        SHA256_CTX sha256;
+        SHA256_Init(&sha256);
+        SHA256_Update(&sha256, info, infolen);
+        SHA256_Final(infohash, &sha256);
+        memcpy(cp,infohash,SHA256_DIGEST_LENGTH); cp+=SHA256_DIGEST_LENGTH; CHECK_HPKE_CTX;
+    }
+
+err:
+    return erv;
+}
 /*
  * @brief HPKE single-shot encryption function
  * @param mode is the HPKE mode
@@ -477,20 +549,13 @@ static int hpke_test_expand_extract(void)
  * @return 1 for good (OpenSSL style), not-1 for error
  */
 int hpke_enc(
-        unsigned int mode,
-        hpke_suite_t suite,
-        size_t recippublen, 
-        unsigned char *recippub,
-        size_t clearlen,
-        unsigned char *clear,
-        size_t aadlen,
-        unsigned char *aad,
-        size_t infolen,
-        unsigned char *info,
-        size_t *senderpublen,
-        unsigned char *senderpub,
-        size_t *cipherlen,
-        unsigned char *cipher
+        unsigned int mode, hpke_suite_t suite,
+        size_t recippublen, unsigned char *recippub,
+        size_t clearlen, unsigned char *clear,
+        size_t aadlen, unsigned char *aad,
+        size_t infolen, unsigned char *info,
+        size_t *senderpublen, unsigned char *senderpub,
+        size_t *cipherlen, unsigned char *cipher
 #ifdef TESTVECTORS
         , hpke_tv_t *tv
 #endif
@@ -512,7 +577,6 @@ int hpke_enc(
      *
      * We'll follow the names used in the test vectors from the draft.
      * For now, we're replicating the setup from Appendix A.2
-     * TODO: 1) generalise and 2) refactor to reduce LOC
      */
 
     /* declare vars - done early so goto err works ok */
@@ -531,16 +595,14 @@ int hpke_enc(
     unsigned char *key=NULL;
     size_t  nonce_len=0;
     unsigned char *nonce=NULL;
-    size_t clbuf_len=0;
-    unsigned char *clbuf=NULL;
 
-    /* step 0 */
+    /* step 0. Initialise peer's key from string */
     pkR = EVP_PKEY_new_raw_public_key(EVP_PKEY_X25519,NULL,recippub,recippublen);
     if (pkR == NULL) {
         erv=__LINE__; goto err;
     }
 
-    /* step 1 */
+    /* step 1. generate sender's key pair */
     pctx = EVP_PKEY_CTX_new(pkR, NULL);
     if (pctx == NULL) {
         erv=__LINE__; goto err;
@@ -574,8 +636,7 @@ int hpke_enc(
         erv=__LINE__; goto err;
     }
 
-
-    /* step 2 */
+    /* step 2 run DH KEM to get zz */
     pctx = EVP_PKEY_CTX_new(pkE,NULL);
     if (pctx == NULL) {
         erv=__LINE__; goto err;
@@ -598,70 +659,14 @@ int hpke_enc(
     }
     EVP_PKEY_CTX_free(pctx); pctx=NULL;
 
-    /* step 3 */
-    context_len=figure_context_len(suite);
-    /* allocate space incl. some o/h just in case */
-    context=OPENSSL_malloc(context_len+1024);
-    if (context==NULL) {
-        erv=__LINE__; goto err;
-    }
+    /* step 3. create context buffer */
+    erv=hpke_make_context(mode,suite,enc,enc_len,
+            recippub,recippublen,
+            zero_buf,SHA256_DIGEST_LENGTH,
+            info,infolen,
+            &context,&context_len);
 
-#define CHECK_HPKE_CTX if ((cp-context)>context_len) { erv=__LINE__; goto err; }
-
-    /* step 3 */
-    unsigned char *cp=context;
-    *cp++=mode; CHECK_HPKE_CTX
-    //memcpy(cp,&suite,sizeof(suite)); cp+=sizeof(suite); CHECK_HPKE_CTX
-    *cp++=(suite.kem_id&0xff00)>>8; *cp++=(suite.kem_id&0xff); 
-    *cp++=(suite.kdf_id&0xff00)>>8; *cp++=(suite.kdf_id&0xff); 
-    *cp++=(suite.aead_id&0xff00)>>8; *cp++=(suite.aead_id&0xff); 
-    memcpy(cp,enc,enc_len); cp+=enc_len; CHECK_HPKE_CTX
-    memcpy(cp,recippub,recippublen); cp+=recippublen; CHECK_HPKE_CTX;
-
-    memcpy(cp,zero_buf,SHA256_DIGEST_LENGTH); cp+=SHA256_DIGEST_LENGTH; CHECK_HPKE_CTX;
-    /* 
-     * if you'd like to re-caclulate the sha256 of nothing...
-     *  SHA256_CTX sha256;
-     *  SHA256_Init(&sha256);
-     *  char* buffer = NULL;
-     *  int bytesRead = 0;
-     *  SHA256_Update(&sha256, buffer, bytesRead);
-     *  SHA256_Final(zero_sha256, &sha256);
-     * ...but I've done it for you, so no need:-)
-     */
-    const unsigned char zero_sha256[SHA256_DIGEST_LENGTH] = {
-        0xe3, 0xb0, 0xc4, 0x42, 0x98, 0xfc, 0x1c, 0x14, 
-        0x9a, 0xfb, 0xf4, 0xc8, 0x99, 0x6f, 0xb9, 0x24, 
-        0x27, 0xae, 0x41, 0xe4, 0x64, 0x9b, 0x93, 0x4c, 
-        0xa4, 0x95, 0x99, 0x1b, 0x78, 0x52, 0xb8, 0x55};
-    memcpy(cp,zero_sha256,SHA256_DIGEST_LENGTH); cp+=SHA256_DIGEST_LENGTH; CHECK_HPKE_CTX;
-
-    /*
-     * Bash command line hashing starting from ascii hex example:
-     *
-     *    $ echo -e "4f6465206f6e2061204772656369616e2055726e" | xxd -r -p | openssl sha256
-     *    (stdin)= 55c4040629c64c5efec2f7230407d612d16289d7c5d7afcf9340280abd2de1ab
-     *
-     * The above generates the Hash(info) used in Appendix A.2
-     *
-     * If you'd like to regenerate the zero_sha256 value above, feel free
-     *    $ echo -n "" | openssl sha256 
-     *    echo -n "" | openssl sha256
-     *    (stadin)= e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855
-     *
-     */
-    if (info==NULL) {
-        memcpy(cp,zero_sha256,SHA256_DIGEST_LENGTH); cp+=SHA256_DIGEST_LENGTH; CHECK_HPKE_CTX;
-    } else {
-        unsigned char infohash[SHA256_DIGEST_LENGTH];
-        SHA256_CTX sha256;
-        SHA256_Init(&sha256);
-        SHA256_Update(&sha256, info, infolen);
-        SHA256_Final(infohash, &sha256);
-        memcpy(cp,infohash,SHA256_DIGEST_LENGTH); cp+=SHA256_DIGEST_LENGTH; CHECK_HPKE_CTX;
-    }
-
-    /* step 4 */
+    /* step 4. extracts and expands as needed */
 #ifdef TESTVECTORS
     hpke_test_expand_extract();
 #endif
@@ -689,7 +694,7 @@ int hpke_enc(
         erv=__LINE__; goto err;
     }
 
-    /* step 5 */
+    /* step 5. call the AEAD */
     size_t lcipherlen=HPKE_MAXSIZE;
     unsigned char lcipher[HPKE_MAXSIZE];
     int arv=hpke_aead_enc(
@@ -704,8 +709,16 @@ int hpke_enc(
     if (lcipherlen > *cipherlen) {
         erv=__LINE__; goto err;
     }
+    /* 
+     * finish up
+     */
     memcpy(cipher,lcipher,lcipherlen);
     *cipherlen=lcipherlen;
+    if (enc_len>*senderpublen) {
+        erv=__LINE__; goto err;
+    }
+    memcpy(senderpub,enc,enc_len);
+    *senderpublen=enc_len;
 
 #ifdef TESTVECTORS
     /*
@@ -716,24 +729,21 @@ int hpke_enc(
         size_t pblen=1024;
         printf("Runtime:\n");
         printf("\tmode: %d, suite; %d,%d,%d\n",mode,suite.kdf_id,suite.kem_id,suite.aead_id);
-        pblen = EVP_PKEY_get1_tls_encodedpoint(pkR,&pbuf); hpke_pbuf("\tpkR",pbuf,pblen); OPENSSL_free(pbuf);
-        hpke_pbuf("\tcontext",context,context_len);
-        hpke_pbuf("\tzz",zz,zz_len);
-        hpke_pbuf("\tsecret",secret,secret_len);
-        hpke_pbuf("\tenc",enc,enc_len);
-        hpke_pbuf("\tinfo",info,infolen);
-        hpke_pbuf("\taad",aad,aadlen);
-        hpke_pbuf("\tnonce",nonce,nonce_len);
-        hpke_pbuf("\tkey",key,key_len);
-        pblen = EVP_PKEY_get1_tls_encodedpoint(pkE,&pbuf); hpke_pbuf("\tpkE",pbuf,pblen); OPENSSL_free(pbuf);
-        hpke_pbuf("\tplaintext",clear,clearlen);
-        hpke_pbuf("\tciphertext",cipher,*cipherlen);
+        pblen = EVP_PKEY_get1_tls_encodedpoint(pkR,&pbuf); hpke_pbuf(stdout,"\tpkR",pbuf,pblen); OPENSSL_free(pbuf);
+        hpke_pbuf(stdout,"\tcontext",context,context_len);
+        hpke_pbuf(stdout,"\tzz",zz,zz_len);
+        hpke_pbuf(stdout,"\tsecret",secret,secret_len);
+        hpke_pbuf(stdout,"\tenc",enc,enc_len);
+        hpke_pbuf(stdout,"\tinfo",info,infolen);
+        hpke_pbuf(stdout,"\taad",aad,aadlen);
+        hpke_pbuf(stdout,"\tnonce",nonce,nonce_len);
+        hpke_pbuf(stdout,"\tkey",key,key_len);
+        pblen = EVP_PKEY_get1_tls_encodedpoint(pkE,&pbuf); hpke_pbuf(stdout,"\tpkE",pbuf,pblen); OPENSSL_free(pbuf);
+        hpke_pbuf(stdout,"\tplaintext",clear,clearlen);
+        hpke_pbuf(stdout,"\tciphertext",cipher,*cipherlen);
     }
-
 #endif
-    /* 
-     * finish up
-     */
+
 err:
     /*
      * Free things up
@@ -747,7 +757,6 @@ err:
     if (secret!=NULL) OPENSSL_free(secret);
     if (key!=NULL) OPENSSL_free(key);
     if (nonce!=NULL) OPENSSL_free(nonce);
-    if (clbuf!=NULL) OPENSSL_free(clbuf);
     return erv;
 }
 
@@ -757,6 +766,8 @@ err:
  * @param suite is the ciphersuite to use
  * @param privlen is the length of the private key
  * @param priv is the encoded private key
+ * @param enclen is the length of the peer's public value
+ * @param enc is the peer's public value
  * @param cipherlen is the length of the ciphertext 
  * @param cipher is the ciphertext
  * @param aadlen is the lenght of the additional data
@@ -770,6 +781,8 @@ int hpke_dec(
         hpke_suite_t suite,
         size_t privlen, 
         unsigned char *priv,
+        size_t enclen,
+        unsigned char *enc,
         size_t cipherlen,
         unsigned char *cipher,
         size_t aadlen,
@@ -781,5 +794,51 @@ int hpke_dec(
     int internal_suite=hpke_suite_check(suite); 
     if (!internal_suite) return(__LINE__);
     if (!priv || !clearlen || !clear || !cipher) return(__LINE__);
-    return 0;
+    int erv=1;
+
+    /*
+     * The plan:
+     * 0. Initialise peer's key from string
+     * 1. load decryptors private key
+     * 2. run DH KEM to get zz
+     * 3. create context buffer
+     * 4. extracts and expands as needed
+     * 5. call the AEAD 
+     *
+     */
+
+    /* declare vars - done early so goto err works ok */
+    EVP_PKEY_CTX *pctx=NULL;
+    EVP_PKEY *pkR=NULL;
+    EVP_PKEY *pkE=NULL;
+    size_t  zz_len=0;
+    unsigned char *zz=NULL;
+    size_t  context_len=0;
+    unsigned char *context=NULL;
+    size_t  secret_len=0;
+    unsigned char *secret=NULL;
+    size_t  key_len=0;
+    unsigned char *key=NULL;
+    size_t  nonce_len=0;
+    unsigned char *nonce=NULL;
+
+    /* step 0. Initialise peer's key from string */
+    /* step 1. load decryptors private key */
+    /* step 2. run DH KEM to get zz */
+    /* step 3. create context buffer */
+    /* step 4. extracts and expands as needed */
+    /* step 5. call the AEAD */
+
+err:
+    if (pkR!=NULL) EVP_PKEY_free(pkR);
+    if (pkE!=NULL) EVP_PKEY_free(pkE);
+    if (pctx!=NULL) EVP_PKEY_CTX_free(pctx);
+    if (zz!=NULL) OPENSSL_free(zz);
+    if (enc!=NULL) OPENSSL_free(enc);
+    if (context!=NULL) OPENSSL_free(context);
+    if (secret!=NULL) OPENSSL_free(secret);
+    if (key!=NULL) OPENSSL_free(key);
+    if (nonce!=NULL) OPENSSL_free(nonce);
+    return erv;
+    return erv;
 }

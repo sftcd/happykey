@@ -39,7 +39,7 @@ and then:
             gcc -g  -I ../openssl/include -c hpke.c
             gcc -g  -o hpkemain hpkemain.o hpke.o -L ../openssl -lssl -lcrypto
 
-I also have a [bash script](env) that sets the environment those shared objects:
+I also have a [bash script](env) that sets the environment for those shared objects:
 
             $ . ./env
 
@@ -66,11 +66,20 @@ If you build this, start with ``hpkemain -h`` to see what's what.
             This version is built with TESTVECTORS
             You should either choose "normal" inputs or use "-T" not both.
 
-There's a file with a sample [public key](pub) to which you can
-encrypt things. (I don't have the private key, honest:-) To do
-that:
+There's a file with a sample [public key](pub) to which you can encrypt things.
+(I don't have the private key, honest:-) Using that to enrypt the tiny shell
+script [env](./env), looks like this:
 
-            $ ./hpkemain -P pub -i infile -o outfile
+            $ ./hpkemain -P pub -i env
+            -----BEGIN SENDERPUB-----
+            zr3hth4TdmxbZk8hyM1ScIfBbHDq3EqOJ+lJ+PowgA8=
+            -----END SENDERPUB-----
+            -----BEGIN CIPHERTEXT-----
+            lwmIl7EpoPbZy3UQBM5B8gBNICHqfuNGwvkraWxFMPfOcPlH19ifEz2Qch6WLFeGGY4C5MtkbJv6A2/kJqTGOSQ7nwWZKXSgTG2wGXpXyZHN2Q==
+            -----END CIPHERTEXT-----
+
+(Not sure that MIME type like stuff is wise, but we'll see - it'll be good enough
+to let me easily test round-tripping at least.)
 
 ## Test Vectors
  
