@@ -2,7 +2,7 @@
 
 I'm implementing
 [draft-irtf-cfrg-hpke](https://tools.ietf.org/html/draft-irtf-cfrg-hpke) using
-OpenSSL, as a precursor to using if as part of the next [Encrypted SNI/ECHO
+OpenSSL, as a precursor to using that as part of the next [Encrypted SNI/ECHO
 draft](https://tools.ietf.org/html/draft-ietf-tls-esni) with my [ESNI-enabled
 OpenSSL](https://github.com/sftcd/openssl) fork.
 
@@ -36,16 +36,21 @@ If you build this, start with ``hpkemain -h`` to see what's what.
             This version is built with TESTVECTORS
             You should either choose "normal" inputs or use "-T" not both.
 
+There's a file with a sample [public key](pub) to which you can
+encrypt things. (I don't have the private key, honest:-) To do
+that:
+
+            $ ./hpkemain -P pub -i infile -o outfile
+
 
 ## Test Vectors
  
 To enable test vector checking, compile with ``TESTVECTORS`` #define'd.
 There's a line to uncomment in the [Makefile](Makefile) that does that.
-
-To do that test vector comparison I use the published 
+To do the test vector comparison I use the published 
 [test-vectors](test-vectors.json) from 
-[the CFRG repo](https://github.com/cfrg/draft-irtf-cfrg-hpke).  
-I use the [json-c](https://github.com/json-c/json-c) library to decode
+[the CFRG repo](https://github.com/cfrg/draft-irtf-cfrg-hpke).  I use the 
+[json-c](https://github.com/json-c/json-c) library to decode
 the JSON file into an array of type``hpke_tv_t`` that I defined.
 The [Makefile](Makefile) here assumes that you've build json-c in a sibling
 directory to this one.

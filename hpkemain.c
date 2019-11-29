@@ -350,7 +350,6 @@ int main(int argc, char **argv)
             if (rrv!=cipherlen) {
                 fprintf(stderr,"Error writing %ld bytes of output to %s (only %ld written)\n",cipherlen,out_in,rrv);
             }
-            printf("Plaintext: %ld, ciphertext %ld \n",plainlen,cipherlen);
             fclose(fout);
 #ifdef TESTVECTORS
             }
