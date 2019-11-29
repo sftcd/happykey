@@ -81,8 +81,8 @@ To do the test vector comparison I use the published
 [the CFRG repo](https://github.com/cfrg/draft-irtf-cfrg-hpke).  I use the 
 [json-c](https://github.com/json-c/json-c) library to decode
 the JSON file into an array of type``hpke_tv_t`` that I defined.
-The [Makefile](Makefile) here assumes that you've build json-c in a sibling
-directory to this one.
+The [Makefile](Makefile) here assumes that you've built json-c in a sibling
+directory to this one as shown above.
 
 As of now, when the ``-T`` commnand line argument is used, the JSON file of
 test vectors is loaded into an array of ``hpke_tv_t`` and I just pick the first
