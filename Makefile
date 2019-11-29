@@ -10,8 +10,8 @@
 # I plan to use this for my ESNI-enabled OpenSSL build (https://github.com/sftcd/openssl)
 # when the time is right.
 
-OSSL=${HOME}/code/openssl
-INCL=${HOME}/code/openssl/include
+OSSL=../openssl
+INCL=../openssl/include
 # There are testvectors for this - see comments in hpketv.h
 # if you don't want to compile in test vector checks then
 # comment out the next line

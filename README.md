@@ -14,6 +14,36 @@ matches a CFRG test vector, but lots is hard-coded to one ciphersuite
 
 ...and ``hpke_dec()`` is still just a stub:-)
 
+## Build 
+
+You'll probably want to start by cloning this, I'll assume you do that
+from within ``$HOME/code``, e.g.:
+
+            $ cd $HOME/code
+            $ git clone https://github.com/sftcd/happykey
+            $ cd happykey
+
+The build needs OpenSSL.  (Not sure if I'm using anything that needs building
+from the OpenSSL tip, but I'll check that.) If you want test vectors, (see
+below) you'll also need json-c,  so my setup looks like:
+
+- $HOME/code/happykey with this repo
+- $HOME/code/openssl with a clone of https://github.com/sftcd/openssl
+- $HOME/code/json-c with a clone of https://github.com/json-c/json-c
+
+If your setup differs, you'll need to hand-edit the [Makefile](Makefile)
+and then:
+
+            $ make
+            gcc -g  -I ../openssl/include -c hpkemain.c
+            gcc -g  -I ../openssl/include -c hpke.c
+            gcc -g  -o hpkemain hpkemain.o hpke.o -L ../openssl -lssl -lcrypto
+
+I also have a [bash script](env) that sets the environment those shared objects:
+
+            $ . ./env
+
+
 If you build this, start with ``hpkemain -h`` to see what's what.
 
             $ ./hpkemain -h
@@ -42,7 +72,6 @@ that:
 
             $ ./hpkemain -P pub -i infile -o outfile
 
-
 ## Test Vectors
  
 To enable test vector checking, compile with ``TESTVECTORS`` #define'd.
@@ -63,18 +92,4 @@ vector... and that now works.  (That means ``-T thing`` is the same for all
 values of "thing" for now - will add code for selecting stuff later when I get
 other ciphersuites done.)
 
-## Build Directories
-
-My setup looks like:
-
-- $HOME/code/happykey with this repo
-- $HOME/code/openssl with a clone of https://github.com/sftcd/openssl
-- $HOME/code/json-c with a clone of https://github.com/json-c/json-c
-
-I also have a [bash setup](env) for those shared objects:
-
-            $ . ./env
-
-Not sure if I'm using anything that needs building from the OpenSSL
-tip, but can check that.
 
