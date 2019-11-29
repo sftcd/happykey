@@ -121,7 +121,7 @@ static int map_input(const char *inp, size_t *outlen, unsigned char **outbuf, in
     } else {
         toutlen=strlen(inp);
         if (toutlen>HPKE_MAXSIZE) return(__LINE__);
-        FILE *fp=fopen(inp,"rb"); /* check if inp is file name */
+        FILE *fp=fopen(inp,"r"); /* check if inp is file name */
         if (fp) {
             /* that worked - so read file up to max into buffer */
             toutlen=fread(tbuf,1,HPKE_MAXSIZE,fp);
@@ -213,7 +213,9 @@ int main(int argc, char **argv)
             case 'I': info_in=optarg; break;
             case 'i': inp_in=optarg; break;
             case 'o': out_in=optarg; break;
+#ifdef TESTVECTORS
             case 'T': tvspec=optarg; break;
+#endif
             default:
                 usage(argv[0],"unknown arg");
         }
@@ -318,7 +320,7 @@ int main(int argc, char **argv)
             fprintf(stderr,"Error (%d) from hpke_enc\n",rv);
         } else {
 #ifdef TESTVECTORS
-            if (tv->encs) {
+            if (tv && tv->encs) {
                 unsigned char *bcipher=NULL;
                 size_t bcipherlen=0;
                 hpke_ah_decode( strlen(tv->encs[0].ciphertext),
@@ -328,13 +330,13 @@ int main(int argc, char **argv)
                 if (bcipherlen!=cipherlen) {
                     printf("Ciphertext output lengths differ: %ld vs %ld\n",
                             bcipherlen,cipherlen);
-                } else if (memcmp(cipher,tv->encs[0].ciphertext,bcipherlen)) {
+                } else if (memcmp(cipher,bcipher,cipherlen)) {
                     printf("Ciphertext outputs differ, sorry\n");
                 } else {
                     printf("Ciphertext outputs the same! Yay!\n");
                 }
-            }
-#else
+            } else {
+#endif
             FILE *fout=NULL;
             if (out_in==NULL) {
                 fout=stdout;
@@ -348,8 +350,12 @@ int main(int argc, char **argv)
             if (rrv!=cipherlen) {
                 fprintf(stderr,"Error writing %ld bytes of output to %s (only %ld written)\n",cipherlen,out_in,rrv);
             }
+            printf("Plaintext: %ld, ciphertext %ld \n",plainlen,cipherlen);
             fclose(fout);
+#ifdef TESTVECTORS
+            }
 #endif
+             
         }
     } 
 

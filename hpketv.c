@@ -9,7 +9,7 @@
 
 /**
  * @file 
- * Stuff related to test vectors for HPKE.
+ * Implementation related to test vectors for HPKE.
  *
  * This is compiled in if TESTVECTORS is #define'd, otherwise not.
  *

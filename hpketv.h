@@ -9,7 +9,7 @@
 
 /**
  * @file 
- * Stuff related to test vectors for HPKE.
+ * Header file related to test vectors for HPKE.
  *
  * This is compiled in if TESTVECTORS is #define'd, otherwise not.
  *
@@ -31,12 +31,18 @@
 
 #ifdef TESTVECTORS
 
+/*
+ * @brief Encryption(s) Test Vector structure using field names from published JSON file
+ */
 typedef struct hpke_tv_encs_s {
     const char *aad;
     const char *plaintext;
     const char *ciphertext;
 } hpke_tv_encs_t;
 
+/*
+ * @brief HKPE Test Vector structure using field names from published JSON file
+ */
 typedef struct hpke_tv_s {
     uint8_t mode;
     uint16_t kdfID;

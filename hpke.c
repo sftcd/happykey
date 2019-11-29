@@ -445,7 +445,7 @@ static int hpke_test_expand_extract(void)
     if (memcmp(calc_prk,PRK,PRK_len)) {
         printf("rfc5869 check: hpke_extract gave wrong answer!\n");
     }
-    rv=hpke_expand(IKM,IKM_len,"",info,info_len,&calc_okm,OKM_len);
+    rv=hpke_expand(PRK,PRK_len,"",info,info_len,&calc_okm,OKM_len);
     if (rv!=1) {
         printf("rfc5869 check: hpke_expand failed: %d\n",rv);
     }
@@ -549,23 +549,24 @@ int hpke_enc(
         erv=__LINE__; goto err;
     }
 #ifdef TESTVECTORS
-    /*
-     * Read secret from tv, then use that instead of 
-     * newly generated key pair
-     */
-    unsigned char *bin_skE=NULL;
-    size_t bin_skE_len=0;
-    hpke_ah_decode(strlen(tv->skE),tv->skE,&bin_skE_len,&bin_skE);
-    pkE = EVP_PKEY_new_raw_private_key(EVP_PKEY_X25519,NULL,bin_skE,bin_skE_len);
-    OPENSSL_free(bin_skE);
-    if (!pkE) {
-        erv=__LINE__; goto err;
-    }
-#else
+    if (tv) {
+        /*
+        * Read secret from tv, then use that instead of 
+        * newly generated key pair
+        */
+        unsigned char *bin_skE=NULL;
+        size_t bin_skE_len=0;
+        hpke_ah_decode(strlen(tv->skE),tv->skE,&bin_skE_len,&bin_skE);
+        pkE = EVP_PKEY_new_raw_private_key(EVP_PKEY_X25519,NULL,bin_skE,bin_skE_len);
+        OPENSSL_free(bin_skE);
+        if (!pkE) {
+            erv=__LINE__; goto err;
+        }
+    } else 
+#endif
     if (EVP_PKEY_keygen(pctx, &pkE) <= 0) {
         erv=__LINE__; goto err;
     }
-#endif
     EVP_PKEY_CTX_free(pctx); pctx=NULL;
 
     enc_len = EVP_PKEY_get1_tls_encodedpoint(pkE,&enc);
@@ -610,7 +611,10 @@ int hpke_enc(
     /* step 3 */
     unsigned char *cp=context;
     *cp++=mode; CHECK_HPKE_CTX
-    memcpy(cp,&suite,sizeof(suite)); cp+=sizeof(suite); CHECK_HPKE_CTX
+    //memcpy(cp,&suite,sizeof(suite)); cp+=sizeof(suite); CHECK_HPKE_CTX
+    *cp++=(suite.kem_id&0xff00)>>8; *cp++=(suite.kem_id&0xff); 
+    *cp++=(suite.kdf_id&0xff00)>>8; *cp++=(suite.kdf_id&0xff); 
+    *cp++=(suite.aead_id&0xff00)>>8; *cp++=(suite.aead_id&0xff); 
     memcpy(cp,enc,enc_len); cp+=enc_len; CHECK_HPKE_CTX
     memcpy(cp,recippub,recippublen); cp+=recippublen; CHECK_HPKE_CTX;
 
@@ -707,23 +711,25 @@ int hpke_enc(
     /*
      * print stuff
      */
-    unsigned char *pbuf;
-    size_t pblen=1024;
-    printf("Runtime:\n");
-    printf("\tmode: %d, suite; %d,%d,%d\n",mode,suite.kdf_id,suite.kem_id,suite.aead_id);
-    pblen = EVP_PKEY_get1_tls_encodedpoint(pkR,&pbuf); hpke_pbuf("\tpkR",pbuf,pblen); OPENSSL_free(pbuf);
-    hpke_pbuf("\tcontext",context,context_len);
-    hpke_pbuf("\tzz",zz,zz_len);
-    hpke_pbuf("\tsecret",secret,secret_len);
-    hpke_pbuf("\tenc",enc,enc_len);
-    hpke_pbuf("\tinfo",info,infolen);
-    hpke_pbuf("\taad",aad,aadlen);
-    hpke_pbuf("\tnonce",nonce,nonce_len);
-    hpke_pbuf("\tkey",key,key_len);
-    pblen = EVP_PKEY_get1_tls_encodedpoint(pkE,&pbuf); hpke_pbuf("\tpkE",pbuf,pblen); OPENSSL_free(pbuf);
-    hpke_pbuf("\tplaintext",clear,clearlen);
-    hpke_pbuf("\tciphertext",cipher,*cipherlen);
-    //pblen = EVP_PKEY_get1_tls_encodedpoint(skE,&pbuf); hpke_pbuf("\tskE",pbuf,pblen); OPENSSL_free(pbuf);
+    if (tv) {
+        unsigned char *pbuf;
+        size_t pblen=1024;
+        printf("Runtime:\n");
+        printf("\tmode: %d, suite; %d,%d,%d\n",mode,suite.kdf_id,suite.kem_id,suite.aead_id);
+        pblen = EVP_PKEY_get1_tls_encodedpoint(pkR,&pbuf); hpke_pbuf("\tpkR",pbuf,pblen); OPENSSL_free(pbuf);
+        hpke_pbuf("\tcontext",context,context_len);
+        hpke_pbuf("\tzz",zz,zz_len);
+        hpke_pbuf("\tsecret",secret,secret_len);
+        hpke_pbuf("\tenc",enc,enc_len);
+        hpke_pbuf("\tinfo",info,infolen);
+        hpke_pbuf("\taad",aad,aadlen);
+        hpke_pbuf("\tnonce",nonce,nonce_len);
+        hpke_pbuf("\tkey",key,key_len);
+        pblen = EVP_PKEY_get1_tls_encodedpoint(pkE,&pbuf); hpke_pbuf("\tpkE",pbuf,pblen); OPENSSL_free(pbuf);
+        hpke_pbuf("\tplaintext",clear,clearlen);
+        hpke_pbuf("\tciphertext",cipher,*cipherlen);
+    }
+
 #endif
     /* 
      * finish up
