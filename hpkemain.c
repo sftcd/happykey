@@ -65,7 +65,6 @@ static void usage(char *prog,char *errmsg)
     exit(1);
 }
 
-
 /*
  * @brief strip out newlines from input
  * @param len is the string length on input and output
@@ -111,7 +110,6 @@ static int map_input(const char *inp, size_t *outlen, unsigned char **outbuf, in
     const char *AH_alphabet="0123456789ABCDEFabcdef";
     /* and base64 isn't much harder */
     const char *B64_alphabet="ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/=";
-
 
     /* if no input, try stdin */
     if (!inp) {
@@ -248,7 +246,6 @@ int main(int argc, char **argv)
     }
 #endif
 
-
     /*
      * Init OpenSSL stuff - copied from lighttpd
      */
@@ -377,6 +374,10 @@ int main(int argc, char **argv)
     } else {
         /*
          * decrypt so
+         */
+        if (!inp_in) usage(argv[0],"decryption requires a -i value");
+        /*
+         * decode input 
          */
     } 
 

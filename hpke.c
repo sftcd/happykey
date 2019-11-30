@@ -471,15 +471,36 @@ static int hpke_test_expand_extract(void)
     rv=hpke_extract(IKM,IKM_len,salt,salt_len,&calc_prk,PRK_len);
     if (rv!=1) {
         printf("rfc5869 check: hpke_extract failed: %d\n",rv);
+        printf("rfc5869 check: hpke_extract failed: %d\n",rv);
+        printf("rfc5869 check: hpke_extract failed: %d\n",rv);
+        printf("rfc5869 check: hpke_extract failed: %d\n",rv);
+        printf("rfc5869 check: hpke_extract failed: %d\n",rv);
+        printf("rfc5869 check: hpke_extract failed: %d\n",rv);
     }
     if (memcmp(calc_prk,PRK,PRK_len)) {
+        printf("rfc5869 check: hpke_extract gave wrong answer!\n");
+        printf("rfc5869 check: hpke_extract gave wrong answer!\n");
+        printf("rfc5869 check: hpke_extract gave wrong answer!\n");
+        printf("rfc5869 check: hpke_extract gave wrong answer!\n");
+        printf("rfc5869 check: hpke_extract gave wrong answer!\n");
         printf("rfc5869 check: hpke_extract gave wrong answer!\n");
     }
     rv=hpke_expand(PRK,PRK_len,"",info,info_len,&calc_okm,OKM_len);
     if (rv!=1) {
         printf("rfc5869 check: hpke_expand failed: %d\n",rv);
+        printf("rfc5869 check: hpke_expand failed: %d\n",rv);
+        printf("rfc5869 check: hpke_expand failed: %d\n",rv);
+        printf("rfc5869 check: hpke_expand failed: %d\n",rv);
+        printf("rfc5869 check: hpke_expand failed: %d\n",rv);
+        printf("rfc5869 check: hpke_expand failed: %d\n",rv);
     }
     if (memcmp(calc_okm,OKM,OKM_len)) {
+        printf("rfc5869 check: hpke_expand gave wrong answer!\n");
+        printf("rfc5869 check: hpke_expand gave wrong answer!\n");
+        printf("rfc5869 check: hpke_expand gave wrong answer!\n");
+        printf("rfc5869 check: hpke_expand gave wrong answer!\n");
+        printf("rfc5869 check: hpke_expand gave wrong answer!\n");
+        printf("rfc5869 check: hpke_expand gave wrong answer!\n");
         printf("rfc5869 check: hpke_expand gave wrong answer!\n");
     }
 
