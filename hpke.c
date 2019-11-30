@@ -544,6 +544,7 @@ static int hpke_make_context(
 err:
     return erv;
 }
+
 /*
  * @brief HPKE single-shot encryption function
  * @param mode is the HPKE mode
@@ -848,7 +849,6 @@ err:
     if (pkE!=NULL) EVP_PKEY_free(pkE);
     if (pctx!=NULL) EVP_PKEY_CTX_free(pctx);
     if (zz!=NULL) OPENSSL_free(zz);
-    if (enc!=NULL) OPENSSL_free(enc);
     if (context!=NULL) OPENSSL_free(context);
     if (secret!=NULL) OPENSSL_free(secret);
     if (key!=NULL) OPENSSL_free(key);

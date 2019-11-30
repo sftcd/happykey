@@ -81,6 +81,24 @@ script [env](./env), looks like this:
 (Not sure that MIME type like stuff is wise, but we'll see - it'll be good enough
 to let me easily test round-tripping at least.)
 
+## PEM-like file format
+
+Since we need the ciphertext and sender's public key to do a decrypt,
+the ``hpkemain`` command line test tool saves both of those in one
+file. An [example](PEM-like-sample) of one of those might be:
+
+            $ ./hpkemain -P pub -i env -o PEM-like-sample
+            $ cat PEM-like-sample
+            -----BEGIN SENDERPUB-----
+            4LQhEvh+EeipiyHVYxHzbX73KqqTnMdRj08kVrceJXw=
+            -----END SENDERPUB-----
+            -----BEGIN CIPHERTEXT-----
+            oTU3z+2R2no0elqYm5N2l0H+HuI0d7wp6w20k1JMD+MZ8US//egDjU1oKByGBFbSH7AoEbe9OY7zhUExVKJnhVl0FwAL5txBPpNbwt4sgT/dpg==
+            -----END CIPHERTEXT-----
+
+My code for reading those files is a little (but not a lot:-) tolerant, e.g. it
+allows additional whitespace to be added within the base64 encoded values.
+
 ## Test Vectors
  
 To enable test vector checking, compile with ``TESTVECTORS`` #define'd.

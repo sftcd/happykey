@@ -1,4 +1,4 @@
-/**
+/*
  * Copyright 2019 Stephen Farrell. All Rights Reserved.
  *
  * Licensed under the OpenSSL license (the "License").  You may not use
@@ -34,14 +34,20 @@
 /*
  * @brief Encryption(s) Test Vector structure using field names from published JSON file
  */
-typedef struct hpke_tv_encs_s {
-    const char *aad;
-    const char *plaintext;
-    const char *ciphertext;
+typedef struct {
+    const char *aad; ///< ascii-hex encoded additional authenticated data
+    const char *plaintext; ///< aascii-hex encoded plaintext
+    const char *ciphertext; ///< ascii-hex encoded ciphertext
 } hpke_tv_encs_t;
 
 /*
  * @brief HKPE Test Vector structure using field names from published JSON file
+ *
+ * The jobj field (at the end) is the json-c object from which all these are
+ * derived and into which most of the char * pointers point. When we make an
+ * array of hpke_tv_s then the same jobj will be pointed at by all, so when 
+ * it's time to call hpke_tv_free then we'll just free one of those using the
+ * json-c API.
  */
 typedef struct hpke_tv_s {
     uint8_t mode;
@@ -65,7 +71,7 @@ typedef struct hpke_tv_s {
     const char *psk;
     int nencs;
     hpke_tv_encs_t *encs;
-    void *jobj; 
+    void *jobj;  ///< pointer to json-c object from which we derived this
 } hpke_tv_t;
 
 /*

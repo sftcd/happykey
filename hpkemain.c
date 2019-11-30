@@ -21,6 +21,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <getopt.h>
+#include <ctype.h>
 
 #include <openssl/evp.h>
 #include <openssl/ssl.h>
@@ -67,6 +68,10 @@ static void usage(char *prog,char *errmsg)
 
 /*
  * @brief strip out newlines from input
+ *
+ * This could be more generic and strip all whitespace
+ * but not sure that'd be right. So this'll do for now:-)
+ *
  * @param len is the string length on input and output
  * @param buf is the string
  * @return void
@@ -170,6 +175,166 @@ static int map_input(const char *inp, size_t *outlen, unsigned char **outbuf, in
     return(1);
 }
 
+/*
+ * Our PEM-like labels
+ */
+#define HPKE_START_SP "-----BEGIN SENDERPUB-----"
+#define HPKE_END_SP "-----END SENDERPUB-----"
+#define HPKE_START_CP "-----BEGIN CIPHERTEXT-----"
+#define HPKE_END_CP "-----END CIPHERTEXT-----"
+
+/*!
+ * @brief write sender public and ciphertext to file
+ * @param fname is the filename (stdout used if null or "")
+ * @param splen sender public length
+ * @param sp sender public
+ * @param ctlen ciphertext length
+ * @param ct ciphertext
+ * @return 1 for successs, other otherwise
+ */
+static int hpkemain_write_ct(const char *fname,
+                const size_t  splen, const unsigned char *sp,
+                const size_t  ctlen, const unsigned char *ct) 
+{
+    FILE *fout=NULL;
+    if (fname==NULL || fname[0]=='\0') {
+        fout=stdout;
+    } else {
+        fout=fopen(fname,"w");
+    }
+    if (fout==NULL) {
+        fprintf(stderr,"Error opening %s for write\n",fname);
+        return(__LINE__);
+    }
+
+    char eb[HPKE_MAXSIZE];
+    size_t eblen=HPKE_MAXSIZE;
+    eblen=EVP_EncodeBlock(eb, sp, splen);
+    fprintf(fout,"%s\n",HPKE_START_SP);
+    size_t rrv=fwrite(eb,1,eblen,fout);
+    if (rrv!=eblen) {
+        fprintf(stderr,"Error writing %ld bytes of output to %s (only %ld written)\n",splen,fname,rrv);
+        return(__LINE__);
+    }
+    fprintf(fout,"\n%s\n",HPKE_END_SP);
+    fprintf(fout,"%s\n",HPKE_START_CP);
+    eblen=EVP_EncodeBlock(eb, ct, ctlen);
+    rrv=fwrite(eb,1,eblen,fout);
+    if (rrv!=eblen) {
+        fprintf(stderr,"Error writing %ld bytes of output to %s (only %ld written)\n",ctlen,fname,rrv);
+        return(__LINE__);
+    }
+    fprintf(fout,"\n%s\n",HPKE_END_CP);
+    fclose(fout);
+    return(1);
+}
+
+/*!
+ * @brief read sender public and ciphertext to file
+ *
+ * An example of our home-grown PEM-like format is
+ * below:
+ *
+ * -----BEGIN SENDERPUB-----
+ * btLLL0obGXN9AAs395USTenEKx5iAHriosas2+TMm0Y=
+ * -----END SENDERPUB-----
+ * -----BEGIN CIPHERTEXT-----
+ * j+NFQjYKmDEa4IwrsPkhPq7Nr+GjhtbdRMFToG1b0+a0jWyoikOTeXSovDaW0f8Ns
+ * uJSJ6BEC7ub9g3UE+oJWeYzzlP6PjI9d52qmDb0gRwjnQ==
+ * -----END CIPHERTEXT-----
+ *
+ * Our decoding rules are:
+ * - file size < HPKE_MAXSIZE (640kb)
+ * - labels MUST be in that order
+ * - we'll chew any whitespace between labels before
+ *   attempting base64 decode
+ *
+ * @param fname is the filename (stdin used if null or "")
+ * @param splen sender public buffer size (modified on output)
+ * @param sp sender public (allocated by calller)
+ * @param ctlen ciphertext buffer size (modified on output)
+ * @param ct ciphertext (allocated by caller)
+ * @return 1 for successs, other otherwise
+ */
+static int hpkemain_read_ct(const char *fname,
+                size_t  *splen, unsigned char *sp,
+                size_t  *ctlen, unsigned char *ct) 
+{
+    FILE *fin=NULL;
+    char fbuf[HPKE_MAXSIZE]; 
+    const char *pfname=fname;
+    if (!fname || fname[0]=='\0') {
+        fin=stdin;
+        pfname="STDIN";
+    } else {
+        fin=fopen(fname,"rb");
+        if (!fin) {
+            fprintf(stderr,"Error opening %s for read\n",fname);
+            return(__LINE__);
+        }
+        int frv=fread(fbuf,1,HPKE_MAXSIZE,fin);
+        if (frv>=HPKE_MAXSIZE) {
+            fprintf(stderr,"Error file %s too big\n",fname);
+            return(__LINE__);
+        }
+        fclose(fin);
+    }
+
+    /* 
+     * Find PEM encoded boundaries
+     */
+#define FINDLAB(buf,lab,labptr) { \
+            labptr=strstr(buf,lab); \
+            if (!labptr) { \
+                fprintf(stderr,"Error can't find boundary (%s) in file  %s\n",lab,pfname); \
+                return(__LINE__); \
+            } \
+        }
+
+    char *sps=NULL;
+    FINDLAB(fbuf,HPKE_START_SP,sps);
+    char *spe=NULL;
+    FINDLAB(sps,HPKE_END_SP,spe);
+    char *cts=NULL;
+    FINDLAB(spe,HPKE_START_CP,cts);
+    char *cte=NULL;
+    FINDLAB(cts,HPKE_END_CP,cte);
+
+    /* next we gotta chew whitespace... boring, isn't it? ;-( */
+    char b64buf[HPKE_MAXSIZE];
+    memset(b64buf,0,HPKE_MAXSIZE);
+    char *bp=b64buf;
+    char *bstart=sps+strlen(HPKE_START_SP)+1;
+    for (char *cp=bstart;cp<spe;cp++) {
+        if (!isspace(*cp)) *bp++=*cp;
+    }
+    int lsplen=EVP_DecodeBlock(sp,b64buf,bp-b64buf);
+    if (lsplen<=0) {
+        fprintf(stderr,"Error base64 decoding sender public within file %s\n",pfname);
+        return(__LINE__);
+    }
+    *splen=lsplen;
+
+    memset(b64buf,0,HPKE_MAXSIZE);
+    bp=b64buf;
+    bstart=cts+strlen(HPKE_START_CP)+1;
+    for (char *cp=bstart;cp<cte;cp++) {
+        if (!isspace(*cp)) *bp++=*cp;
+    }
+    int lctlen=EVP_DecodeBlock(ct,b64buf,bp-b64buf);
+    if (lctlen<=0) {
+        fprintf(stderr,"Error base64 decoding ciphertezt within file %s\n",pfname);
+        return(__LINE__);
+    }
+    *ctlen=lctlen;
+    return(1);
+}
+
+
+
+/*!
+ * @brief hey it's main()
+ */
 int main(int argc, char **argv)
 {
     int doing_enc=1; // may as well assume that
@@ -334,38 +499,11 @@ int main(int argc, char **argv)
                 }
             } else {
 #endif
-            FILE *fout=NULL;
-            if (out_in==NULL) {
-                fout=stdout;
-            } else {
-                fout=fopen(out_in,"w");
-            }
-            if (fout==NULL) {
-                fprintf(stderr,"Error writing %ld bytes of output to %s\n",cipherlen,out_in);
-            }
+                int wrv=hpkemain_write_ct(out_in,senderpublen,senderpub,cipherlen,cipher);
+                if (wrv!=1) {
+                    return(wrv);
+                }
 
-#define START_SP "-----BEGIN SENDERPUB-----"
-#define END_SP "-----END SENDERPUB-----"
-#define START_CP "-----BEGIN CIPHERTEXT-----"
-#define END_CP "-----END CIPHERTEXT-----"
-
-            char eb[HPKE_MAXSIZE];
-            size_t eblen=HPKE_MAXSIZE;
-	        eblen=EVP_EncodeBlock(eb, senderpub, senderpublen);
-            fprintf(fout,"%s\n",START_SP);
-            size_t rrv=fwrite(eb,1,eblen,fout);
-            if (rrv!=eblen) {
-                fprintf(stderr,"Error writing %ld bytes of output to %s (only %ld written)\n",cipherlen,out_in,rrv);
-            }
-            fprintf(fout,"\n%s\n",END_SP);
-            fprintf(fout,"%s\n",START_CP);
-	        eblen=EVP_EncodeBlock(eb, cipher, cipherlen);
-            rrv=fwrite(eb,1,eblen,fout);
-            if (rrv!=eblen) {
-                fprintf(stderr,"Error writing %ld bytes of output to %s (only %ld written)\n",cipherlen,out_in,rrv);
-            }
-            fprintf(fout,"\n%s\n",END_CP);
-            fclose(fout);
 #ifdef TESTVECTORS
             }
 #endif
@@ -373,12 +511,23 @@ int main(int argc, char **argv)
         }
     } else {
         /*
-         * decrypt so
+         * try decode and then decrypt so
          */
-        if (!inp_in) usage(argv[0],"decryption requires a -i value");
-        /*
-         * decode input 
-         */
+        size_t senderpublen=HPKE_MAXSIZE; unsigned char senderpub[HPKE_MAXSIZE];
+        size_t cipherlen=HPKE_MAXSIZE; unsigned char cipher[HPKE_MAXSIZE];
+        size_t clearlen=HPKE_MAXSIZE; unsigned char clear[HPKE_MAXSIZE];
+        int rv=hpkemain_read_ct(inp_in,&senderpublen,senderpub,&cipherlen,cipher);
+        if (rv!=1) {
+            fprintf(stderr,"Error reading input - exiting\n");
+            exit(rv);
+        }
+        rv=hpke_dec( hpke_mode, hpke_suite,
+                privlen, priv,
+                senderpublen, senderpub,
+                cipherlen, cipher,
+                0, NULL,
+                &clearlen, clear); 
+
     } 
 
 #ifdef TESTVECTORS
