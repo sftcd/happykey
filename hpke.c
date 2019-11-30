@@ -794,16 +794,11 @@ err:
 int hpke_dec(
         unsigned int mode,
         hpke_suite_t suite,
-        size_t privlen, 
-        unsigned char *priv,
-        size_t enclen,
-        unsigned char *enc,
-        size_t cipherlen,
-        unsigned char *cipher,
-        size_t aadlen,
-        unsigned char *aad,
-        size_t *clearlen,
-        unsigned char *clear)
+        size_t privlen, unsigned char *priv,
+        size_t enclen, unsigned char *enc,
+        size_t cipherlen, unsigned char *cipher,
+        size_t aadlen, unsigned char *aad,
+        size_t *clearlen, unsigned char *clear)
 {
     if (mode!=HPKE_MODE_BASE) return(__LINE__);
     int internal_suite=hpke_suite_check(suite); 
@@ -824,7 +819,7 @@ int hpke_dec(
 
     /* declare vars - done early so goto err works ok */
     EVP_PKEY_CTX *pctx=NULL;
-    EVP_PKEY *pkR=NULL;
+    EVP_PKEY *skR=NULL;
     EVP_PKEY *pkE=NULL;
     size_t  zz_len=0;
     unsigned char *zz=NULL;
@@ -838,14 +833,24 @@ int hpke_dec(
     unsigned char *nonce=NULL;
 
     /* step 0. Initialise peer's key from string */
+    pkE = EVP_PKEY_new_raw_public_key(EVP_PKEY_X25519,NULL,enc,enclen);
+    if (pkE == NULL) {
+        erv=__LINE__; goto err;
+    }
+
     /* step 1. load decryptors private key */
+    skR=EVP_PKEY_new_raw_private_key(EVP_PKEY_X25519,NULL,priv,privlen);
+    if (!skR) {
+        erv=__LINE__; goto err;
+    }
+
     /* step 2. run DH KEM to get zz */
     /* step 3. create context buffer */
     /* step 4. extracts and expands as needed */
     /* step 5. call the AEAD */
 
 err:
-    if (pkR!=NULL) EVP_PKEY_free(pkR);
+    if (skR!=NULL) EVP_PKEY_free(skR);
     if (pkE!=NULL) EVP_PKEY_free(pkE);
     if (pctx!=NULL) EVP_PKEY_CTX_free(pctx);
     if (zz!=NULL) OPENSSL_free(zz);
@@ -854,5 +859,78 @@ err:
     if (key!=NULL) OPENSSL_free(key);
     if (nonce!=NULL) OPENSSL_free(nonce);
     return erv;
-    return erv;
+}
+
+/*!
+ * @brief generate a key pair
+ * @param mode is the mode (currently unused)
+ * @param suite is the ciphersuite (currently unused)
+ * @param publen is the size of the public key buffer (exact length on output)
+ * @param pub is the public value
+ * @param privlen is the size of the private key buffer (exact length on output)
+ * @param priv is the private key
+ */
+int hpke_kg(
+        unsigned int mode, hpke_suite_t suite,
+        size_t *publen, unsigned char *pub,
+        size_t *privlen, unsigned char *priv) 
+{
+    if (mode!=HPKE_MODE_BASE) return(__LINE__);
+    if (!hpke_suite_check(suite)) return(__LINE__);
+    if (!pub || !priv) return(__LINE__);
+    int erv=1; ///< Our error return value - 1 is success
+
+    EVP_PKEY_CTX *pctx=NULL;
+    EVP_PKEY *skR=NULL;
+    unsigned char *lpub=NULL;
+    BIO *bfp=NULL;
+
+    /* step 1. generate sender's key pair */
+    pctx = EVP_PKEY_CTX_new_id(EVP_PKEY_X25519, NULL);
+    if (pctx == NULL) {
+        erv=__LINE__; goto err;
+    }
+    if (EVP_PKEY_keygen_init(pctx) <= 0) {
+        erv=__LINE__; goto err;
+    }
+    if (EVP_PKEY_keygen(pctx, &skR) <= 0) {
+        erv=__LINE__; goto err;
+    }
+    EVP_PKEY_CTX_free(pctx); pctx=NULL;
+
+    size_t lpublen = EVP_PKEY_get1_tls_encodedpoint(skR,&lpub);
+    if (lpub==NULL || lpublen == 0) {
+        erv=__LINE__; goto err;
+    }
+    if (lpublen>*publen) {
+        erv=__LINE__; goto err;
+    }
+    *publen=lpublen;
+    memcpy(pub,lpub,lpublen);
+    OPENSSL_free(lpub);lpub=NULL;
+
+    bfp=BIO_new(BIO_s_mem());
+    if (!bfp) {
+        erv=__LINE__; goto err;
+    }
+    if (!PEM_write_bio_PrivateKey(bfp,skR,NULL,NULL,0,NULL,NULL)) {
+        erv=__LINE__; goto err;
+    }
+    unsigned char lpriv[HPKE_MAXSIZE];
+    size_t lprivlen = BIO_read(bfp, lpriv, HPKE_MAXSIZE);
+    if (lprivlen <=0) {
+        erv=__LINE__; goto err;
+    }
+    if (lprivlen > *privlen) {
+        erv=__LINE__; goto err;
+    }
+    *privlen=lprivlen;
+    memcpy(priv,lpriv,lprivlen);
+
+err:
+    if (skR!=NULL) EVP_PKEY_free(skR);
+    if (pctx!=NULL) EVP_PKEY_CTX_free(pctx);
+    if (lpub!=NULL) OPENSSL_free(lpub);
+    if (bfp!=NULL) BIO_free_all(bfp);
+    return(erv);
 }

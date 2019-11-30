@@ -47,24 +47,26 @@ I also have a [bash script](env) that sets the environment for those shared obje
 If you build this, start with ``hpkemain -h`` to see what's what.
 
             $ ./hpkemain -h
-            Usage: ./hpkemain [-h|-v|-e|-d] [-P public] [-p private] [-a aad] [-I info] [-i input] [-o output] [-T tvspec]
+            Usage: ./hpkemain [-h|-v|-k|-e|-d] [-P public] [-p private] [-a aad] [-I info] [-i input] [-o output]
             HPKE (draft-irtf-cfrg-hpke) tester, options are:
-                -h help
-                -v verbose output
-                -e encrypt
-                -d decrypt
-                -P public key file name or base64 or ascii-hex encoded value
-                -p private key file name or base64 or ascii-hex encoded value
-                -a additional authenticated data file name or actual value
-                -I additional info to bind to key - file name or actual value
-                -i input file name or actual value (stdin if not specified)
-                -o output file name (output to stdout if not specified) 
-                -T run a testvector for mode/suite, e.g. "-T 0,1,1,2"
+	            -h help
+	            -v verbose output
+	            -e encrypt
+	            -d decrypt
+	            -k generate key pair
+	            -P public key file name or base64 or ascii-hex encoded value
+	            -p private key file name or base64 or ascii-hex encoded value
+	            -a additional authenticated data file name or actual value
+	            -I additional info to bind to key - file name or actual value
+	            -i input file name or actual value (stdin if not specified)
+	            -o output file name (output to stdout if not specified) 
             
             note that sometimes base64 or ascii-hex decoding might work when you don't want it to
             (sorry about that;-)
-            This version is built with TESTVECTORS
-            You should either choose "normal" inputs or use "-T" not both.
+            
+            When generating a key pair, supply public and private file names
+
+## Encrypt a file
 
 There's a file with a sample [public key](pub) to which you can encrypt things.
 (I don't have the private key, honest:-) Using that to enrypt the tiny shell
@@ -81,7 +83,7 @@ script [env](./env), looks like this:
 (Not sure that MIME type like stuff is wise, but we'll see - it'll be good enough
 to let me easily test round-tripping at least.)
 
-## PEM-like file format
+## PEM-like ciphertext file format
 
 Since we need the ciphertext and sender's public key to do a decrypt,
 the ``hpkemain`` command line test tool saves both of those in one
@@ -98,6 +100,33 @@ file. An [example](PEM-like-sample) of one of those might be:
 
 My code for reading those files is a little (but not a lot:-) tolerant, e.g. it
 allows additional whitespace to be added within the base64 encoded values.
+
+## Key generation
+
+To generate a key pair and store the private key in PEM format (PKCS#8 PrivateKey)
+and the public key as a binary value:
+
+            $ ./hpkemain -k -p privfile -P pubfile
+            $ cat privfile
+            -----BEGIN PRIVATE KEY-----
+            MC4CAQAwBQYDK2VuBCIEIIArh+i/Cp1kResmsimUskHPp0yUxoKj4oklv11t9NhJ
+            -----END PRIVATE KEY-----
+            $ hd pubfile 
+            00000000  f1 8e e3 9f 90 4f 73 47  eb 60 81 4a 41 76 40 72  |.....OsG.`.JAv@r|
+            00000010  87 3e 51 28 0c 9f d2 34  a9 c6 7c c8 68 4f 71 38  |.>Q(...4..|.hOq8|
+            00000020
+
+Or you can put both keys in one file if you omit the public key file name:
+
+            $ ./hpkemain -k -p both
+            $ cat both
+            -----BEGIN PRIVATE KEY-----
+            MC4CAQAwBQYDK2VuBCIEIChYQexI/NDGRL1T01Ym4lyLUxT75GMgoVIalV+Va5pU
+            -----END PRIVATE KEY-----
+            -----BEGIN PUBLIC KEY-----
+            b/OkZZ/VNEs+H3NrHpb+F0nYeagcV2knkCZ0BOtaX3M=
+            -----END PUBLIC KEY-----
+
 
 ## Test Vectors
  

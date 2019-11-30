@@ -38,15 +38,16 @@ static void usage(char *prog,char *errmsg)
 {
     if (errmsg) fprintf(stderr,"\nError! %s\n\n",errmsg);
 #ifdef TESTVECTORS
-    fprintf(stderr,"Usage: %s [-h|-v|-e|-d] [-P public] [-p private] [-a aad] [-I info] [-i input] [-o output] [-T tvspec]\n",prog);
+    fprintf(stderr,"Usage: %s [-h|-v|-k|-e|-d] [-P public] [-p private] [-a aad] [-I info] [-i input] [-o output] [-T tvspec]\n",prog);
 #else
-    fprintf(stderr,"Usage: %s [-h|-v|-e|-d] [-P public] [-p private] [-a aad] [-I info] [-i input] [-o output]\n",prog);
+    fprintf(stderr,"Usage: %s [-h|-v|-k|-e|-d] [-P public] [-p private] [-a aad] [-I info] [-i input] [-o output]\n",prog);
 #endif
     fprintf(stderr,"HPKE (draft-irtf-cfrg-hpke) tester, options are:\n");
     fprintf(stderr,"\t-h help\n");
     fprintf(stderr,"\t-v verbose output\n");
     fprintf(stderr,"\t-e encrypt\n");
     fprintf(stderr,"\t-d decrypt\n");
+    fprintf(stderr,"\t-k generate key pair\n");
     fprintf(stderr,"\t-P public key file name or base64 or ascii-hex encoded value\n");
     fprintf(stderr,"\t-p private key file name or base64 or ascii-hex encoded value\n");
     fprintf(stderr,"\t-a additional authenticated data file name or actual value\n");
@@ -59,6 +60,8 @@ static void usage(char *prog,char *errmsg)
     fprintf(stderr,"\n");
     fprintf(stderr,"note that sometimes base64 or ascii-hex decoding might work when you don't want it to\n");
     fprintf(stderr,"(sorry about that;-)\n");
+    fprintf(stderr,"\n");
+    fprintf(stderr,"When generating a key pair, supply public and private file names\n");
 #ifdef TESTVECTORS
     fprintf(stderr,"This version is built with TESTVECTORS\n");
     fprintf(stderr,"You should either choose \"normal\" inputs or use \"-T\" not both.\n");
@@ -182,7 +185,76 @@ static int map_input(const char *inp, size_t *outlen, unsigned char **outbuf, in
 #define HPKE_END_SP "-----END SENDERPUB-----"
 #define HPKE_START_CP "-----BEGIN CIPHERTEXT-----"
 #define HPKE_END_CP "-----END CIPHERTEXT-----"
+#define HPKE_START_PUB "-----BEGIN PUBLIC KEY-----"
+#define HPKE_END_PUB "-----END PUBLIC KEY-----"
 
+/*!
+ * @brief write key pair to file or files
+ * @param publen is the size of the public key buffer 
+ * @param pub is the public value
+ * @param privlen is the size of the private key buffer 
+ * @param priv is the private key
+ * @param privfname is the private key file name (or key pair file name)
+ * @param pubfname is the public key file name
+ * @return 1 for good
+ */
+static int hpkemain_write_keys(
+        size_t publen, unsigned char *pub,
+        size_t privlen, unsigned char *priv,
+        char *privname, char *pubname)
+{
+    FILE *fp=NULL;
+    size_t frv=0;
+    if (!privname) {
+        return(__LINE__);
+    }
+    if (pubname) {
+        if ((fp=fopen(pubname,"w"))==NULL) {
+            return(__LINE__);
+        }
+        frv=fwrite(pub,1,publen,fp);
+        fclose(fp);
+        if (frv!=publen) {
+            return(__LINE__);
+        }
+        if ((fp=fopen(privname,"w"))==NULL) {
+            return(__LINE__);
+        }
+        frv=fwrite(priv,1,privlen,fp);
+        fclose(fp);
+        if (frv!=privlen) {
+            return(__LINE__);
+        }
+    } else  {
+        if ((fp=fopen(privname,"w"))==NULL) {
+            return(__LINE__);
+        }
+        frv=fwrite(priv,1,privlen,fp);
+        if (frv!=privlen) {
+            fclose(fp);
+            return(__LINE__);
+        }
+
+        char b64pub[HPKE_MAXSIZE];
+        size_t b64publen=HPKE_MAXSIZE;
+        if (publen>HPKE_MAXSIZE) {
+            fprintf(stderr,"Error key too big %ld bytes\n",publen);
+            return(__LINE__);
+        }
+        fprintf(fp,"%s\n",HPKE_START_PUB);
+        b64publen=EVP_EncodeBlock(b64pub, pub, publen);
+        frv=fwrite(b64pub,1,b64publen,fp);
+        fprintf(fp,"\n%s\n",HPKE_END_PUB);
+        fclose(fp);
+        if (frv!=b64publen) {
+            return(__LINE__);
+        }
+    }
+    return(1);
+}
+
+
+ 
 /*!
  * @brief write sender public and ciphertext to file
  * @param fname is the filename (stdout used if null or "")
@@ -209,6 +281,10 @@ static int hpkemain_write_ct(const char *fname,
 
     char eb[HPKE_MAXSIZE];
     size_t eblen=HPKE_MAXSIZE;
+    if (splen>HPKE_MAXSIZE) {
+        fprintf(stderr,"Error key too big %ld bytes\n",splen);
+        return(__LINE__);
+    }
     eblen=EVP_EncodeBlock(eb, sp, splen);
     fprintf(fout,"%s\n",HPKE_START_SP);
     size_t rrv=fwrite(eb,1,eblen,fout);
@@ -218,6 +294,10 @@ static int hpkemain_write_ct(const char *fname,
     }
     fprintf(fout,"\n%s\n",HPKE_END_SP);
     fprintf(fout,"%s\n",HPKE_START_CP);
+    if (ctlen>HPKE_MAXSIZE) {
+        fprintf(stderr,"Error ciphertext too big %ld bytes\n",ctlen);
+        return(__LINE__);
+    }
     eblen=EVP_EncodeBlock(eb, ct, ctlen);
     rrv=fwrite(eb,1,eblen,fout);
     if (rrv!=eblen) {
@@ -337,7 +417,8 @@ static int hpkemain_read_ct(const char *fname,
  */
 int main(int argc, char **argv)
 {
-    int doing_enc=1; // may as well assume that
+    int doing_enc=1; ///< whether we're encrypting (default) or decrypting 
+    int generate=0; ///< whether we're generating a key pair (default off)
     /*
      * the xxx_in vars could be a filename or b64 value, we'll check later
      */
@@ -360,14 +441,15 @@ int main(int argc, char **argv)
     int opt;
 
 #ifdef TESTVECTORS
-    while((opt = getopt(argc, argv, "?hedvP:p:a:I:i:o:T:")) != -1) {
+    while((opt = getopt(argc, argv, "?hkedvP:p:a:I:i:o:T:")) != -1) {
 #else
-    while((opt = getopt(argc, argv, "?hedvP:p:a:I:i:o:")) != -1) {
+    while((opt = getopt(argc, argv, "?hkedvP:p:a:I:i:o:")) != -1) {
 #endif
         switch(opt) {
             case 'h':
             case '?': usage(argv[0],NULL); break;
             case 'v': verbose++; break;
+            case 'k': generate=1; break;
             case 'e': doing_enc=1; break;
             case 'd': doing_enc=0; break;
             case 'P': pub_in=optarg; break;
@@ -396,17 +478,18 @@ int main(int argc, char **argv)
         printf("Doing testvector for %s\n",tvspec);
     } else {
 #endif
-    if (doing_enc && !pub_in) usage(argv[0],"No recipient public key (\"-P\") provided"); 
-    if (!doing_enc && !priv_in) usage(argv[0],"No recipient private key (\"-p\") provided"); 
+    if (!generate && doing_enc && !pub_in) usage(argv[0],"No recipient public key (\"-P\") provided"); 
+    if (!generate && !doing_enc && !priv_in) usage(argv[0],"No recipient private key (\"-p\") provided"); 
+    if (generate && !priv_in) usage(argv[0],"No key pair file name(s) when generating"); 
 
     /*
      * Map from command line args (or the lack thereof) to buffers
      */
-    if (doing_enc && map_input(pub_in,&publen,&pub,1)!=1) usage(argv[0],"bad -P value");
-    if (!doing_enc && map_input(priv_in,&privlen,&priv,1)!=1) usage(argv[0],"bad -p value");
-    if (aad_in && map_input(aad_in,&aadlen,&aad,1)!=1) usage(argv[0],"bad -a value");
-    if (info_in && map_input(info_in,&infolen,&info,1)!=1) usage(argv[0],"bad -I value");
-    if (doing_enc && map_input(inp_in,&plainlen,&plain,0)!=1) usage(argv[0],"bad -i value");
+    if (!generate && doing_enc && map_input(pub_in,&publen,&pub,1)!=1) usage(argv[0],"bad -P value");
+    if (!generate && !doing_enc && map_input(priv_in,&privlen,&priv,1)!=1) usage(argv[0],"bad -p value");
+    if (!generate && aad_in && map_input(aad_in,&aadlen,&aad,1)!=1) usage(argv[0],"bad -a value");
+    if (!generate && info_in && map_input(info_in,&infolen,&info,1)!=1) usage(argv[0],"bad -I value");
+    if (!generate && doing_enc && map_input(inp_in,&plainlen,&plain,0)!=1) usage(argv[0],"bad -i value");
 #ifdef TESTVECTORS
     }
 #endif
@@ -458,7 +541,27 @@ int main(int argc, char **argv)
     /*
      * Call one of our functions
      */
-    if (doing_enc) {
+    if (generate) {
+        size_t publen=HPKE_MAXSIZE; unsigned char pub[HPKE_MAXSIZE];
+        size_t privlen=HPKE_MAXSIZE; unsigned char priv[HPKE_MAXSIZE];
+        int rv=hpke_kg(
+            hpke_mode, hpke_suite,
+            &publen, pub,
+            &privlen, priv);
+        if (rv!=1) {
+            fprintf(stderr,"Error (%d) from hpke_kg\n",rv);
+            exit(1);
+        }
+        rv=hpkemain_write_keys(publen, pub, privlen, priv,
+                priv_in,pub_in);
+        if (rv!=1) {
+            fprintf(stderr,"Error (%d) writing files (%s,%s)\n",rv,
+                    (priv_in?priv_in:"NULL"),
+                    (pub_in?pub_in:"NULL"));
+            exit(1);
+        }
+        
+    } else if (doing_enc) {
         size_t senderpublen=HPKE_MAXSIZE; unsigned char senderpub[HPKE_MAXSIZE];
         size_t cipherlen=HPKE_MAXSIZE; unsigned char cipher[HPKE_MAXSIZE];
         int rv=hpke_enc(
@@ -507,7 +610,6 @@ int main(int argc, char **argv)
 #ifdef TESTVECTORS
             }
 #endif
-             
         }
     } else {
         /*
@@ -527,6 +629,7 @@ int main(int argc, char **argv)
                 cipherlen, cipher,
                 0, NULL,
                 &clearlen, clear); 
+        if (priv!=NULL) OPENSSL_free(priv);
 
     } 
 

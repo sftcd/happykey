@@ -152,5 +152,19 @@ int hpke_dec(
         size_t *clearlen,
         unsigned char *clear);
 
+/*!
+ * @brief generate a key pair
+ * @param mode is the mode (currently unused)
+ * @param suite is the ciphersuite (currently unused)
+ * @param publen is the size of the public key buffer (exact length on output)
+ * @param pub is the public value
+ * @param privlen is the size of the private key buffer (exact length on output)
+ * @param priv is the private key
+ */
+int hpke_kg(
+        unsigned int mode, hpke_suite_t suite,
+        size_t *publen, unsigned char *pub,
+        size_t *privlen, unsigned char *priv); 
+
 #endif
 
