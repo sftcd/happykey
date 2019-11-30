@@ -129,13 +129,6 @@ static int hpke_pbuf(FILE *fout, char *msg,unsigned char *buf,size_t blen)
 }
 
 /*
- * @brief encode binary to ascii hex
- *
- * @param blen is the input buffer length
- * @param buf is the input buffer
- * @para
-
-/*
  * @brief Check if ciphersuite is ok/known to us
  * @param suite is the externally supplied cipheruite
  * @return 1 for good, not-1 for error
