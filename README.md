@@ -5,6 +5,8 @@ This is a work-in-progress implementation of
 OpenSSL, as a precursor to using that as part of the 
 next [Encrypted SNI/ECHO draft](https://tools.ietf.org/html/draft-ietf-tls-esni) with 
 my [ESNI-enabled OpenSSL](https://github.com/sftcd/openssl) fork.
+(As of now, this needs to be built against a master/tip version of
+OpenSSL such as my fork.)
 
 Currently, (20191201) ``hpke_enc()`` produces output that matches at least one
 CFRG test vector, but lots is hard-coded to one ciphersuite (x25519,
@@ -14,7 +16,6 @@ seems happy for the moment, at least with nominal behaviour, so things aren't
 totally shabby:-)
 
 Main TODOs (possibly in this order) are:
-- check if vanilla and/or current-release OpenSSL works
 - arbitrary sizes for plain/cipher texts (640kB is a hard limit for now:-)
 - selection of test vectors (first matching for now)
 - APIs for non single-shot operation (non-existent:-)
@@ -28,8 +29,8 @@ Assuming you want to build within ``$HOME/code``, as I do, then:
             $ git clone https://github.com/sftcd/happykey
             $ cd happykey
 
-The build needs OpenSSL.  (Not sure if I'm using anything that needs building
-from the OpenSSL tip, but I'll check that.) If you want to check test vectors,
+This build needs to be built against a "master" OpenSSL.  
+If you want to check test vectors,
 (see below) you'll also need json-c,  so my setup looks like:
 
 - ``$HOME/code/happykey`` with this repo
