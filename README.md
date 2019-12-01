@@ -13,11 +13,11 @@ matches a CFRG test vector, but lots is hard-coded to one ciphersuite
 valgrind seems happy for the moment, at least with nominal behaviour,
 so things aren't that shabby:-)
 
-Main TODOs are:
-- arbitrary sizes plain/cipher texts (640kB is a hard limit for now:-)
-- multiple algorithms and modes (only one for now)
+Main TODOs (possibly in this order) are:
+- arbitrary sizes for plain/cipher texts (640kB is a hard limit for now:-)
 - selection of test vectors (first matching for now)
 - APIs for non single-shot operation (non-existent:-)
+- multiple algorithms and modes (only one for now)
 
 ## Build 
 
