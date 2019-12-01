@@ -67,6 +67,8 @@ If you build this, start with ``hpkemain -h`` to see what's what.
             
             When generating a key pair, supply public and private file names
 
+There's a bit of (unfinished) doxygen-generated documentation of the [API](hpke-api.pdf).
+
 ## Encrypt a file
 
 There's a file with a sample [public key](pub) to which you can encrypt things.
@@ -84,8 +86,10 @@ script [env](./env), looks like this:
 (Not sure that MIME type like stuff is wise, but we'll see - it'll be good enough
 to let me easily test round-tripping at least.)
 
-The [roundtrip.sh](roundtrip.sh) script fethes some plaintext, generates a key
-pair, then encrypts a file to that public key, then decrypts that.
+The [roundtrip.sh](roundtrip.sh) script fetches some plaintext, generates a key
+pair, then encrypts a file to that public key, then decrypts that. All relevant
+files end up in ``$HOME/code/happykey/scratch`` with random looking names. (A 
+``make clean`` will clean those out too.)
 
 ## PEM-like ciphertext file format
 
