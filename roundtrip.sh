@@ -21,12 +21,19 @@ BINDIR=$HOME/code/happykey
 # LD_LIBRARY_PATH...
 . $BINDIR/env
 
+if [ ! -f $BINDIR/hpkemain ]
+then
+    echo "You probably need to run make first ..."
+    exit 1
+fi
+
+
 SCRATCH=$BINDIR/scratch
 mkdir -p $SCRATCH
 
 if [ ! -f $SCRATCH/plain ]
 then
-    echo "Fetching new plaintext..."
+    echo "Fetching new plaintext from https://jell.ie/news/ ..."
     curl https://jell.ie/news/ >$SCRATCH/plain
 fi
 

@@ -6,14 +6,18 @@ OpenSSL, as a precursor to using that as part of the next [Encrypted SNI/ECHO
 draft](https://tools.ietf.org/html/draft-ietf-tls-esni) with my [ESNI-enabled
 OpenSSL](https://github.com/sftcd/openssl) fork.
 
-Note: Lotsa work remains!
-
 Currently, (20191201) ``hpke_enc()`` produces an output, and one that
 matches a CFRG test vector, but lots is hard-coded to one ciphersuite
 (x25519,hkdf-sha256,aes128gcm) and plenty of code needs re-factoring. 
+``hpke_dec()`` can now also decrypt what ``hpke_enc()`` produced, and
+valgrind seems happy for the moment, at least with nominal behaviour,
+so things aren't that shabby:-)
 
-``hpke_dec()`` can now also decrypt what ``hpke_enc()`` produced, so
-that's also good:-)
+Main TODOs are:
+- arbitrary sizes plain/cipher texts (640kB is a hard limit for now:-)
+- multiple algorithms and modes (only one for now)
+- selection of test vectors (first matching for now)
+- APIs for non single-shot operation (non-existent:-)
 
 ## Build 
 
