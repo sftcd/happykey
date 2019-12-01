@@ -134,6 +134,8 @@ int hpke_enc(
  * @param cipher is the ciphertext
  * @param aadlen is the lenght of the additional data
  * @param aad is the encoded additional data
+ * @param infolen is the lenght of the info data (can be zero)
+ * @param info is the encoded info data (can be NULL)
  * @param clearlen is the length of the input buffer for cleartext (octets used on output)
  * @param clear is the encoded cleartext
  * @return 1 for good (OpenSSL style), not-1 for error
@@ -141,16 +143,12 @@ int hpke_enc(
 int hpke_dec(
         unsigned int mode,
         hpke_suite_t suite,
-        size_t privlen, 
-        unsigned char *priv,
-        size_t enclen,
-        unsigned char *enc,
-        size_t cipherlen,
-        unsigned char *cipher,
-        size_t aadlen,
-        unsigned char *aad,
-        size_t *clearlen,
-        unsigned char *clear);
+        size_t privlen, unsigned char *priv,
+        size_t enclen, unsigned char *enc,
+        size_t cipherlen, unsigned char *cipher,
+        size_t aadlen, unsigned char *aad,
+        size_t infolen, unsigned char *info,
+        size_t *clearlen, unsigned char *clear);
 
 /*!
  * @brief generate a key pair
@@ -165,6 +163,16 @@ int hpke_kg(
         unsigned int mode, hpke_suite_t suite,
         size_t *publen, unsigned char *pub,
         size_t *privlen, unsigned char *priv); 
+/**
+ * @brief for odd/occasional debugging
+ *
+ * @param fout is a FILE * to use
+ * @param msg is prepended to print
+ * @param buf is the buffer to print
+ * @param blen is the length of the buffer
+ * @return 1 for success 
+ */
+int hpke_pbuf(FILE *fout, char *msg,unsigned char *buf,size_t blen); 
 
 #endif
 

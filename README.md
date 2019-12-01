@@ -8,11 +8,12 @@ OpenSSL](https://github.com/sftcd/openssl) fork.
 
 Note: Lotsa work remains!
 
-Currently, (20191129) ``hpke_enc()`` produces an output, and one that
+Currently, (20191201) ``hpke_enc()`` produces an output, and one that
 matches a CFRG test vector, but lots is hard-coded to one ciphersuite
 (x25519,hkdf-sha256,aes128gcm) and plenty of code needs re-factoring. 
 
-...and ``hpke_dec()`` is still just a stub:-)
+``hpke_dec()`` can now also decrypt what ``hpke_enc()`` produced, so
+that's also good:-)
 
 ## Build 
 
@@ -83,6 +84,9 @@ script [env](./env), looks like this:
 (Not sure that MIME type like stuff is wise, but we'll see - it'll be good enough
 to let me easily test round-tripping at least.)
 
+The [roundtrip.sh](roundtrip.sh) script fethes some plaintext, generates a key
+pair, then encrypts a file to that public key, then decrypts that.
+
 ## PEM-like ciphertext file format
 
 Since we need the ciphertext and sender's public key to do a decrypt,
@@ -126,7 +130,6 @@ Or you can put both keys in one file if you omit the public key file name:
             -----BEGIN PUBLIC KEY-----
             b/OkZZ/VNEs+H3NrHpb+F0nYeagcV2knkCZ0BOtaX3M=
             -----END PUBLIC KEY-----
-
 
 ## Test Vectors
  

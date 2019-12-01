@@ -32,6 +32,12 @@
 #endif
 
 /*
+ * Define this if you want loads printing of intermediate
+ * cryptographic values
+ */
+#undef SUPERVERBOSE 
+
+/*
  * handy thing to have :-)
  */
 static const unsigned char zero_buf[SHA256_DIGEST_LENGTH] = {
@@ -114,7 +120,7 @@ int hpke_ah_decode(size_t ahlen, const char *ah, size_t *blen, unsigned char **b
  * @param blen is the length of the buffer
  * @return 1 for success 
  */
-static int hpke_pbuf(FILE *fout, char *msg,unsigned char *buf,size_t blen) 
+int hpke_pbuf(FILE *fout, char *msg,unsigned char *buf,size_t blen) 
 {
     if (!fout || !buf || !msg) {
         return 0;
@@ -157,6 +163,92 @@ static int figure_context_len(hpke_suite_t suite)
 }
 
 /**
+ * @brief do the AEAD decrhyption 
+ *
+ * @param cipher_len is an input/output, better be big enough on input, exact on output
+ * @param cipher is an output
+ * @return 1 for good otherwise bad
+ * @returns NULL (on error) or pointer to alloced buffer for ciphertext
+ */
+static int hpke_aead_dec(
+            unsigned char *key, size_t key_len,
+            unsigned char *iv, size_t iv_len,
+            unsigned char *aad, size_t aad_len,
+            unsigned char *cipher, size_t cipher_len,
+            unsigned char *plain, size_t *plain_len)
+{
+    int erv=1;
+    EVP_CIPHER_CTX *ctx=NULL;
+    int len=0;
+    size_t plaintext_len=0;
+    unsigned char *plaintext=NULL;
+    size_t tag_len=EVP_GCM_TLS_TAG_LEN;
+    unsigned char tag[EVP_GCM_TLS_TAG_LEN]; 
+    plaintext=OPENSSL_malloc(cipher_len);
+    if (plaintext==NULL) {
+        erv=__LINE__; goto err;
+    }
+    /* Create and initialise the context */
+    if(!(ctx = EVP_CIPHER_CTX_new())) {
+        erv=__LINE__; goto err;
+    }
+    /* Initialise the encryption operation. */
+    const EVP_CIPHER *enc = EVP_aes_128_gcm();
+    if (enc == NULL) {
+        erv=__LINE__; goto err;
+    }
+    if(1 != EVP_DecryptInit_ex(ctx, enc, NULL, NULL, NULL)) {
+        erv=__LINE__; goto err;
+    }
+    /* Set IV length if default 12 bytes (96 bits) is not appropriate */
+    if(1 != EVP_CIPHER_CTX_ctrl(ctx, EVP_CTRL_GCM_SET_IVLEN, iv_len, NULL)) {
+        erv=__LINE__; goto err;
+    }
+    /* Initialise key and IV */
+    if(1 != EVP_DecryptInit_ex(ctx, NULL, NULL, key, iv))  {
+        erv=__LINE__; goto err;
+    }
+    /* Provide any AAD data. This can be called zero or more times as
+     * required
+     */
+    if (aad_len!=0 && aad!=NULL) {
+        if(1 != EVP_DecryptUpdate(ctx, NULL, &len, aad, aad_len)) {
+            erv=__LINE__; goto err;
+        }
+    }
+    /* Provide the message to be encrypted, and obtain the encrypted output.
+     * EVP_EncryptUpdate can be called multiple times if necessary
+     */
+    if(1 != EVP_DecryptUpdate(ctx, plaintext, &len, cipher, cipher_len-EVP_GCM_TLS_TAG_LEN)) {
+        erv=__LINE__; goto err;
+    }
+    plaintext_len = len;
+
+    /* Set expected tag value. Works in OpenSSL 1.0.1d and later */
+    if(!EVP_CIPHER_CTX_ctrl(ctx, EVP_CTRL_GCM_SET_TAG, EVP_GCM_TLS_TAG_LEN, cipher+cipher_len-EVP_GCM_TLS_TAG_LEN)) {
+        erv=__LINE__; goto err;
+    }
+    /* Finalise the encryption. Normally ciphertext bytes may be written at
+     * this stage, but this does not occur in GCM mode
+     */
+    if(EVP_DecryptFinal_ex(ctx, plaintext + len, &len) <= 0)  {
+        erv=__LINE__; goto err;
+    }
+
+    /* Clean up */
+    if (plaintext_len>*plain_len) {
+        erv=__LINE__; goto err;
+    }
+    *plain_len=plaintext_len;
+    memcpy(plain,plaintext,plaintext_len);
+err:
+    if (ctx) EVP_CIPHER_CTX_free(ctx);
+    if (plaintext!=NULL) OPENSSL_free(plaintext);
+    return erv;
+    return(0);
+}
+
+/**
  * @brief do the AEAD encryption as per the I-D
  *
  * Note: The tag output isn't really needed but was useful when I got
@@ -175,6 +267,7 @@ static int hpke_aead_enc(
             unsigned char *plain, size_t plain_len,
             unsigned char *cipher, size_t *cipher_len)
 {
+
     /*
      * From https://wiki.openssl.org/index.php/EVP_Authenticated_Encryption_and_Decryption
      */
@@ -185,7 +278,6 @@ static int hpke_aead_enc(
     unsigned char *ciphertext=NULL;
     size_t tag_len=EVP_GCM_TLS_TAG_LEN;
     unsigned char tag[EVP_GCM_TLS_TAG_LEN]; 
-
     if (tag_len+plain_len>*cipher_len) {
         erv=__LINE__; goto err;
     }
@@ -272,6 +364,7 @@ err:
     if (ctx) EVP_CIPHER_CTX_free(ctx);
     if (ciphertext!=NULL) OPENSSL_free(ciphertext);
     return erv;
+
 }
 
 
@@ -503,7 +596,63 @@ static int hpke_test_expand_extract(void)
 #endif
 
 /*!
+ * @brief run the KEM with two keys 
+ *
+ * @param key1 is the first key, for which we have the private value
+ * @param key2 is the peer's key
+ * @param zz is (a pointer to) the buffer for the result
+ * @param zzlen is the size of the buffer (octets-used on exit)
+ * @return 1 for good, not-1 for not good
+ */
+static int hpke_do_kem(EVP_PKEY *key1, EVP_PKEY *key2, 
+                   unsigned char **zz, size_t *zzlen)
+{
+    int erv=1;
+    EVP_PKEY_CTX *pctx=NULL;
+
+    /* step 2 run DH KEM to get zz */
+    pctx = EVP_PKEY_CTX_new(key1,NULL);
+    if (pctx == NULL) {
+        erv=__LINE__; goto err;
+    }
+    if (EVP_PKEY_derive_init(pctx) <= 0 ) {
+        erv=__LINE__; goto err;
+    }
+    if (EVP_PKEY_derive_set_peer(pctx, key2) <= 0 ) {
+        erv=__LINE__; goto err;
+    }
+    if (EVP_PKEY_derive(pctx, NULL, zzlen) <= 0) {
+        erv=__LINE__; goto err;
+    }
+    *zz=OPENSSL_malloc(*zzlen);
+    if (*zz == NULL) {
+        erv=__LINE__; goto err;
+    }
+    if (EVP_PKEY_derive(pctx, *zz, zzlen) <= 0) {
+        erv=__LINE__; goto err;
+    }
+    EVP_PKEY_CTX_free(pctx); pctx=NULL;
+err:
+    if (pctx!=NULL) EVP_PKEY_CTX_free(pctx);
+    return erv;
+}
+
+/*!
  * @brief Create context for input to extract/expand
+ *
+ * @param mode is the HPKE mode
+ * @param suite is the ciphersuite to use
+ * @param enc is the sender public key
+ * @param enclen is the length of the sender public key
+ * @param recippub is the encoded recipient public key
+ * @param recippublen is the length of the recipient public key
+ * @param zb is buffer of zeros (future proofing)
+ * @param zblen is the length of the buffer of zeros 
+ * @param info is buffer of info to bind
+ * @param infolen is the length of the buffer of info
+ * @param context is a buffer for the resulting context
+ * @param context_len is the size of the buffer and octets-used on exit
+ * @return 1 for good, not 1 otherwise
  */
 static int hpke_make_context(
             int mode, hpke_suite_t suite,
@@ -580,6 +729,10 @@ int hpke_enc(
     if (!hpke_suite_check(suite)) return(__LINE__);
     if (!recippub || !clear || !senderpublen || !senderpub || !cipherlen  || !cipher) return(__LINE__);
     int erv=1; ///< Our error return value - 1 is success
+#ifdef SUPERVERBOSE
+    unsigned char *pbuf;
+    size_t pblen=1024;
+#endif
 
     /*
      * The plan:
@@ -652,30 +805,14 @@ int hpke_enc(
     }
 
     /* step 2 run DH KEM to get zz */
-    pctx = EVP_PKEY_CTX_new(pkE,NULL);
-    if (pctx == NULL) {
-        erv=__LINE__; goto err;
+    erv=hpke_do_kem(pkE,pkR,&zz,&zz_len);
+    if (erv!=1) {
+        goto err;
     }
-    if (EVP_PKEY_derive_init(pctx) <= 0 ) {
-        erv=__LINE__; goto err;
-    }
-    if (EVP_PKEY_derive_set_peer(pctx, pkR) <= 0 ) {
-        erv=__LINE__; goto err;
-    }
-    if (EVP_PKEY_derive(pctx, NULL, &zz_len) <= 0) {
-        erv=__LINE__; goto err;
-    }
-    zz=OPENSSL_malloc(zz_len);
-    if (zz == NULL) {
-        erv=__LINE__; goto err;
-    }
-    if (EVP_PKEY_derive(pctx, zz, &zz_len) <= 0) {
-        erv=__LINE__; goto err;
-    }
-    EVP_PKEY_CTX_free(pctx); pctx=NULL;
 
     /* step 3. create context buffer */
-    erv=hpke_make_context(mode,suite,enc,enc_len,
+    erv=hpke_make_context(mode,suite,
+            enc,enc_len,
             recippub,recippublen,
             zero_buf,SHA256_DIGEST_LENGTH,
             info,infolen,
@@ -693,7 +830,6 @@ int hpke_enc(
     if (hpke_extract(zz,zz_len,zero_buf,SHA256_DIGEST_LENGTH,&secret,secret_len)!=1) {
         erv=__LINE__; goto err;
     }
-
     /*
      * key = Expand(secret, concat("hpke key", context), Nk)
     */
@@ -760,9 +896,24 @@ int hpke_enc(
 #endif
 
 err:
-    /*
-     * Free things up
-     */
+
+#ifdef SUPERVERBOSE
+    printf("Encrypting:\n");
+    printf("\tmode: %d, suite; %d,%d,%d\n",mode,suite.kdf_id,suite.kem_id,suite.aead_id);
+    pblen = EVP_PKEY_get1_tls_encodedpoint(pkE,&pbuf); hpke_pbuf(stdout,"\tpkE",pbuf,pblen); OPENSSL_free(pbuf);
+    hpke_pbuf(stdout,"\tcontext",context,context_len);
+    hpke_pbuf(stdout,"\tzz",zz,zz_len);
+    hpke_pbuf(stdout,"\tsecret",secret,secret_len);
+    hpke_pbuf(stdout,"\tenc",enc,enc_len);
+    hpke_pbuf(stdout,"\tinfo",info,infolen);
+    hpke_pbuf(stdout,"\taad",aad,aadlen);
+    hpke_pbuf(stdout,"\tnonce",nonce,nonce_len);
+    hpke_pbuf(stdout,"\tkey",key,key_len);
+    pblen = EVP_PKEY_get1_tls_encodedpoint(pkR,&pbuf); hpke_pbuf(stdout,"\tpkR",pbuf,pblen); OPENSSL_free(pbuf);
+    hpke_pbuf(stdout,"\tcleartext",clear,clearlen);
+    hpke_pbuf(stdout,"\tciphertext",cipher,*cipherlen);
+#endif
+
     if (pkR!=NULL) EVP_PKEY_free(pkR);
     if (pkE!=NULL) EVP_PKEY_free(pkE);
     if (pctx!=NULL) EVP_PKEY_CTX_free(pctx);
@@ -787,6 +938,8 @@ err:
  * @param cipher is the ciphertext
  * @param aadlen is the lenght of the additional data
  * @param aad is the encoded additional data
+ * @param infolen is the lenght of the info data (can be zero)
+ * @param info is the encoded info data (can be NULL)
  * @param clearlen is the length of the input buffer for cleartext (octets used on output)
  * @param clear is the encoded cleartext
  * @return 1 for good (OpenSSL style), not-1 for error
@@ -798,6 +951,7 @@ int hpke_dec(
         size_t enclen, unsigned char *enc,
         size_t cipherlen, unsigned char *cipher,
         size_t aadlen, unsigned char *aad,
+        size_t infolen, unsigned char *info,
         size_t *clearlen, unsigned char *clear)
 {
     if (mode!=HPKE_MODE_BASE) return(__LINE__);
@@ -805,6 +959,10 @@ int hpke_dec(
     if (!internal_suite) return(__LINE__);
     if (!priv || !clearlen || !clear || !cipher) return(__LINE__);
     int erv=1;
+#ifdef SUPERVERBOSE
+    unsigned char *pbuf;
+    size_t pblen=1024;
+#endif
 
     /*
      * The plan:
@@ -831,25 +989,115 @@ int hpke_dec(
     unsigned char *key=NULL;
     size_t  nonce_len=0;
     unsigned char *nonce=NULL;
+    size_t  mypub_len=0;
+    unsigned char *mypub=NULL;
+    BIO *bfp=NULL;
 
     /* step 0. Initialise peer's key from string */
     pkE = EVP_PKEY_new_raw_public_key(EVP_PKEY_X25519,NULL,enc,enclen);
     if (pkE == NULL) {
+        printf("Enclen: %ld\n",enclen);
         erv=__LINE__; goto err;
     }
 
     /* step 1. load decryptors private key */
     skR=EVP_PKEY_new_raw_private_key(EVP_PKEY_X25519,NULL,priv,privlen);
     if (!skR) {
+        /* check PEM decode - that might work :-) */
+        bfp=BIO_new(BIO_s_mem());
+        if (!bfp) {
+            erv=__LINE__; goto err;
+        }
+        BIO_write(bfp,priv,privlen);
+        if (!PEM_read_bio_PrivateKey(bfp,&skR,NULL,NULL)) {
+            erv=__LINE__; goto err;
+        }
+    }
+
+    /* step 2 run DH KEM to get zz */
+    erv=hpke_do_kem(skR,pkE,&zz,&zz_len);
+    if (erv!=1) {
+        goto err;
+    }
+
+    /* step 3. create context buffer */
+    mypub_len=EVP_PKEY_get1_tls_encodedpoint(skR,&mypub);
+    if (mypub==NULL || mypub_len == 0) {
+        erv=__LINE__; goto err;
+    }
+    erv=hpke_make_context(mode,suite,
+            enc,enclen,
+            mypub,mypub_len,
+            zero_buf,SHA256_DIGEST_LENGTH,
+            info,infolen,
+            &context,&context_len);
+
+    /* step 4. extracts and expands as needed */
+    /*
+     * secret = Extract(psk, zz)
+     * in my case psk is 32 octets of zero
+     */
+    secret_len=SHA256_DIGEST_LENGTH;
+    if (hpke_extract(zz,zz_len,zero_buf,SHA256_DIGEST_LENGTH,&secret,secret_len)!=1) {
+        erv=__LINE__; goto err;
+    }
+    /*
+     * key = Expand(secret, concat("hpke key", context), Nk)
+    */
+    key_len=16;
+    if (hpke_expand(secret,secret_len,"hpke key",context,context_len,&key,key_len)!=1) {
+        erv=__LINE__; goto err;
+    }
+    /*
+     * nonce = Expand(secret, concat("hpke nonce", context), Nn)
+    */
+    nonce_len=12;
+    if (hpke_expand(secret,secret_len,"hpke nonce",context,context_len,&nonce,nonce_len)!=1) {
         erv=__LINE__; goto err;
     }
 
-    /* step 2. run DH KEM to get zz */
-    /* step 3. create context buffer */
-    /* step 4. extracts and expands as needed */
     /* step 5. call the AEAD */
+    size_t lclearlen=HPKE_MAXSIZE;
+    unsigned char lclear[HPKE_MAXSIZE];
+    int arv=hpke_aead_dec(
+                key,key_len,
+                nonce,nonce_len,
+                aad,aadlen,
+                cipher,cipherlen,
+                lclear,&lclearlen);
+    if (arv!=1) {
+        erv=arv; goto err;
+    }
+    if (lclearlen > *clearlen) {
+        erv=__LINE__; goto err;
+    }
+    /* 
+     * finish up
+     */
+    memcpy(clear,lclear,lclearlen);
+    *clearlen=lclearlen;
 
 err:
+
+#ifdef SUPERVERBOSE
+    printf("Decrypting:\n");
+    printf("\tmode: %d, suite; %d,%d,%d\n",mode,suite.kdf_id,suite.kem_id,suite.aead_id);
+    pblen = EVP_PKEY_get1_tls_encodedpoint(pkE,&pbuf); hpke_pbuf(stdout,"\tpkE",pbuf,pblen); OPENSSL_free(pbuf);
+    hpke_pbuf(stdout,"\tcontext",context,context_len);
+    hpke_pbuf(stdout,"\tzz",zz,zz_len);
+    hpke_pbuf(stdout,"\tsecret",secret,secret_len);
+    hpke_pbuf(stdout,"\tenc",enc,enclen);
+    hpke_pbuf(stdout,"\tinfo",info,infolen);
+    hpke_pbuf(stdout,"\taad",aad,aadlen);
+    hpke_pbuf(stdout,"\tnonce",nonce,nonce_len);
+    hpke_pbuf(stdout,"\tkey",key,key_len);
+    pblen = EVP_PKEY_get1_tls_encodedpoint(skR,&pbuf); hpke_pbuf(stdout,"\tpkR",pbuf,pblen); OPENSSL_free(pbuf);
+    hpke_pbuf(stdout,"\tciphertext",cipher,cipherlen);
+    if (*clearlen!=HPKE_MAXSIZE) hpke_pbuf(stdout,"\tplaintext",clear,*clearlen);
+    else printf("clearlen is HPKE_MAXSIZE, so decryption probably failed\n");
+#endif
+
+    if (bfp!=NULL) BIO_free_all(bfp);
     if (skR!=NULL) EVP_PKEY_free(skR);
     if (pkE!=NULL) EVP_PKEY_free(pkE);
     if (pctx!=NULL) EVP_PKEY_CTX_free(pctx);
@@ -857,6 +1105,7 @@ err:
     if (context!=NULL) OPENSSL_free(context);
     if (secret!=NULL) OPENSSL_free(secret);
     if (key!=NULL) OPENSSL_free(key);
+    if (mypub!=NULL) OPENSSL_free(mypub);
     if (nonce!=NULL) OPENSSL_free(nonce);
     return erv;
 }
@@ -928,6 +1177,7 @@ int hpke_kg(
     memcpy(priv,lpriv,lprivlen);
 
 err:
+
     if (skR!=NULL) EVP_PKEY_free(skR);
     if (pctx!=NULL) EVP_PKEY_CTX_free(pctx);
     if (lpub!=NULL) OPENSSL_free(lpub);

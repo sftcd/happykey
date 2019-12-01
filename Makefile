@@ -55,3 +55,5 @@ docclean:
 
 clean:
 	- rm -f hpkemain.o hpke.o hpketv.o hpkemain 
+	- rm -rf scratch/*
+

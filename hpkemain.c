@@ -115,9 +115,9 @@ static int map_input(const char *inp, size_t *outlen, unsigned char **outbuf, in
     unsigned char tbuf[HPKE_MAXSIZE];
     memset(tbuf,0,HPKE_MAXSIZE); /* need this so valgrind doesn't complain about b64 strspn below with short values */
     /* asci hex is easy:-) either case allowed*/
-    const char *AH_alphabet="0123456789ABCDEFabcdef";
+    const char *AH_alphabet="0123456789ABCDEFabcdef\n";
     /* and base64 isn't much harder */
-    const char *B64_alphabet="ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/=";
+    const char *B64_alphabet="ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/=\n";
 
     /* if no input, try stdin */
     if (!inp) {
@@ -144,8 +144,8 @@ static int map_input(const char *inp, size_t *outlen, unsigned char **outbuf, in
     /* ascii-hex or b64 decode as needed */
     /* try from most constrained to least in that order */
     if (strip) {
-        strip_newlines(&toutlen,tbuf);
         if (toutlen<=strspn(tbuf,AH_alphabet)) {
+            strip_newlines(&toutlen,tbuf);
             int adr=hpke_ah_decode(toutlen,tbuf,outlen,outbuf);
             if (!adr) return(__LINE__);
             if (adr==1) {
@@ -154,6 +154,7 @@ static int map_input(const char *inp, size_t *outlen, unsigned char **outbuf, in
 	        }
 	    } 
 	    if (toutlen<=strspn(tbuf,B64_alphabet)) {
+            strip_newlines(&toutlen,tbuf);
 	        *outbuf=OPENSSL_malloc(toutlen);
 	        if (!*outbuf) return(__LINE__);
 	        *outlen=EVP_DecodeBlock(*outbuf, (unsigned char *)tbuf, toutlen);
@@ -187,6 +188,9 @@ static int map_input(const char *inp, size_t *outlen, unsigned char **outbuf, in
 #define HPKE_END_CP "-----END CIPHERTEXT-----"
 #define HPKE_START_PUB "-----BEGIN PUBLIC KEY-----"
 #define HPKE_END_PUB "-----END PUBLIC KEY-----"
+#define HPKE_START_PRIV "-----BEGIN PRIVATE KEY-----"
+#define HPKE_END_PRIV "-----END PRIVATE KEY-----"
+
 
 /*!
  * @brief write key pair to file or files
@@ -375,10 +379,12 @@ static int hpkemain_read_ct(const char *fname,
     FINDLAB(fbuf,HPKE_START_SP,sps);
     char *spe=NULL;
     FINDLAB(sps,HPKE_END_SP,spe);
+    spe--; /* there's a LF before */
     char *cts=NULL;
     FINDLAB(spe,HPKE_START_CP,cts);
     char *cte=NULL;
     FINDLAB(cts,HPKE_END_CP,cte);
+    cte--; /* there's a LF before */
 
     /* next we gotta chew whitespace... boring, isn't it? ;-( */
     char b64buf[HPKE_MAXSIZE];
@@ -388,12 +394,15 @@ static int hpkemain_read_ct(const char *fname,
     for (char *cp=bstart;cp<spe;cp++) {
         if (!isspace(*cp)) *bp++=*cp;
     }
-    int lsplen=EVP_DecodeBlock(sp,b64buf,bp-b64buf);
+    size_t paddingoctets=0;
+    char *bbp=bp-1;
+    while (*bbp=='=') { paddingoctets++; bbp--;}
+    size_t lsplen=EVP_DecodeBlock(sp,b64buf,bp-b64buf);
     if (lsplen<=0) {
         fprintf(stderr,"Error base64 decoding sender public within file %s\n",pfname);
         return(__LINE__);
     }
-    *splen=lsplen;
+    *splen=lsplen-paddingoctets;
 
     memset(b64buf,0,HPKE_MAXSIZE);
     bp=b64buf;
@@ -401,12 +410,15 @@ static int hpkemain_read_ct(const char *fname,
     for (char *cp=bstart;cp<cte;cp++) {
         if (!isspace(*cp)) *bp++=*cp;
     }
-    int lctlen=EVP_DecodeBlock(ct,b64buf,bp-b64buf);
+    paddingoctets=0;
+    bbp=bp-1;
+    while (*bbp=='=') { paddingoctets++; bbp--;}
+    size_t lctlen=EVP_DecodeBlock(ct,b64buf,bp-b64buf);
     if (lctlen<=0) {
         fprintf(stderr,"Error base64 decoding ciphertezt within file %s\n",pfname);
         return(__LINE__);
     }
-    *ctlen=lctlen;
+    *ctlen=lctlen-paddingoctets;
     return(1);
 }
 
@@ -623,14 +635,50 @@ int main(int argc, char **argv)
             fprintf(stderr,"Error reading input - exiting\n");
             exit(rv);
         }
+#if 0
+        /* 
+         * Check if priv at this stage is PEM-like (and hence needs further
+         * decoding), or not...
+         * Move this inside hpke_dec...
+         */
+        hpke_pbuf(stdout,"priv",priv,privlen);
+        int pemlike=strspn(priv,HPKE_START_PRIV); 
+        if (pemlike==strlen(HPKE_START_PRIV)) {
+            printf("Yep, it'S PEM-like\n");
+        }
+#endif
         rv=hpke_dec( hpke_mode, hpke_suite,
                 privlen, priv,
                 senderpublen, senderpub,
                 cipherlen, cipher,
-                0, NULL,
+                aadlen,aad,
+                infolen,info,
                 &clearlen, clear); 
+        if (rv!=1) {
+            fprintf(stderr,"Error decrypting (%d) - exiting\n",rv);
+            exit(rv);
+        }
         if (priv!=NULL) OPENSSL_free(priv);
-
+        FILE *fout=NULL;
+        if (!out_in) {
+            fout=stdout;
+        } else {
+            fout=fopen(out_in,"wb");
+            if (!fout) {
+                fprintf(stderr,"Decryption worked but can't open (%s) - exiting\n",out_in);
+                exit(1);
+            }
+        }
+        size_t frv=fwrite(clear,1,clearlen,fout);
+        if (frv!=clearlen) {
+            fprintf(stderr,"Error writing %ld bytes of output to %s (only %ld written)\n",
+                        clearlen,(out_in?out_in:"STDOUT"),frv);
+            exit(1);
+        }
+        if (out_in!=NULL) {
+            fclose(fout);
+            if (verbose) printf("All worked: Recovered plain is %ld octets.\n",clearlen);
+        }
     } 
 
 #ifdef TESTVECTORS
