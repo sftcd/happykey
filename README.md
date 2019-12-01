@@ -1,19 +1,20 @@
 # happykey
 
-I'm implementing
-[draft-irtf-cfrg-hpke](https://tools.ietf.org/html/draft-irtf-cfrg-hpke) using
-OpenSSL, as a precursor to using that as part of the next [Encrypted SNI/ECHO
-draft](https://tools.ietf.org/html/draft-ietf-tls-esni) with my [ESNI-enabled
-OpenSSL](https://github.com/sftcd/openssl) fork.
+This is a work-in-progress implementation of 
+[draft-irtf-cfrg-hpke](https://tools.ietf.org/html/draft-irtf-cfrg-hpke), using
+OpenSSL, as a precursor to using that as part of the 
+next [Encrypted SNI/ECHO draft](https://tools.ietf.org/html/draft-ietf-tls-esni) with 
+my [ESNI-enabled OpenSSL](https://github.com/sftcd/openssl) fork.
 
-Currently, (20191201) ``hpke_enc()`` produces an output, and one that
-matches a CFRG test vector, but lots is hard-coded to one ciphersuite
-(x25519,hkdf-sha256,aes128gcm) and plenty of code needs re-factoring. 
-``hpke_dec()`` can now also decrypt what ``hpke_enc()`` produced, and
-valgrind seems happy for the moment, at least with nominal behaviour,
-so things aren't that shabby:-)
+Currently, (20191201) ``hpke_enc()`` produces output that matches at least one
+CFRG test vector, but lots is hard-coded to one ciphersuite (x25519,
+hkdf-sha256 and aes128gcm) and plenty of code needs re-factoring. In addition,
+``hpke_dec()`` can decrypt what ``hpke_enc()`` produces, and valgrind
+seems happy for the moment, at least with nominal behaviour, so things aren't
+totally shabby:-)
 
 Main TODOs (possibly in this order) are:
+- check if vanilla and/or current-release OpenSSL works
 - arbitrary sizes for plain/cipher texts (640kB is a hard limit for now:-)
 - selection of test vectors (first matching for now)
 - APIs for non single-shot operation (non-existent:-)
@@ -21,20 +22,19 @@ Main TODOs (possibly in this order) are:
 
 ## Build 
 
-You'll probably want to start by cloning this, I'll assume you do that
-from within ``$HOME/code``, e.g.:
+Assuming you want to build within ``$HOME/code``, as I do, then:
 
             $ cd $HOME/code
             $ git clone https://github.com/sftcd/happykey
             $ cd happykey
 
 The build needs OpenSSL.  (Not sure if I'm using anything that needs building
-from the OpenSSL tip, but I'll check that.) If you want test vectors, (see
-below) you'll also need json-c,  so my setup looks like:
+from the OpenSSL tip, but I'll check that.) If you want to check test vectors,
+(see below) you'll also need json-c,  so my setup looks like:
 
-- $HOME/code/happykey with this repo
-- $HOME/code/openssl with a clone of https://github.com/sftcd/openssl
-- $HOME/code/json-c with a clone of https://github.com/json-c/json-c
+- ``$HOME/code/happykey`` with this repo
+- ``$HOME/code/openssl`` with a clone of [OpenSSL](https://github.com/sftcd/openssl)
+- ``$HOME/code/json-c`` with a clone of [json-c](https://github.com/json-c/json-c)
 
 If your setup differs, you'll need to hand-edit the [Makefile](Makefile)
 and then:
@@ -44,12 +44,14 @@ and then:
             gcc -g  -I ../openssl/include -c hpke.c
             gcc -g  -o hpkemain hpkemain.o hpke.o -L ../openssl -lssl -lcrypto
 
-I also have a [bash script](env) that sets the environment for those shared objects:
+I also have a [bash script](env) that sets the environment for to pick up 
+the shared objects needed:
 
             $ . ./env
 
 
-If you build this, start with ``hpkemain -h`` to see what's what.
+If you do build this, ``hpkemain`` is the test tool, so start with 
+``hpkemain -h`` to see what's what:
 
             $ ./hpkemain -h
             Usage: ./hpkemain [-h|-v|-k|-e|-d] [-P public] [-p private] [-a aad] [-I info] [-i input] [-o output]
@@ -87,11 +89,11 @@ script [env](./env), looks like this:
             lwmIl7EpoPbZy3UQBM5B8gBNICHqfuNGwvkraWxFMPfOcPlH19ifEz2Qch6WLFeGGY4C5MtkbJv6A2/kJqTGOSQ7nwWZKXSgTG2wGXpXyZHN2Q==
             -----END CIPHERTEXT-----
 
-(Not sure that MIME type like stuff is wise, but we'll see - it'll be good enough
+(Not sure that MIME type like stuff is wise, but we'll see - it's good enough
 to let me easily test round-tripping at least.)
 
 The [roundtrip.sh](roundtrip.sh) script fetches some plaintext, generates a key
-pair, then encrypts a file to that public key, then decrypts that. All relevant
+pair, encrypts a file to that public key, then decrypts that. All relevant
 files end up in ``$HOME/code/happykey/scratch`` with random looking names. (A 
 ``make clean`` will clean those out too.)
 
@@ -141,6 +143,10 @@ Or you can put both keys in one file if you omit the public key file name:
 
 ## Test Vectors
  
+The authors of the HPKE draft also published some (96!) test vectors,
+so one of the things I did while coding was to check I get the same
+values as those.
+
 To enable test vector checking, compile with ``TESTVECTORS`` #define'd.
 There's a line to uncomment in the [Makefile](Makefile) that does that.
 To do the test vector comparison I use the published 
