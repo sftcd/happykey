@@ -98,6 +98,11 @@ pair, encrypts a file to that public key, then decrypts that. All relevant
 files end up in ``$HOME/code/happykey/scratch`` with random looking names. (A 
 ``make clean`` will clean those out too.)
 
+The [infoaadtest.sh](infoaadtest.sh) script does the same as
+[roundtrip.sh](roundtrip.sh) but provides optional (random) AAD and Info inputs
+to encryption and checks that decryption works or fails as appropriate when
+good/bad values are provided. 
+
 ## PEM-like ciphertext file format
 
 Since we need the ciphertext and sender's public key to do a decrypt,

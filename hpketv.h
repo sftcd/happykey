@@ -76,7 +76,7 @@ typedef struct hpke_tv_s {
 
 /*!
  * @brief load test vectors from json file to array
- * @param filename is the json file
+ * @param fname is the json file
  * @param nelems returns with the number of array elements
  * @param array returns with the elements
  * @return 1 for good, other for bad
@@ -86,7 +86,7 @@ int hpke_tv_load(char *fname, int *nelems, hpke_tv_t **array);
 /*!
  * @brief select a test vector to use based on mode and suite
  * @param nelems is the number of array elements
- * @param array is the elements
+ * @param arr is the elements
  * @param selector is a string to use
  * @param tv is the chosen test vector (doesn't need to be freed)
  * @return 1 for good, other for bad

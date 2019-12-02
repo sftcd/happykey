@@ -635,18 +635,6 @@ int main(int argc, char **argv)
             fprintf(stderr,"Error reading input - exiting\n");
             exit(rv);
         }
-#if 0
-        /* 
-         * Check if priv at this stage is PEM-like (and hence needs further
-         * decoding), or not...
-         * Move this inside hpke_dec...
-         */
-        hpke_pbuf(stdout,"priv",priv,privlen);
-        int pemlike=strspn(priv,HPKE_START_PRIV); 
-        if (pemlike==strlen(HPKE_START_PRIV)) {
-            printf("Yep, it'S PEM-like\n");
-        }
-#endif
         rv=hpke_dec( hpke_mode, hpke_suite,
                 privlen, priv,
                 senderpublen, senderpub,

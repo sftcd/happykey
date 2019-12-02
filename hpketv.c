@@ -47,12 +47,13 @@
 /*!
  * Crap out if this isn't defined.
  */
-assert("TESTVECTORS not defined which is bad");
+#define FAIL2BUILD(x) int x;
+FAIL2BUILD("Don't build hpkeyv.c without TESTVECRTORS being defined")
 #endif
 
-/*
+/*!
  * @brief load test vectors from json file to array
- * @param filename is the json file
+ * @param fname is the json file
  * @param nelems returns with the number of array elements
  * @param array returns with the elements
  * @return 1 for good, other for bad
@@ -103,7 +104,7 @@ int hpke_tv_load(char *fname, int *nelems, hpke_tv_t **array)
      */
 
 /*
- * Marcros to grab a numeric or string field from JSON object 
+ * Marcros to grab a numeric or string field from json-c object 
  * and whack in same-named field of ours
  */
 
@@ -192,6 +193,9 @@ void hpke_tv_free(int nelems, hpke_tv_t *array)
     return;
 }
 
+/*!
+ * @brief print the name of a field and the value of that field
+ */
 #define PRINTIT(_xx) printf("\t"#_xx": %s\n",a->_xx);
 
 /*

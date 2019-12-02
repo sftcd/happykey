@@ -790,8 +790,8 @@ WARN_LOGFILE           =
 # spaces. See also FILE_PATTERNS and EXTENSION_MAPPING
 # Note: If this tag is empty the current directory is searched.
 
-INPUT                  = hpke.h
-INPUT                  += hpke.c 
+INPUT                  = hpke.c
+INPUT                  += hpke.h 
 INPUT                  += hpketv.h 
 INPUT                  += hpketv.c 
 #INPUT                  += hpkemain.c 

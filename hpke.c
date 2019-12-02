@@ -8,7 +8,7 @@
  */
 
 /**
- * @file 
+ * @file
  * An OpenSSL-based HPKE implementation following draft-irtf-cfrg-hpke
  *
  * I plan to use this for my ESNI-enabled OpenSSL build (https://github.com/sftcd/openssl)
@@ -31,13 +31,7 @@
 #include "hpketv.h"
 #endif
 
-/*
- * Define this if you want loads printing of intermediate
- * cryptographic values
- */
-#undef SUPERVERBOSE 
-
-/*
+/**
  * handy thing to have :-)
  */
 static const unsigned char zero_buf[SHA256_DIGEST_LENGTH] = {
@@ -46,7 +40,7 @@ static const unsigned char zero_buf[SHA256_DIGEST_LENGTH] = {
         0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
         0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00 };
 
-/*
+/*!
  * Bash command line hashing starting from ascii hex example:
  *
  *    $ echo -e "4f6465206f6e2061204772656369616e2055726e" | xxd -r -p | openssl sha256
@@ -73,19 +67,21 @@ static const unsigned char zero_sha256[SHA256_DIGEST_LENGTH] = {
     0x27, 0xae, 0x41, 0xe4, 0x64, 0x9b, 0x93, 0x4c, 
     0xa4, 0x95, 0x99, 0x1b, 0x78, 0x52, 0xb8, 0x55};
 
-/* Map ascii to binary */
+/*!
+ * @brief  Map ascii to binary 
+ */
 #define HPKE_A2B(__c__) (__c__>='0'&&__c__<='9'?(__c__-'0'):\
                         (__c__>='A'&&__c__<='F'?(__c__-'A'+10):\
                         (__c__>='a'&&__c__<='f'?(__c__-'a'+10):0)))
 
-/**
+/*!
  * @brief decode ascii hex to a binary buffer
  *
  * @param ahlen is the ascii hex string length
- * @param ahstr is the ascii hex string
+ * @param ah is the ascii hex string
  * @param blen is a pointer to the returned binary length
  * @param buf is a pointer to the internally allocated binary buffer
- * @return zero for error, 1 for success 
+ * @return 1 for good otherwise bad
  */
 int hpke_ah_decode(size_t ahlen, const char *ah, size_t *blen, unsigned char **buf)
 {
@@ -111,7 +107,7 @@ int hpke_ah_decode(size_t ahlen, const char *ah, size_t *blen, unsigned char **b
     return 1;
 }
 
-/**
+/*!
  * @brief for odd/occasional debugging
  *
  * @param fout is a FILE * to use
@@ -120,7 +116,7 @@ int hpke_ah_decode(size_t ahlen, const char *ah, size_t *blen, unsigned char **b
  * @param blen is the length of the buffer
  * @return 1 for success 
  */
-int hpke_pbuf(FILE *fout, char *msg,unsigned char *buf,size_t blen) 
+static int hpke_pbuf(FILE *fout, char *msg,unsigned char *buf,size_t blen) 
 {
     if (!fout || !buf || !msg) {
         return 0;
@@ -134,7 +130,7 @@ int hpke_pbuf(FILE *fout, char *msg,unsigned char *buf,size_t blen)
     return 1;
 }
 
-/*
+/*!
  * @brief Check if ciphersuite is ok/known to us
  * @param suite is the externally supplied cipheruite
  * @return 1 for good, not-1 for error
@@ -148,48 +144,65 @@ static int hpke_suite_check(hpke_suite_t suite)
     return(1);
 }
 
-/*
+/*!
  * @brief return the length of the context for this suite
  * @param suite is the externally supplied cipheruite
  * @return the length (in octets) of the context 
  *
  * For now, we only recognise HPKE_SUITE_DEFAULT
  */
-static int figure_context_len(hpke_suite_t suite)
+static int figure_contextlen(hpke_suite_t suite)
 {
     /* for now, I'm using the test vector, we'll see how that goes */
     //return strlen("00000200010001ef0bf7ee58713568663204cf720cff64a852c77ace25f478cfe7dc0721508e03186c394e175b7b161760b1bd5b822a0804bd066b170c695c0df123176fa7df6f0000000000000000000000000000000000000000000000000000000000000000e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b85555c4040629c64c5efec2f7230407d612d16289d7c5d7afcf9340280abd2de1ab")/2;
     return(167);
 }
 
-/**
- * @brief do the AEAD decrhyption 
+/*
+ * Ok, there's an odd accidental coding style feature here:
+ * For all the externally visible functions in hpke.h, when
+ * passing in a buffer, the length parameter precedes the 
+ * associated buffer pointer. It turns out that, entirely by
+ * accident, I did the exact opposite for all the static 
+ * functions defined inside here. But since I was consistent
+ * in both cases, I'll declare that a feature and move on:-)
+ *
+ * For example, just below you'll see:
+ *          unsigned char *iv, size_t ivlen,
+ * ...whereas in hpke.h, you see:
+ *          size_t publen, unsigned char *pub,
+ */
+
+/*!
+ * @brief do the AEAD decryption 
  *
  * @param key is the secret
- * @param key_len is the length of the secret
+ * @param keylen is the length of the secret
  * @param iv is the initialisation vector
- * @param iv_len is the length of the iv
+ * @param ivlen is the length of the iv
  * @param aad is the additional authenticated data
- * @param aad_len is the length of the aad
- * @param cipher_len is an input/output, better be big enough on input, exact on output
- * @param cipher is an output
+ * @param aadlen is the length of the aad
+ * @param cipher is obvious
+ * @param cipherlen is the ciphertext length
+ * @param plain is an output
+ * @param plainlen is an input/output, better be big enough on input, exact on output
  * @return 1 for good otherwise bad
  */
 static int hpke_aead_dec(
-            unsigned char *key, size_t key_len,
-            unsigned char *iv, size_t iv_len,
-            unsigned char *aad, size_t aad_len,
-            unsigned char *cipher, size_t cipher_len,
-            unsigned char *plain, size_t *plain_len)
+            unsigned char *key, size_t keylen,
+            unsigned char *iv, size_t ivlen,
+            unsigned char *aad, size_t aadlen,
+            unsigned char *cipher, size_t cipherlen,
+            unsigned char *plain, size_t *plainlen)
 {
     int erv=1;
     EVP_CIPHER_CTX *ctx=NULL;
     int len=0;
-    size_t plaintext_len=0;
+    size_t plaintextlen=0;
     unsigned char *plaintext=NULL;
-    size_t tag_len=EVP_GCM_TLS_TAG_LEN;
+    size_t taglen=EVP_GCM_TLS_TAG_LEN;
     unsigned char tag[EVP_GCM_TLS_TAG_LEN]; 
-    plaintext=OPENSSL_malloc(cipher_len);
+    plaintext=OPENSSL_malloc(cipherlen);
     if (plaintext==NULL) {
         erv=__LINE__; goto err;
     }
@@ -206,7 +219,7 @@ static int hpke_aead_dec(
         erv=__LINE__; goto err;
     }
     /* Set IV length if default 12 bytes (96 bits) is not appropriate */
-    if(1 != EVP_CIPHER_CTX_ctrl(ctx, EVP_CTRL_GCM_SET_IVLEN, iv_len, NULL)) {
+    if(1 != EVP_CIPHER_CTX_ctrl(ctx, EVP_CTRL_GCM_SET_IVLEN, ivlen, NULL)) {
         erv=__LINE__; goto err;
     }
     /* Initialise key and IV */
@@ -216,21 +229,21 @@ static int hpke_aead_dec(
     /* Provide any AAD data. This can be called zero or more times as
      * required
      */
-    if (aad_len!=0 && aad!=NULL) {
-        if(1 != EVP_DecryptUpdate(ctx, NULL, &len, aad, aad_len)) {
+    if (aadlen!=0 && aad!=NULL) {
+        if(1 != EVP_DecryptUpdate(ctx, NULL, &len, aad, aadlen)) {
             erv=__LINE__; goto err;
         }
     }
     /* Provide the message to be encrypted, and obtain the encrypted output.
      * EVP_EncryptUpdate can be called multiple times if necessary
      */
-    if(1 != EVP_DecryptUpdate(ctx, plaintext, &len, cipher, cipher_len-EVP_GCM_TLS_TAG_LEN)) {
+    if(1 != EVP_DecryptUpdate(ctx, plaintext, &len, cipher, cipherlen-EVP_GCM_TLS_TAG_LEN)) {
         erv=__LINE__; goto err;
     }
-    plaintext_len = len;
+    plaintextlen = len;
 
     /* Set expected tag value. Works in OpenSSL 1.0.1d and later */
-    if(!EVP_CIPHER_CTX_ctrl(ctx, EVP_CTRL_GCM_SET_TAG, EVP_GCM_TLS_TAG_LEN, cipher+cipher_len-EVP_GCM_TLS_TAG_LEN)) {
+    if(!EVP_CIPHER_CTX_ctrl(ctx, EVP_CTRL_GCM_SET_TAG, EVP_GCM_TLS_TAG_LEN, cipher+cipherlen-EVP_GCM_TLS_TAG_LEN)) {
         erv=__LINE__; goto err;
     }
     /* Finalise the encryption. Normally ciphertext bytes may be written at
@@ -241,11 +254,11 @@ static int hpke_aead_dec(
     }
 
     /* Clean up */
-    if (plaintext_len>*plain_len) {
+    if (plaintextlen>*plainlen) {
         erv=__LINE__; goto err;
     }
-    *plain_len=plaintext_len;
-    memcpy(plain,plaintext,plaintext_len);
+    *plainlen=plaintextlen;
+    memcpy(plain,plaintext,plaintextlen);
 err:
     if (ctx) EVP_CIPHER_CTX_free(ctx);
     if (plaintext!=NULL) OPENSSL_free(plaintext);
@@ -253,46 +266,43 @@ err:
     return(0);
 }
 
-/**
+/*!
  * @brief do the AEAD encryption as per the I-D
  *
  * @param key is the secret
- * @param key_len is the length of the secret
+ * @param keylen is the length of the secret
  * @param iv is the initialisation vector
- * @param iv_len is the length of the iv
+ * @param ivlen is the length of the iv
  * @param aad is the additional authenticated data
- * @param aad_len is the length of the aad
- * @param cipher_len is an input/output, better be big enough on input, exact on output
+ * @param aadlen is the length of the aad
+ * @param plain is an output
+ * @param plainlen is the length of plain
  * @param cipher is an output
+ * @param cipherlen is an input/output, better be big enough on input, exact on output
  * @return 1 for good otherwise bad
- * @returns 1 for success, not-1 otherwise
  */
 static int hpke_aead_enc(
-            unsigned char *key, size_t key_len,
-            unsigned char *iv, size_t iv_len,
-            unsigned char *aad, size_t aad_len,
-            unsigned char *plain, size_t plain_len,
-            unsigned char *cipher, size_t *cipher_len)
+            unsigned char *key, size_t keylen,
+            unsigned char *iv, size_t ivlen,
+            unsigned char *aad, size_t aadlen,
+            unsigned char *plain, size_t plainlen,
+            unsigned char *cipher, size_t *cipherlen)
 {
-
-    /*
-     * From https://wiki.openssl.org/index.php/EVP_Authenticated_Encryption_and_Decryption
-     */
     int erv=1;
     EVP_CIPHER_CTX *ctx=NULL;
     int len;
-    size_t ciphertext_len;
+    size_t ciphertextlen;
     unsigned char *ciphertext=NULL;
-    size_t tag_len=EVP_GCM_TLS_TAG_LEN;
+    size_t taglen=EVP_GCM_TLS_TAG_LEN;
     unsigned char tag[EVP_GCM_TLS_TAG_LEN]; 
-    if (tag_len+plain_len>*cipher_len) {
+    if (taglen+plainlen>*cipherlen) {
         erv=__LINE__; goto err;
     }
     /*
      * We'll allocate this much extra for ciphertext and check the AEAD doesn't require more
      * If it does, we'll fail.
      */
-    ciphertext=OPENSSL_malloc(plain_len+tag_len);
+    ciphertext=OPENSSL_malloc(plainlen+taglen);
     if (ciphertext==NULL) {
         erv=__LINE__; goto err;
     }
@@ -309,7 +319,7 @@ static int hpke_aead_enc(
         erv=__LINE__; goto err;
     }
     /* Set IV length if default 12 bytes (96 bits) is not appropriate */
-    if(1 != EVP_CIPHER_CTX_ctrl(ctx, EVP_CTRL_GCM_SET_IVLEN, iv_len, NULL)) {
+    if(1 != EVP_CIPHER_CTX_ctrl(ctx, EVP_CTRL_GCM_SET_IVLEN, ivlen, NULL)) {
         erv=__LINE__; goto err;
     }
     /* Initialise key and IV */
@@ -319,54 +329,39 @@ static int hpke_aead_enc(
     /* Provide any AAD data. This can be called zero or more times as
      * required
      */
-    if (aad_len!=0 && aad!=NULL) {
-        if(1 != EVP_EncryptUpdate(ctx, NULL, &len, aad, aad_len)) {
+    if (aadlen!=0 && aad!=NULL) {
+        if(1 != EVP_EncryptUpdate(ctx, NULL, &len, aad, aadlen)) {
             erv=__LINE__; goto err;
         }
     }
     /* Provide the message to be encrypted, and obtain the encrypted output.
      * EVP_EncryptUpdate can be called multiple times if necessary
      */
-    if(1 != EVP_EncryptUpdate(ctx, ciphertext, &len, plain, plain_len)) {
+    if(1 != EVP_EncryptUpdate(ctx, ciphertext, &len, plain, plainlen)) {
         erv=__LINE__; goto err;
     }
-    ciphertext_len = len;
+    ciphertextlen = len;
     /* Finalise the encryption. Normally ciphertext bytes may be written at
      * this stage, but this does not occur in GCM mode
      */
     if(1 != EVP_EncryptFinal_ex(ctx, ciphertext + len, &len))  {
         erv=__LINE__; goto err;
     }
-    ciphertext_len += len;
+    ciphertextlen += len;
     /*
-     * Get the tag
-     * This isn't a duplicate so needs to be added to the ciphertext
-     *
-     * So I had a problem with this code when built with optimisation
-     * turned on ("-O3" or even "-g -O1" when I manually edited the
-     * Makefile). Valgrind reports use of uninitialised memory
-     * related to the tag (when it was later printed in SSL_ESNI_print).
-     * When I was just passing in the tag directly, I got a couple
-     * of valgrind errors from within SSL_ESNI_print and then loads
-     * (>1000) other uninitialised memory errors later on from all
-     * sorts of places in code I've not touched for ESNI.
-     * For now, building with "no-asm" is a workaround that works
-     * around:-)
-     * I mailed the openssl-users list:
-     * https://mta.openssl.org/pipermail/openssl-users/2019-November/011503.html
-     * TODO(ESNI): follow up on this
+     * Get the tag This isn't a duplicate so needs to be added to the ciphertext
      */
-    if(1 != EVP_CIPHER_CTX_ctrl(ctx, EVP_CTRL_AEAD_GET_TAG, tag_len, tag)) {
+    if(1 != EVP_CIPHER_CTX_ctrl(ctx, EVP_CTRL_AEAD_GET_TAG, taglen, tag)) {
         erv=__LINE__; goto err;
     }
-    memcpy(ciphertext+ciphertext_len,tag,tag_len);
-    ciphertext_len += tag_len;
+    memcpy(ciphertext+ciphertextlen,tag,taglen);
+    ciphertextlen += taglen;
     /* Clean up */
-    if (ciphertext_len>*cipher_len) {
+    if (ciphertextlen>*cipherlen) {
         erv=__LINE__; goto err;
     }
-    *cipher_len=ciphertext_len;
-    memcpy(cipher,ciphertext,ciphertext_len);
+    *cipherlen=ciphertextlen;
+    memcpy(cipher,ciphertext,ciphertextlen);
 err:
     if (ctx) EVP_CIPHER_CTX_free(ctx);
     if (ciphertext!=NULL) OPENSSL_free(ciphertext);
@@ -379,15 +374,16 @@ err:
  * brief RFC5869 HKDF-Extract
  *
  * @param zz - the initial key material (IKM)
- * @param zz_len - length of above
+ * @param zzlen - length of above
  * @param salt - surprisingly this is the salt;-)
- * @param salt_len - length of above
+ * @param saltlen - length of above
  * @param secret - the result of extraction (allocated inside)
- * @param secret_len - an input only!
+ * @param secretlen - an input only!
+ * @return 1 for good otherwise bad
  */
-static int hpke_extract(const unsigned char *zz, const size_t zz_len,
-        const unsigned char *salt, const size_t salt_len,
-        unsigned char **secret, const size_t secret_len)
+static int hpke_extract(const unsigned char *zz, const size_t zzlen,
+        const unsigned char *salt, const size_t saltlen,
+        unsigned char **secret, const size_t secretlen)
 {
     EVP_PKEY_CTX *pctx=NULL;
     int erv=1;
@@ -404,21 +400,21 @@ static int hpke_extract(const unsigned char *zz, const size_t zz_len,
     if (EVP_PKEY_CTX_set_hkdf_md(pctx, EVP_sha256())!=1) {
         erv=__LINE__; goto err;
     }
-    if (EVP_PKEY_CTX_set1_hkdf_key(pctx, zz, zz_len)!=1) {
+    if (EVP_PKEY_CTX_set1_hkdf_key(pctx, zz, zzlen)!=1) {
         erv=__LINE__; goto err;
     }
-    if (EVP_PKEY_CTX_set1_hkdf_salt(pctx, salt, salt_len)!=1) {
+    if (EVP_PKEY_CTX_set1_hkdf_salt(pctx, salt, saltlen)!=1) {
         erv=__LINE__; goto err;
     }
-    *secret=OPENSSL_malloc(secret_len);
+    *secret=OPENSSL_malloc(secretlen);
     if (!secret) {
         erv=__LINE__; goto err;
     }
-    size_t lsecret_len=secret_len;
-    if (EVP_PKEY_derive(pctx, *secret, &lsecret_len)!=1) {
+    size_t lsecretlen=secretlen;
+    if (EVP_PKEY_derive(pctx, *secret, &lsecretlen)!=1) {
         erv=__LINE__; goto err;
     }
-    if (lsecret_len!=secret_len) { /* just in case it changed */
+    if (lsecretlen!=secretlen) { /* just in case it changed */
         erv=__LINE__; goto err;
     }
     EVP_PKEY_CTX_free(pctx); pctx=NULL;
@@ -431,32 +427,33 @@ err:
  * brief RFC5869 HKDF-Expand
  *
  * @param secret - the initial key material (IKM)
- * @param secret_len - length of above
+ * @param secretlen - length of above
  * @param label - label to prepend to info
  * @param context - the info
- * @param context_len - length of above
+ * @param contextlen - length of above
  * @param out - the result of expansion (allocated inside)
- * @param out_len - an input only!
+ * @param outlen - an input only!
+ * @return 1 for good otherwise bad
  */
-static int hpke_expand(unsigned char *secret, size_t secret_len,
-                char *label, unsigned char *context, size_t context_len,
-                unsigned char **out, size_t out_len)
+static int hpke_expand(unsigned char *secret, size_t secretlen,
+                char *label, unsigned char *context, size_t contextlen,
+                unsigned char **out, size_t outlen)
 {
     EVP_PKEY_CTX *pctx=NULL;
     int erv=1;
     unsigned char *clbuf=NULL;
-    size_t clbuf_len;
+    size_t clbuflen;
     size_t lablen=0;
 
     if (label) lablen=strlen(label);
 
-    clbuf_len=context_len+lablen;
-    clbuf=OPENSSL_malloc(clbuf_len);
+    clbuflen=contextlen+lablen;
+    clbuf=OPENSSL_malloc(clbuflen);
     if (!clbuf) {
         erv=__LINE__; goto err;
     }
     if (label) memcpy(clbuf,label,lablen);
-    memcpy(clbuf+lablen,context,context_len);
+    memcpy(clbuf+lablen,context,contextlen);
 
     pctx = EVP_PKEY_CTX_new_id(EVP_PKEY_HKDF, NULL);
     if (!pctx) {
@@ -471,21 +468,21 @@ static int hpke_expand(unsigned char *secret, size_t secret_len,
     if (EVP_PKEY_CTX_set_hkdf_md(pctx, EVP_sha256())!=1) {
         erv=__LINE__; goto err;
     }
-    if (EVP_PKEY_CTX_set1_hkdf_key(pctx, secret, secret_len)!=1) {
+    if (EVP_PKEY_CTX_set1_hkdf_key(pctx, secret, secretlen)!=1) {
         erv=__LINE__; goto err;
     }
-    if (EVP_PKEY_CTX_add1_hkdf_info(pctx, clbuf, clbuf_len)!=1) {
+    if (EVP_PKEY_CTX_add1_hkdf_info(pctx, clbuf, clbuflen)!=1) {
         erv=__LINE__; goto err;
     }
-    *out=OPENSSL_malloc(out_len);
+    *out=OPENSSL_malloc(outlen);
     if (!out) {
         erv=__LINE__; goto err;
     }
-    size_t lout_len=out_len; /* just in case it changes */
-    if (EVP_PKEY_derive(pctx, *out, &lout_len)!=1) {
+    size_t loutlen=outlen; /* just in case it changes */
+    if (EVP_PKEY_derive(pctx, *out, &loutlen)!=1) {
         erv=__LINE__; goto err;
     }
-    if (lout_len!=out_len) {
+    if (loutlen!=outlen) {
         erv=__LINE__; goto err;
     }
     EVP_PKEY_CTX_free(pctx); pctx=NULL;
@@ -527,16 +524,16 @@ static int hpke_test_expand_extract(void)
                            0x0b,0x0b,0x0b,0x0b,
                            0x0b,0x0b,0x0b,0x0b,
                            0x0b,0x0b}; 
-    size_t IKM_len=22;
+    size_t IKMlen=22;
     unsigned char salt[13]={0x00,0x01,0x02,0x03,
                             0x04,0x05,0x06,0x07,
                             0x08,0x09,0x0a,0x0b,
                             0x0c}; 
-    size_t salt_len=13;
+    size_t saltlen=13;
     unsigned char info[10]={0xf0,0xf1,0xf2,0xf3,
                             0xf4,0xf5,0xf6,0xf7,
                             0xf8,0xf9}; 
-    size_t info_len=10;
+    size_t infolen=10;
     unsigned char PRK[32]={ 0x07,0x77,0x09,0x36,
                             0x2c,0x2e,0x32,0xdf,
                             0x0d,0xdc,0x3f,0x0d,
@@ -545,7 +542,7 @@ static int hpke_test_expand_extract(void)
                             0xb5,0x0f,0x9c,0x31,
                             0x22,0xec,0x84,0x4a,
                             0xd7,0xc2,0xb3,0xe5};
-    size_t PRK_len=32;
+    size_t PRKlen=32;
     unsigned char OKM[42]={ 0x3c,0xb2,0x5f,0x25,
                             0xfa,0xac,0xd5,0x7a,
                             0x90,0x43,0x4f,0x64,
@@ -557,11 +554,11 @@ static int hpke_test_expand_extract(void)
                             0x34,0x00,0x72,0x08,
                             0xd5,0xb8,0x87,0x18,
                             0x58,0x65 }; /* 42 octets */
-    size_t OKM_len=42;
+    size_t OKMlen=42;
     unsigned char *calc_prk;
     unsigned char *calc_okm;
     int rv=1;
-    rv=hpke_extract(IKM,IKM_len,salt,salt_len,&calc_prk,PRK_len);
+    rv=hpke_extract(IKM,IKMlen,salt,saltlen,&calc_prk,PRKlen);
     if (rv!=1) {
         printf("rfc5869 check: hpke_extract failed: %d\n",rv);
         printf("rfc5869 check: hpke_extract failed: %d\n",rv);
@@ -570,7 +567,7 @@ static int hpke_test_expand_extract(void)
         printf("rfc5869 check: hpke_extract failed: %d\n",rv);
         printf("rfc5869 check: hpke_extract failed: %d\n",rv);
     }
-    if (memcmp(calc_prk,PRK,PRK_len)) {
+    if (memcmp(calc_prk,PRK,PRKlen)) {
         printf("rfc5869 check: hpke_extract gave wrong answer!\n");
         printf("rfc5869 check: hpke_extract gave wrong answer!\n");
         printf("rfc5869 check: hpke_extract gave wrong answer!\n");
@@ -578,7 +575,7 @@ static int hpke_test_expand_extract(void)
         printf("rfc5869 check: hpke_extract gave wrong answer!\n");
         printf("rfc5869 check: hpke_extract gave wrong answer!\n");
     }
-    rv=hpke_expand(PRK,PRK_len,"",info,info_len,&calc_okm,OKM_len);
+    rv=hpke_expand(PRK,PRKlen,"",info,infolen,&calc_okm,OKMlen);
     if (rv!=1) {
         printf("rfc5869 check: hpke_expand failed: %d\n",rv);
         printf("rfc5869 check: hpke_expand failed: %d\n",rv);
@@ -587,7 +584,7 @@ static int hpke_test_expand_extract(void)
         printf("rfc5869 check: hpke_expand failed: %d\n",rv);
         printf("rfc5869 check: hpke_expand failed: %d\n",rv);
     }
-    if (memcmp(calc_okm,OKM,OKM_len)) {
+    if (memcmp(calc_okm,OKM,OKMlen)) {
         printf("rfc5869 check: hpke_expand gave wrong answer!\n");
         printf("rfc5869 check: hpke_expand gave wrong answer!\n");
         printf("rfc5869 check: hpke_expand gave wrong answer!\n");
@@ -645,6 +642,11 @@ err:
 }
 
 /*!
+ * @brief make it easier to do repetitive code
+ */
+#define CHECK_HPKE_CTX if ((cp-*context)>*contextlen) { erv=__LINE__; goto err; }
+
+/*!
  * @brief Create context for input to extract/expand
  *
  * @param mode is the HPKE mode
@@ -658,22 +660,21 @@ err:
  * @param info is buffer of info to bind
  * @param infolen is the length of the buffer of info
  * @param context is a buffer for the resulting context
- * @param context_len is the size of the buffer and octets-used on exit
+ * @param contextlen is the size of the buffer and octets-used on exit
  * @return 1 for good, not 1 otherwise
  */
 static int hpke_make_context(
             int mode, hpke_suite_t suite,
-            const unsigned char *enc, const size_t enc_len,
+            const unsigned char *enc, const size_t enclen,
             const unsigned char *recippub, const size_t recippublen,
             const unsigned char *zb, const size_t zblen,
             const unsigned char *info, const size_t infolen,
-            unsigned char **context, size_t *context_len) 
+            unsigned char **context, size_t *contextlen) 
 {
     int erv=1;
-#define CHECK_HPKE_CTX if ((cp-*context)>*context_len) { erv=__LINE__; goto err; }
-    *context_len=figure_context_len(suite);
+    *contextlen=figure_contextlen(suite);
     /* allocate space incl. some o/h just in case */
-    *context=OPENSSL_malloc(*context_len+1024);
+    *context=OPENSSL_malloc(*contextlen+1024);
     if (*context==NULL) {
         erv=__LINE__; goto err;
     }
@@ -682,7 +683,7 @@ static int hpke_make_context(
     *cp++=(suite.kem_id&0xff00)>>8; *cp++=(suite.kem_id&0xff);  CHECK_HPKE_CTX;
     *cp++=(suite.kdf_id&0xff00)>>8; *cp++=(suite.kdf_id&0xff);  CHECK_HPKE_CTX;
     *cp++=(suite.aead_id&0xff00)>>8; *cp++=(suite.aead_id&0xff); 
-    memcpy(cp,enc,enc_len); cp+=enc_len; CHECK_HPKE_CTX
+    memcpy(cp,enc,enclen); cp+=enclen; CHECK_HPKE_CTX
     memcpy(cp,recippub,recippublen); cp+=recippublen; CHECK_HPKE_CTX;
     memcpy(cp,zero_buf,SHA256_DIGEST_LENGTH); cp+=SHA256_DIGEST_LENGTH; CHECK_HPKE_CTX;
     memcpy(cp,zero_sha256,SHA256_DIGEST_LENGTH); cp+=SHA256_DIGEST_LENGTH; CHECK_HPKE_CTX;
@@ -735,7 +736,12 @@ int hpke_enc(
     if (mode!=HPKE_MODE_BASE) return(__LINE__);
     if (!hpke_suite_check(suite)) return(__LINE__);
     if (!recippub || !clear || !senderpublen || !senderpub || !cipherlen  || !cipher) return(__LINE__);
-    int erv=1; ///< Our error return value - 1 is success
+    int erv=1; /* Our error return value - 1 is success */
+/*
+ * Define this if you want loads printing of intermediate
+ * cryptographic values
+ */
+#undef SUPERVERBOSE 
 #ifdef SUPERVERBOSE
     unsigned char *pbuf;
     size_t pblen=1024;
@@ -758,17 +764,17 @@ int hpke_enc(
     EVP_PKEY_CTX *pctx=NULL;
     EVP_PKEY *pkR=NULL;
     EVP_PKEY *pkE=NULL;
-    size_t  zz_len=0;
+    size_t  zzlen=0;
     unsigned char *zz=NULL;
-    size_t  enc_len=0;
+    size_t  enclen=0;
     unsigned char *enc=NULL;
-    size_t  context_len=0;
+    size_t  contextlen=0;
     unsigned char *context=NULL;
-    size_t  secret_len=0;
+    size_t  secretlen=0;
     unsigned char *secret=NULL;
-    size_t  key_len=0;
+    size_t  keylen=0;
     unsigned char *key=NULL;
-    size_t  nonce_len=0;
+    size_t  noncelen=0;
     unsigned char *nonce=NULL;
 
     /* step 0. Initialise peer's key from string */
@@ -792,9 +798,9 @@ int hpke_enc(
         * newly generated key pair
         */
         unsigned char *bin_skE=NULL;
-        size_t bin_skE_len=0;
-        hpke_ah_decode(strlen(tv->skE),tv->skE,&bin_skE_len,&bin_skE);
-        pkE = EVP_PKEY_new_raw_private_key(EVP_PKEY_X25519,NULL,bin_skE,bin_skE_len);
+        size_t bin_skElen=0;
+        hpke_ah_decode(strlen(tv->skE),tv->skE,&bin_skElen,&bin_skE);
+        pkE = EVP_PKEY_new_raw_private_key(EVP_PKEY_X25519,NULL,bin_skE,bin_skElen);
         OPENSSL_free(bin_skE);
         if (!pkE) {
             erv=__LINE__; goto err;
@@ -806,24 +812,24 @@ int hpke_enc(
     }
     EVP_PKEY_CTX_free(pctx); pctx=NULL;
 
-    enc_len = EVP_PKEY_get1_tls_encodedpoint(pkE,&enc);
-    if (enc==NULL || enc_len == 0) {
+    enclen = EVP_PKEY_get1_tls_encodedpoint(pkE,&enc);
+    if (enc==NULL || enclen == 0) {
         erv=__LINE__; goto err;
     }
 
     /* step 2 run DH KEM to get zz */
-    erv=hpke_do_kem(pkE,pkR,&zz,&zz_len);
+    erv=hpke_do_kem(pkE,pkR,&zz,&zzlen);
     if (erv!=1) {
         goto err;
     }
 
     /* step 3. create context buffer */
     erv=hpke_make_context(mode,suite,
-            enc,enc_len,
+            enc,enclen,
             recippub,recippublen,
             zero_buf,SHA256_DIGEST_LENGTH,
             info,infolen,
-            &context,&context_len);
+            &context,&contextlen);
 
     /* step 4. extracts and expands as needed */
 #ifdef TESTVECTORS
@@ -833,22 +839,22 @@ int hpke_enc(
      * secret = Extract(psk, zz)
      * in my case psk is 32 octets of zero
      */
-    secret_len=SHA256_DIGEST_LENGTH;
-    if (hpke_extract(zz,zz_len,zero_buf,SHA256_DIGEST_LENGTH,&secret,secret_len)!=1) {
+    secretlen=SHA256_DIGEST_LENGTH;
+    if (hpke_extract(zz,zzlen,zero_buf,SHA256_DIGEST_LENGTH,&secret,secretlen)!=1) {
         erv=__LINE__; goto err;
     }
     /*
      * key = Expand(secret, concat("hpke key", context), Nk)
     */
-    key_len=16;
-    if (hpke_expand(secret,secret_len,"hpke key",context,context_len,&key,key_len)!=1) {
+    keylen=16;
+    if (hpke_expand(secret,secretlen,"hpke key",context,contextlen,&key,keylen)!=1) {
         erv=__LINE__; goto err;
     }
     /*
      * nonce = Expand(secret, concat("hpke nonce", context), Nn)
     */
-    nonce_len=12;
-    if (hpke_expand(secret,secret_len,"hpke nonce",context,context_len,&nonce,nonce_len)!=1) {
+    noncelen=12;
+    if (hpke_expand(secret,secretlen,"hpke nonce",context,contextlen,&nonce,noncelen)!=1) {
         erv=__LINE__; goto err;
     }
 
@@ -856,8 +862,8 @@ int hpke_enc(
     size_t lcipherlen=HPKE_MAXSIZE;
     unsigned char lcipher[HPKE_MAXSIZE];
     int arv=hpke_aead_enc(
-                key,key_len,
-                nonce,nonce_len,
+                key,keylen,
+                nonce,noncelen,
                 aad,aadlen,
                 clear,clearlen,
                 lcipher,&lcipherlen);
@@ -872,11 +878,11 @@ int hpke_enc(
      */
     memcpy(cipher,lcipher,lcipherlen);
     *cipherlen=lcipherlen;
-    if (enc_len>*senderpublen) {
+    if (enclen>*senderpublen) {
         erv=__LINE__; goto err;
     }
-    memcpy(senderpub,enc,enc_len);
-    *senderpublen=enc_len;
+    memcpy(senderpub,enc,enclen);
+    *senderpublen=enclen;
 
 #ifdef TESTVECTORS
     /*
@@ -888,14 +894,14 @@ int hpke_enc(
         printf("Runtime:\n");
         printf("\tmode: %d, suite; %d,%d,%d\n",mode,suite.kdf_id,suite.kem_id,suite.aead_id);
         pblen = EVP_PKEY_get1_tls_encodedpoint(pkR,&pbuf); hpke_pbuf(stdout,"\tpkR",pbuf,pblen); OPENSSL_free(pbuf);
-        hpke_pbuf(stdout,"\tcontext",context,context_len);
-        hpke_pbuf(stdout,"\tzz",zz,zz_len);
-        hpke_pbuf(stdout,"\tsecret",secret,secret_len);
-        hpke_pbuf(stdout,"\tenc",enc,enc_len);
+        hpke_pbuf(stdout,"\tcontext",context,contextlen);
+        hpke_pbuf(stdout,"\tzz",zz,zzlen);
+        hpke_pbuf(stdout,"\tsecret",secret,secretlen);
+        hpke_pbuf(stdout,"\tenc",enc,enclen);
         hpke_pbuf(stdout,"\tinfo",info,infolen);
         hpke_pbuf(stdout,"\taad",aad,aadlen);
-        hpke_pbuf(stdout,"\tnonce",nonce,nonce_len);
-        hpke_pbuf(stdout,"\tkey",key,key_len);
+        hpke_pbuf(stdout,"\tnonce",nonce,noncelen);
+        hpke_pbuf(stdout,"\tkey",key,keylen);
         pblen = EVP_PKEY_get1_tls_encodedpoint(pkE,&pbuf); hpke_pbuf(stdout,"\tpkE",pbuf,pblen); OPENSSL_free(pbuf);
         hpke_pbuf(stdout,"\tplaintext",clear,clearlen);
         hpke_pbuf(stdout,"\tciphertext",cipher,*cipherlen);
@@ -908,14 +914,14 @@ err:
     printf("Encrypting:\n");
     printf("\tmode: %d, suite; %d,%d,%d\n",mode,suite.kdf_id,suite.kem_id,suite.aead_id);
     pblen = EVP_PKEY_get1_tls_encodedpoint(pkE,&pbuf); hpke_pbuf(stdout,"\tpkE",pbuf,pblen); OPENSSL_free(pbuf);
-    hpke_pbuf(stdout,"\tcontext",context,context_len);
-    hpke_pbuf(stdout,"\tzz",zz,zz_len);
-    hpke_pbuf(stdout,"\tsecret",secret,secret_len);
-    hpke_pbuf(stdout,"\tenc",enc,enc_len);
+    hpke_pbuf(stdout,"\tcontext",context,contextlen);
+    hpke_pbuf(stdout,"\tzz",zz,zzlen);
+    hpke_pbuf(stdout,"\tsecret",secret,secretlen);
+    hpke_pbuf(stdout,"\tenc",enc,enclen);
     hpke_pbuf(stdout,"\tinfo",info,infolen);
     hpke_pbuf(stdout,"\taad",aad,aadlen);
-    hpke_pbuf(stdout,"\tnonce",nonce,nonce_len);
-    hpke_pbuf(stdout,"\tkey",key,key_len);
+    hpke_pbuf(stdout,"\tnonce",nonce,noncelen);
+    hpke_pbuf(stdout,"\tkey",key,keylen);
     pblen = EVP_PKEY_get1_tls_encodedpoint(pkR,&pbuf); hpke_pbuf(stdout,"\tpkR",pbuf,pblen); OPENSSL_free(pbuf);
     hpke_pbuf(stdout,"\tcleartext",clear,clearlen);
     hpke_pbuf(stdout,"\tciphertext",cipher,*cipherlen);
@@ -986,17 +992,17 @@ int hpke_dec(
     EVP_PKEY_CTX *pctx=NULL;
     EVP_PKEY *skR=NULL;
     EVP_PKEY *pkE=NULL;
-    size_t  zz_len=0;
+    size_t  zzlen=0;
     unsigned char *zz=NULL;
-    size_t  context_len=0;
+    size_t  contextlen=0;
     unsigned char *context=NULL;
-    size_t  secret_len=0;
+    size_t  secretlen=0;
     unsigned char *secret=NULL;
-    size_t  key_len=0;
+    size_t  keylen=0;
     unsigned char *key=NULL;
-    size_t  nonce_len=0;
+    size_t  noncelen=0;
     unsigned char *nonce=NULL;
-    size_t  mypub_len=0;
+    size_t  mypublen=0;
     unsigned char *mypub=NULL;
     BIO *bfp=NULL;
 
@@ -1022,44 +1028,44 @@ int hpke_dec(
     }
 
     /* step 2 run DH KEM to get zz */
-    erv=hpke_do_kem(skR,pkE,&zz,&zz_len);
+    erv=hpke_do_kem(skR,pkE,&zz,&zzlen);
     if (erv!=1) {
         goto err;
     }
 
     /* step 3. create context buffer */
-    mypub_len=EVP_PKEY_get1_tls_encodedpoint(skR,&mypub);
-    if (mypub==NULL || mypub_len == 0) {
+    mypublen=EVP_PKEY_get1_tls_encodedpoint(skR,&mypub);
+    if (mypub==NULL || mypublen == 0) {
         erv=__LINE__; goto err;
     }
     erv=hpke_make_context(mode,suite,
             enc,enclen,
-            mypub,mypub_len,
+            mypub,mypublen,
             zero_buf,SHA256_DIGEST_LENGTH,
             info,infolen,
-            &context,&context_len);
+            &context,&contextlen);
 
     /* step 4. extracts and expands as needed */
     /*
      * secret = Extract(psk, zz)
      * in my case psk is 32 octets of zero
      */
-    secret_len=SHA256_DIGEST_LENGTH;
-    if (hpke_extract(zz,zz_len,zero_buf,SHA256_DIGEST_LENGTH,&secret,secret_len)!=1) {
+    secretlen=SHA256_DIGEST_LENGTH;
+    if (hpke_extract(zz,zzlen,zero_buf,SHA256_DIGEST_LENGTH,&secret,secretlen)!=1) {
         erv=__LINE__; goto err;
     }
     /*
      * key = Expand(secret, concat("hpke key", context), Nk)
     */
-    key_len=16;
-    if (hpke_expand(secret,secret_len,"hpke key",context,context_len,&key,key_len)!=1) {
+    keylen=16;
+    if (hpke_expand(secret,secretlen,"hpke key",context,contextlen,&key,keylen)!=1) {
         erv=__LINE__; goto err;
     }
     /*
      * nonce = Expand(secret, concat("hpke nonce", context), Nn)
     */
-    nonce_len=12;
-    if (hpke_expand(secret,secret_len,"hpke nonce",context,context_len,&nonce,nonce_len)!=1) {
+    noncelen=12;
+    if (hpke_expand(secret,secretlen,"hpke nonce",context,contextlen,&nonce,noncelen)!=1) {
         erv=__LINE__; goto err;
     }
 
@@ -1067,8 +1073,8 @@ int hpke_dec(
     size_t lclearlen=HPKE_MAXSIZE;
     unsigned char lclear[HPKE_MAXSIZE];
     int arv=hpke_aead_dec(
-                key,key_len,
-                nonce,nonce_len,
+                key,keylen,
+                nonce,noncelen,
                 aad,aadlen,
                 cipher,cipherlen,
                 lclear,&lclearlen);
@@ -1090,14 +1096,14 @@ err:
     printf("Decrypting:\n");
     printf("\tmode: %d, suite; %d,%d,%d\n",mode,suite.kdf_id,suite.kem_id,suite.aead_id);
     pblen = EVP_PKEY_get1_tls_encodedpoint(pkE,&pbuf); hpke_pbuf(stdout,"\tpkE",pbuf,pblen); OPENSSL_free(pbuf);
-    hpke_pbuf(stdout,"\tcontext",context,context_len);
-    hpke_pbuf(stdout,"\tzz",zz,zz_len);
-    hpke_pbuf(stdout,"\tsecret",secret,secret_len);
+    hpke_pbuf(stdout,"\tcontext",context,contextlen);
+    hpke_pbuf(stdout,"\tzz",zz,zzlen);
+    hpke_pbuf(stdout,"\tsecret",secret,secretlen);
     hpke_pbuf(stdout,"\tenc",enc,enclen);
     hpke_pbuf(stdout,"\tinfo",info,infolen);
     hpke_pbuf(stdout,"\taad",aad,aadlen);
-    hpke_pbuf(stdout,"\tnonce",nonce,nonce_len);
-    hpke_pbuf(stdout,"\tkey",key,key_len);
+    hpke_pbuf(stdout,"\tnonce",nonce,noncelen);
+    hpke_pbuf(stdout,"\tkey",key,keylen);
     pblen = EVP_PKEY_get1_tls_encodedpoint(skR,&pbuf); hpke_pbuf(stdout,"\tpkR",pbuf,pblen); OPENSSL_free(pbuf);
     hpke_pbuf(stdout,"\tciphertext",cipher,cipherlen);
     if (*clearlen!=HPKE_MAXSIZE) hpke_pbuf(stdout,"\tplaintext",clear,*clearlen);
@@ -1125,6 +1131,7 @@ err:
  * @param pub is the public value
  * @param privlen is the size of the private key buffer (exact length on output)
  * @param priv is the private key
+ * @return 1 for good (OpenSSL style), not-1 for error
  */
 int hpke_kg(
         unsigned int mode, hpke_suite_t suite,
@@ -1134,7 +1141,7 @@ int hpke_kg(
     if (mode!=HPKE_MODE_BASE) return(__LINE__);
     if (!hpke_suite_check(suite)) return(__LINE__);
     if (!pub || !priv) return(__LINE__);
-    int erv=1; ///< Our error return value - 1 is success
+    int erv=1; /* Our error return value - 1 is success */
 
     EVP_PKEY_CTX *pctx=NULL;
     EVP_PKEY *skR=NULL;

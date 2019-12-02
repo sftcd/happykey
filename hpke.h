@@ -70,17 +70,6 @@ typedef struct {
  */
 #define HPKE_SUITE_DEFAULT { HPKE_KEM_ID_25519, HPKE_KDF_ID_HKDF_SHA256, HPKE_AEAD_ID_AES_GCM_128 }
 
-/**
- * @brief decode ascii hex to a binary buffer
- *
- * @param ahlen is the ascii hex string length
- * @param ahstr is the ascii hex string
- * @param blen is a pointer to the returned binary length
- * @param buf is a pointer to the internally allocated binary buffer
- * @return 1 for good (OpenSSL style), not-1 for error
- */
-int hpke_ah_decode(size_t ahlen, const char *ah, size_t *blen, unsigned char **buf);
-
 /*
  * @brief HPKE single-shot encryption function
  * @param mode is the HPKE mode
@@ -160,15 +149,15 @@ int hpke_kg(
         size_t *privlen, unsigned char *priv); 
 
 /**
- * @brief for odd/occasional debugging
+ * @brief decode ascii hex to a binary buffer
  *
- * @param fout is a FILE * to use
- * @param msg is prepended to print
- * @param buf is the buffer to print
- * @param blen is the length of the buffer
+ * @param ahlen is the ascii hex string length
+ * @param ah is the ascii hex string
+ * @param blen is a pointer to the returned binary length
+ * @param buf is a pointer to the internally allocated binary buffer
  * @return 1 for good (OpenSSL style), not-1 for error
  */
-int hpke_pbuf(FILE *fout, char *msg,unsigned char *buf,size_t blen); 
+int hpke_ah_decode(size_t ahlen, const char *ah, size_t *blen, unsigned char **buf);
 
 #endif
 
