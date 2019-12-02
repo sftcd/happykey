@@ -53,7 +53,7 @@
 #define HPKE_AEAD_ID_AES_GCM_256     0x0002 ///< AES-GCM-256
 #define HPKE_AEAD_ID_CHACHA_POLY1305 0x0003 ///< Chacha20-Poly1305
 
-/*
+/*!
  * @brief ciphersuite combination
  */
 typedef struct {
@@ -62,8 +62,8 @@ typedef struct {
     uint16_t    aead_id; ///< Authenticated Encryption with Associated Data id
 } hpke_suite_t;
 
-/*
- * Some suite constants
+/*!
+ * A suite constant (the only one supported for now:-)
  * Use this as follows:
  *
  *          hpke_suit_t myvar = HPKE_SUITE_DEFAULT;
@@ -77,7 +77,7 @@ typedef struct {
  * @param ahstr is the ascii hex string
  * @param blen is a pointer to the returned binary length
  * @param buf is a pointer to the internally allocated binary buffer
- * @return zero for error, 1 for success 
+ * @return 1 for good (OpenSSL style), not-1 for error
  */
 int hpke_ah_decode(size_t ahlen, const char *ah, size_t *blen, unsigned char **buf);
 
@@ -105,18 +105,12 @@ int hpke_ah_decode(size_t ahlen, const char *ah, size_t *blen, unsigned char **b
 int hpke_enc(
         unsigned int mode,
         hpke_suite_t suite,
-        size_t publen, 
-        unsigned char *pub,
-        size_t clearlen,
-        unsigned char *clear,
-        size_t aadlen,
-        unsigned char *aad,
-        size_t infolen,
-        unsigned char *info,
-        size_t *senderpublen,
-        unsigned char *senderpub,
-        size_t *cipherlen,
-        unsigned char *cipher
+        size_t publen, unsigned char *pub,
+        size_t clearlen, unsigned char *clear,
+        size_t aadlen, unsigned char *aad,
+        size_t infolen, unsigned char *info,
+        size_t *senderpublen, unsigned char *senderpub,
+        size_t *cipherlen, unsigned char *cipher
 #ifdef TESTVECTORS
         , hpke_tv_t *tv
 #endif
@@ -158,11 +152,13 @@ int hpke_dec(
  * @param pub is the public value
  * @param privlen is the size of the private key buffer (exact length on output)
  * @param priv is the private key
+ * @return 1 for good (OpenSSL style), not-1 for error
  */
 int hpke_kg(
         unsigned int mode, hpke_suite_t suite,
         size_t *publen, unsigned char *pub,
         size_t *privlen, unsigned char *priv); 
+
 /**
  * @brief for odd/occasional debugging
  *
@@ -170,7 +166,7 @@ int hpke_kg(
  * @param msg is prepended to print
  * @param buf is the buffer to print
  * @param blen is the length of the buffer
- * @return 1 for success 
+ * @return 1 for good (OpenSSL style), not-1 for error
  */
 int hpke_pbuf(FILE *fout, char *msg,unsigned char *buf,size_t blen); 
 

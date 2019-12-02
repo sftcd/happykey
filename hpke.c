@@ -165,10 +165,15 @@ static int figure_context_len(hpke_suite_t suite)
 /**
  * @brief do the AEAD decrhyption 
  *
+ * @param key is the secret
+ * @param key_len is the length of the secret
+ * @param iv is the initialisation vector
+ * @param iv_len is the length of the iv
+ * @param aad is the additional authenticated data
+ * @param aad_len is the length of the aad
  * @param cipher_len is an input/output, better be big enough on input, exact on output
  * @param cipher is an output
  * @return 1 for good otherwise bad
- * @returns NULL (on error) or pointer to alloced buffer for ciphertext
  */
 static int hpke_aead_dec(
             unsigned char *key, size_t key_len,
@@ -251,14 +256,16 @@ err:
 /**
  * @brief do the AEAD encryption as per the I-D
  *
- * Note: The tag output isn't really needed but was useful when I got
- * the aad wrong at one stage to keep it for now.
- * Most parameters obvious but...
- *
+ * @param key is the secret
+ * @param key_len is the length of the secret
+ * @param iv is the initialisation vector
+ * @param iv_len is the length of the iv
+ * @param aad is the additional authenticated data
+ * @param aad_len is the length of the aad
  * @param cipher_len is an input/output, better be big enough on input, exact on output
  * @param cipher is an output
  * @return 1 for good otherwise bad
- * @returns NULL (on error) or pointer to alloced buffer for ciphertext
+ * @returns 1 for success, not-1 otherwise
  */
 static int hpke_aead_enc(
             unsigned char *key, size_t key_len,
@@ -694,7 +701,7 @@ err:
     return erv;
 }
 
-/*
+/*!
  * @brief HPKE single-shot encryption function
  * @param mode is the HPKE mode
  * @param suite is the ciphersuite to use
@@ -926,7 +933,7 @@ err:
     return erv;
 }
 
-/*
+/*!
  * @brief HPKE single-shot decryption function
  * @param mode is the HPKE mode
  * @param suite is the ciphersuite to use

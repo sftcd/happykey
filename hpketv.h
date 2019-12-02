@@ -24,14 +24,14 @@
  * https://raw.githubusercontent.com/cfrg/draft-irtf-cfrg-hpke/master/test-vectors.json
  * A copy from 20191126 is are also in this repo in test-vectors.json
  *
+ * This should only be included if TESTVECTORS is #define'd.
+ *
  */
 
 #ifndef HPKETV_H_INCLUDED
 #define HPKETV_H_INCLUDED
 
-#ifdef TESTVECTORS
-
-/*
+/*!
  * @brief Encryption(s) Test Vector structure using field names from published JSON file
  */
 typedef struct {
@@ -40,7 +40,7 @@ typedef struct {
     const char *ciphertext; ///< ascii-hex encoded ciphertext
 } hpke_tv_encs_t;
 
-/*
+/*!
  * @brief HKPE Test Vector structure using field names from published JSON file
  *
  * The jobj field (at the end) is the json-c object from which all these are
@@ -74,7 +74,7 @@ typedef struct hpke_tv_s {
     void *jobj;  ///< pointer to json-c object from which we derived this
 } hpke_tv_t;
 
-/*
+/*!
  * @brief load test vectors from json file to array
  * @param filename is the json file
  * @param nelems returns with the number of array elements
@@ -83,7 +83,7 @@ typedef struct hpke_tv_s {
  */
 int hpke_tv_load(char *fname, int *nelems, hpke_tv_t **array);
 
-/*
+/*!
  * @brief select a test vector to use based on mode and suite
  * @param nelems is the number of array elements
  * @param array is the elements
@@ -99,25 +99,23 @@ int hpke_tv_load(char *fname, int *nelems, hpke_tv_t **array);
  */
 int hpke_tv_pick(int nelems, hpke_tv_t *arr, char *selector, hpke_tv_t **tv);
 
-/*
+/*!
  * @brief free up test vector array
  * @param nelems is the number of array elements
  * @param array is a guess what?
  * @return 1 for good, other for bad
  *
- * Caller should free "parent" array
+ * Caller doesn't need to free "parent" array
  */
 void hpke_tv_free(int nelems, hpke_tv_t *array);
 
-/*
+/*!
  * @brief print test vectors
  * @param nelems is the number of array elements
  * @param array is the elements
  * @return 1 for good, other for bad
  */
 void hpke_tv_print(int nelems, hpke_tv_t *array);
-
-#endif // TESTVECTORS
 
 #endif // HPKETV_H_INCLUDED
 

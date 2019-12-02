@@ -26,8 +26,6 @@
  *
  */
 
-#ifdef TESTVECTORS
-
 #include <stddef.h>
 #include <stdint.h>
 #include <string.h>
@@ -44,6 +42,13 @@
 
 #include <json.h>
 #include <json_tokener.h>
+
+#ifndef TESTVECTORS
+/*!
+ * Crap out if this isn't defined.
+ */
+assert("TESTVECTORS not defined which is bad");
+#endif
 
 /*
  * @brief load test vectors from json file to array
@@ -96,6 +101,11 @@ int hpke_tv_load(char *fname, int *nelems, hpke_tv_t **array)
      * Again, since this code will be compiled out, we're loosey-goosey
      * with error handling.
      */
+
+/*
+ * Marcros to grab a numeric or string field from JSON object 
+ * and whack in same-named field of ours
+ */
 
 #define grabnum(_xx)  if (!strcmp(key,""#_xx"")) { \
                         thearr[i]._xx=json_object_get_int(val); \
@@ -168,7 +178,7 @@ int hpke_tv_load(char *fname, int *nelems, hpke_tv_t **array)
  * @param array is a guess what?
  * @return 1 for good, other for bad
  *
- * Caller should free "parent" array
+ * Caller doesn't need to free "parent" array
  */
 void hpke_tv_free(int nelems, hpke_tv_t *array)
 {
@@ -272,4 +282,3 @@ int hpke_tv_pick(int nelems, hpke_tv_t *arr, char *selector, hpke_tv_t **tv)
     return(0);
 }
 
-#endif

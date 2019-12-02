@@ -46,9 +46,9 @@ hpkemain: hpkemain.o hpke.o
 	${CC} ${CFLAGS} -o $@ hpkemain.o hpke.o -L ${OSSL} -lssl -lcrypto
 endif
 
-doc: 
-	- doxygen hpke.doxy
-	- (cd doxy/latex; make; mv refman.pdf ../../hpke-api.pdf )
+doc: hpke.c hpke.h hpketv.h hpketv.c
+	doxygen hpke.doxy
+	(cd doxy/latex; make; mv refman.pdf ../../hpke-api.pdf )
 
 docclean:
 	- rm -rf doxy
