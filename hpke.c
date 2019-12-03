@@ -373,16 +373,17 @@ err:
 /*!
  * brief RFC5869 HKDF-Extract
  *
- * @param zz - the initial key material (IKM)
- * @param zzlen - length of above
  * @param salt - surprisingly this is the salt;-)
  * @param saltlen - length of above
+ * @param zz - the initial key material (IKM)
+ * @param zzlen - length of above
  * @param secret - the result of extraction (allocated inside)
  * @param secretlen - an input only!
  * @return 1 for good otherwise bad
  */
-static int hpke_extract(const unsigned char *zz, const size_t zzlen,
+static int hpke_extract(
         const unsigned char *salt, const size_t saltlen,
+        const unsigned char *zz, const size_t zzlen,
         unsigned char **secret, const size_t secretlen)
 {
     EVP_PKEY_CTX *pctx=NULL;
@@ -558,7 +559,7 @@ static int hpke_test_expand_extract(void)
     unsigned char *calc_prk;
     unsigned char *calc_okm;
     int rv=1;
-    rv=hpke_extract(IKM,IKMlen,salt,saltlen,&calc_prk,PRKlen);
+    rv=hpke_extract(salt,saltlen,IKM,IKMlen,&calc_prk,PRKlen);
     if (rv!=1) {
         printf("rfc5869 check: hpke_extract failed: %d\n",rv);
         printf("rfc5869 check: hpke_extract failed: %d\n",rv);
@@ -655,8 +656,7 @@ err:
  * @param enclen is the length of the sender public key
  * @param recippub is the encoded recipient public key
  * @param recippublen is the length of the recipient public key
- * @param zb is buffer of zeros (future proofing)
- * @param zblen is the length of the buffer of zeros 
+ * @param pskid is a PSK ID string (can be NULL)
  * @param info is buffer of info to bind
  * @param infolen is the length of the buffer of info
  * @param context is a buffer for the resulting context
@@ -667,7 +667,7 @@ static int hpke_make_context(
             int mode, hpke_suite_t suite,
             const unsigned char *enc, const size_t enclen,
             const unsigned char *recippub, const size_t recippublen,
-            const unsigned char *zb, const size_t zblen,
+            const char *pskid,
             const unsigned char *info, const size_t infolen,
             unsigned char **context, size_t *contextlen) 
 {
@@ -686,7 +686,16 @@ static int hpke_make_context(
     memcpy(cp,enc,enclen); cp+=enclen; CHECK_HPKE_CTX
     memcpy(cp,recippub,recippublen); cp+=recippublen; CHECK_HPKE_CTX;
     memcpy(cp,zero_buf,SHA256_DIGEST_LENGTH); cp+=SHA256_DIGEST_LENGTH; CHECK_HPKE_CTX;
-    memcpy(cp,zero_sha256,SHA256_DIGEST_LENGTH); cp+=SHA256_DIGEST_LENGTH; CHECK_HPKE_CTX;
+    if (pskid==NULL) {
+        memcpy(cp,zero_sha256,SHA256_DIGEST_LENGTH); cp+=SHA256_DIGEST_LENGTH; CHECK_HPKE_CTX;
+    } else {
+        unsigned char pskidhash[SHA256_DIGEST_LENGTH];
+        SHA256_CTX sha256;
+        SHA256_Init(&sha256);
+        SHA256_Update(&sha256, pskid, strlen(pskid));
+        SHA256_Final(pskidhash, &sha256);
+        memcpy(cp,pskidhash,SHA256_DIGEST_LENGTH); cp+=SHA256_DIGEST_LENGTH; CHECK_HPKE_CTX;
+    }
     if (info==NULL) {
         memcpy(cp,zero_sha256,SHA256_DIGEST_LENGTH); cp+=SHA256_DIGEST_LENGTH; CHECK_HPKE_CTX;
     } else {
@@ -702,10 +711,60 @@ err:
     return erv;
 }
 
+
+/*!
+ * @brief check mode is in-range and supported
+ * @param mode is the caller's chosen mode
+ * @return 1 for good (OpenSSL style), not-1 for error
+ */
+static int hpke_mode_check(unsigned int mode) 
+{
+    switch (mode) {
+        case HPKE_MODE_BASE:
+        case HPKE_MODE_PSK:
+            break;
+        case HPKE_MODE_AUTH:
+        case HPKE_MODE_PSKAUTH:
+            printf("not yet!");
+            return(__LINE__);
+            break;
+        default:
+            return(__LINE__);
+    }
+    return (1);
+}
+
+/*!
+ * @brief check psk params are as per spec
+ * @param mode is the mode in use
+ * @param pskid PSK identifier
+ * @param psklen length of PSK
+ * @param psk the psk itself
+ * @return 1 for good (OpenSSL style), not-1 for error
+ *
+ * If a PSK mode is used both * pskid and psk must be 
+ * non-default. Otherwise we ignore the PSK params.
+ */
+static int hpke_psk_check(
+        unsigned int mode,
+        char *pskid, 
+        size_t psklen, 
+        unsigned char *psk)
+{
+    if (mode==HPKE_MODE_BASE || mode==HPKE_MODE_AUTH) return(1);
+    if (pskid==NULL) return(__LINE__);
+    if (psklen==0) return(__LINE__);
+    if (psk==NULL) return(__LINE__);
+    return(1);
+}
+
 /*!
  * @brief HPKE single-shot encryption function
  * @param mode is the HPKE mode
  * @param suite is the ciphersuite to use
+ * @param pskid is the pskid string fpr a PSK mode (can be NULL)
+ * @param psklen is the psk length
+ * @param psk is the psk 
  * @param recippublen is the length of the recipient public key
  * @param recippub is the encoded recipient public key
  * @param clearlen is the length of the cleartext
@@ -722,6 +781,7 @@ err:
  */
 int hpke_enc(
         unsigned int mode, hpke_suite_t suite,
+        char *pskid, size_t psklen, unsigned char *psk,
         size_t recippublen, unsigned char *recippub,
         size_t clearlen, unsigned char *clear,
         size_t aadlen, unsigned char *aad,
@@ -733,8 +793,11 @@ int hpke_enc(
 #endif
         )
 {
-    if (mode!=HPKE_MODE_BASE) return(__LINE__);
-    if (!hpke_suite_check(suite)) return(__LINE__);
+    int crv=1;
+    if ((crv=hpke_mode_check(mode))!=1) return(crv);
+    if ((crv=hpke_psk_check(mode,pskid,psklen,psk))!=1) return(crv);
+    if ((crv=hpke_suite_check(suite))!=1) return(crv);
+
     if (!recippub || !clear || !senderpublen || !senderpub || !cipherlen  || !cipher) return(__LINE__);
     int erv=1; /* Our error return value - 1 is success */
 /*
@@ -794,9 +857,9 @@ int hpke_enc(
 #ifdef TESTVECTORS
     if (tv) {
         /*
-        * Read secret from tv, then use that instead of 
-        * newly generated key pair
-        */
+         * Read DH private from tv, then use that instead of 
+         * newly generated key pair
+         */
         unsigned char *bin_skE=NULL;
         size_t bin_skElen=0;
         hpke_ah_decode(strlen(tv->skE),tv->skE,&bin_skElen,&bin_skE);
@@ -805,6 +868,7 @@ int hpke_enc(
         if (!pkE) {
             erv=__LINE__; goto err;
         }
+
     } else 
 #endif
     if (EVP_PKEY_keygen(pctx, &pkE) <= 0) {
@@ -827,7 +891,7 @@ int hpke_enc(
     erv=hpke_make_context(mode,suite,
             enc,enclen,
             recippub,recippublen,
-            zero_buf,SHA256_DIGEST_LENGTH,
+            pskid,
             info,infolen,
             &context,&contextlen);
 
@@ -837,10 +901,16 @@ int hpke_enc(
 #endif
     /*
      * secret = Extract(psk, zz)
-     * in my case psk is 32 octets of zero
+     * unless otherwise specified psk is 32 octets of zero
      */
+    size_t IKM_len=SHA256_DIGEST_LENGTH;
+    const unsigned char *IKM=zero_buf;
     secretlen=SHA256_DIGEST_LENGTH;
-    if (hpke_extract(zz,zzlen,zero_buf,SHA256_DIGEST_LENGTH,&secret,secretlen)!=1) {
+    if (mode==HPKE_MODE_PSK || mode==HPKE_MODE_PSKAUTH) {
+        IKM=psk;
+        IKM_len=psklen;
+    }
+    if (hpke_extract(IKM,IKM_len,zz,zzlen,&secret,secretlen)!=1) {
         erv=__LINE__; goto err;
     }
     /*
@@ -905,6 +975,10 @@ int hpke_enc(
         pblen = EVP_PKEY_get1_tls_encodedpoint(pkE,&pbuf); hpke_pbuf(stdout,"\tpkE",pbuf,pblen); OPENSSL_free(pbuf);
         hpke_pbuf(stdout,"\tplaintext",clear,clearlen);
         hpke_pbuf(stdout,"\tciphertext",cipher,*cipherlen);
+        if (mode==HPKE_MODE_PSK || mode==HPKE_MODE_PSKAUTH) {
+            fprintf(stdout,"\tpskid: %s\n",pskid);
+            hpke_pbuf(stdout,"\tpsk",psk,psklen);
+        }
     }
 #endif
 
@@ -925,6 +999,10 @@ err:
     pblen = EVP_PKEY_get1_tls_encodedpoint(pkR,&pbuf); hpke_pbuf(stdout,"\tpkR",pbuf,pblen); OPENSSL_free(pbuf);
     hpke_pbuf(stdout,"\tcleartext",clear,clearlen);
     hpke_pbuf(stdout,"\tciphertext",cipher,*cipherlen);
+    if (mode==HPKE_MODE_PSK || mode==HPKE_MODE_PSKAUTH) {
+        fprintf(stdout,"\tpskid: %s\n",pskid);
+        hpke_pbuf(stdout,"\tpsk",psk,psklen);
+    }
 #endif
 
     if (pkR!=NULL) EVP_PKEY_free(pkR);
@@ -943,6 +1021,9 @@ err:
  * @brief HPKE single-shot decryption function
  * @param mode is the HPKE mode
  * @param suite is the ciphersuite to use
+ * @param pskid is the pskid string fpr a PSK mode (can be NULL)
+ * @param psklen is the psk length
+ * @param psk is the psk 
  * @param privlen is the length of the private key
  * @param priv is the encoded private key
  * @param enclen is the length of the peer's public value
@@ -958,8 +1039,8 @@ err:
  * @return 1 for good (OpenSSL style), not-1 for error
  */
 int hpke_dec(
-        unsigned int mode,
-        hpke_suite_t suite,
+        unsigned int mode, hpke_suite_t suite,
+        char *pskid, size_t psklen, unsigned char *psk,
         size_t privlen, unsigned char *priv,
         size_t enclen, unsigned char *enc,
         size_t cipherlen, unsigned char *cipher,
@@ -967,9 +1048,11 @@ int hpke_dec(
         size_t infolen, unsigned char *info,
         size_t *clearlen, unsigned char *clear)
 {
-    if (mode!=HPKE_MODE_BASE) return(__LINE__);
-    int internal_suite=hpke_suite_check(suite); 
-    if (!internal_suite) return(__LINE__);
+    int crv=1;
+    if ((crv=hpke_mode_check(mode))!=1) return(crv);
+    if ((crv=hpke_psk_check(mode,pskid,psklen,psk))!=1) return(crv);
+    if ((crv=hpke_suite_check(suite))!=1) return(crv);
+
     if (!priv || !clearlen || !clear || !cipher) return(__LINE__);
     int erv=1;
 #ifdef SUPERVERBOSE
@@ -1041,7 +1124,7 @@ int hpke_dec(
     erv=hpke_make_context(mode,suite,
             enc,enclen,
             mypub,mypublen,
-            zero_buf,SHA256_DIGEST_LENGTH,
+            pskid,
             info,infolen,
             &context,&contextlen);
 
@@ -1050,8 +1133,14 @@ int hpke_dec(
      * secret = Extract(psk, zz)
      * in my case psk is 32 octets of zero
      */
+    size_t IKM_len=SHA256_DIGEST_LENGTH;
+    const unsigned char *IKM=zero_buf;
     secretlen=SHA256_DIGEST_LENGTH;
-    if (hpke_extract(zz,zzlen,zero_buf,SHA256_DIGEST_LENGTH,&secret,secretlen)!=1) {
+    if (mode==HPKE_MODE_PSK || mode==HPKE_MODE_PSKAUTH) {
+        IKM=psk;
+        IKM_len=psklen;
+    }
+    if (hpke_extract(IKM,IKM_len,zz,zzlen,&secret,secretlen)!=1) {
         erv=__LINE__; goto err;
     }
     /*
@@ -1106,6 +1195,10 @@ err:
     hpke_pbuf(stdout,"\tkey",key,keylen);
     pblen = EVP_PKEY_get1_tls_encodedpoint(skR,&pbuf); hpke_pbuf(stdout,"\tpkR",pbuf,pblen); OPENSSL_free(pbuf);
     hpke_pbuf(stdout,"\tciphertext",cipher,cipherlen);
+    if (mode==HPKE_MODE_PSK || mode==HPKE_MODE_PSKAUTH) {
+        fprintf(stdout,"\tpskid: %s\n",pskid);
+        hpke_pbuf(stdout,"\tpsk",psk,psklen);
+    }
     if (*clearlen!=HPKE_MAXSIZE) hpke_pbuf(stdout,"\tplaintext",clear,*clearlen);
     else printf("clearlen is HPKE_MAXSIZE, so decryption probably failed\n");
 #endif

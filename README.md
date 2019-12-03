@@ -15,11 +15,15 @@ hkdf-sha256 and aes128gcm) and plenty of code needs re-factoring. In addition,
 seems happy for the moment, at least with nominal behaviour, so things aren't
 totally shabby:-)
 
+Latest change (20191203) is I've added support for PSK mode (not PSK-auth, just
+PSK) but that's not really tested. It does appear to  validate against a test
+vector though and round-trips work.
+
 Main TODOs (possibly in this order) are:
+- selection of test vectors (first matching mode for now)
 - arbitrary sizes for plain/cipher texts (640kB is a hard limit for now:-)
-- selection of test vectors (first matching for now)
 - APIs for non single-shot operation (non-existent:-)
-- multiple algorithms and modes (only one for now)
+- multiple suites (only one for now)
 
 ## Build 
 
@@ -55,24 +59,42 @@ If you do build this, ``hpkemain`` is the test tool, so start with
 ``hpkemain -h`` to see what's what:
 
             $ ./hpkemain -h
-            Usage: ./hpkemain [-h|-v|-k|-e|-d] [-P public] [-p private] [-a aad] [-I info] [-i input] [-o output]
             HPKE (draft-irtf-cfrg-hpke) tester, options are:
-	            -h help
-	            -v verbose output
-	            -e encrypt
-	            -d decrypt
-	            -k generate key pair
-	            -P public key file name or base64 or ascii-hex encoded value
-	            -p private key file name or base64 or ascii-hex encoded value
-	            -a additional authenticated data file name or actual value
-	            -I additional info to bind to key - file name or actual value
-	            -i input file name or actual value (stdin if not specified)
-	            -o output file name (output to stdout if not specified) 
-            
-            note that sometimes base64 or ascii-hex decoding might work when you don't want it to
-            (sorry about that;-)
-            
-            When generating a key pair, supply public and private file names
+            Key generaion:
+                Usage: ./hpkemain -k -p private [-P public]
+            Encryption:
+                Usage: ./hpkemain -e -P public [-p private] [-a aad] [-I info]
+                        [-i input] [-o output]
+                        [-m mode] [-s psk] [-n pskid]
+            Decryption:
+                Usage: ./hpkemain -d -p private [-P public] [-a aad] [-I info]
+                        [-m mode] [-s psk] [-n pskid]
+                        [-m mode] [-s psk] [-n pskid]
+            This version is built with TESTVECTORS
+                Usage: ./hpkemain -T tvspec
+                tvspec is not yet implemented, 1st picked for now.
+            Options:
+                -a additional authenticated data file name or actual value
+                -d decrypt
+                -e encrypt
+                -h help
+                -I additional info to bind to key - file name or actual value
+                -i input file name or actual value (stdin if not specified)
+                -k generate key pair
+                -P public key file name or base64 or ascii-hex encoded value
+                -p private key file name or base64 or ascii-hex encoded value
+                -m mode (one of: base,psk,pskauth)
+                -n PSK id string
+                -o output file name (output to stdout if not specified) 
+                -s psk file name or base64 or ascii-hex encoded value
+                -T run a testvector for mode/suite, e.g. "-T <selector>"
+                -v verbose output
+
+            Notes:
+            - Sometimes base64 or ascii-hex decoding might work when you
+              don't want it to (sorry about that;-)
+            - If a PSK mode is used, both pskid "-n" and psk "-s" MUST
+               be supplied
 
 There's a bit of (unfinished) doxygen-generated documentation of the [API](hpke-api.pdf).
 
@@ -102,6 +124,9 @@ The [infoaadtest.sh](infoaadtest.sh) script does the same as
 [roundtrip.sh](roundtrip.sh) but provides optional (random) AAD and Info inputs
 to encryption and checks that decryption works or fails as appropriate when
 good/bad values are provided. 
+
+The [psktest.sh](psktest.sh) script is like [infoaadtest.sh](infoaadtest.sh)
+but with the PSK mode, with good and bad PSK and PSKID values.
 
 ## PEM-like ciphertext file format
 

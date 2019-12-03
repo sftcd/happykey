@@ -33,7 +33,7 @@
 #define HPKE_MODE_BASE              0 ///< Base mode (all that we support for now)
 #define HPKE_MODE_PSK               1 ///< Pre-shared key mode
 #define HPKE_MODE_AUTH              2 ///< Authenticated mode
-#define HPKE_MODE_PSK_AUTH          3 ///< PSK+authenticated mode
+#define HPKE_MODE_PSKAUTH           3 ///< PSK+authenticated mode
 
 /*
  * The (16bit) HPKE algorithn IDs
@@ -74,6 +74,9 @@ typedef struct {
  * @brief HPKE single-shot encryption function
  * @param mode is the HPKE mode
  * @param suite is the ciphersuite to use
+ * @param pskid is the pskid string fpr a PSK mode (can be NULL)
+ * @param psklen is the psk length
+ * @param psk is the psk 
  * @param publen is the length of the public key
  * @param pub is the encoded public key
  * @param clearlen is the length of the cleartext
@@ -92,8 +95,8 @@ typedef struct {
  * smaller than a 64 bit pointer, so that's grand, if odd:-)
  */
 int hpke_enc(
-        unsigned int mode,
-        hpke_suite_t suite,
+        unsigned int mode, hpke_suite_t suite,
+        char *pskid, size_t psklen, unsigned char *psk,
         size_t publen, unsigned char *pub,
         size_t clearlen, unsigned char *clear,
         size_t aadlen, unsigned char *aad,
@@ -109,6 +112,9 @@ int hpke_enc(
  * @brief HPKE single-shot decryption function
  * @param mode is the HPKE mode
  * @param suite is the ciphersuite to use
+ * @param pskid is the pskid string fpr a PSK mode (can be NULL)
+ * @param psklen is the psk length
+ * @param psk is the psk 
  * @param privlen is the length of the private key
  * @param priv is the encoded private key
  * @param enclen is the length of the peer's public value
@@ -124,8 +130,8 @@ int hpke_enc(
  * @return 1 for good (OpenSSL style), not-1 for error
  */
 int hpke_dec(
-        unsigned int mode,
-        hpke_suite_t suite,
+        unsigned int mode, hpke_suite_t suite,
+        char *pskid, size_t psklen, unsigned char *psk,
         size_t privlen, unsigned char *priv,
         size_t enclen, unsigned char *enc,
         size_t cipherlen, unsigned char *cipher,

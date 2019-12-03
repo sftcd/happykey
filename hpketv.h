@@ -85,6 +85,7 @@ int hpke_tv_load(char *fname, int *nelems, hpke_tv_t **array);
 
 /*!
  * @brief select a test vector to use based on mode and suite
+ * @param mode is the selected mode
  * @param nelems is the number of array elements
  * @param arr is the elements
  * @param selector is a string to use
@@ -97,7 +98,7 @@ int hpke_tv_load(char *fname, int *nelems, hpke_tv_t **array);
  * The string to use is like "0,1,1,2" specifying the 
  * mode and suite in the (sorta:-) obvious manner.
  */
-int hpke_tv_pick(int nelems, hpke_tv_t *arr, char *selector, hpke_tv_t **tv);
+int hpke_tv_pick(unsigned int mode, int nelems, hpke_tv_t *arr, char *selector, hpke_tv_t **tv);
 
 /*!
  * @brief free up test vector array
