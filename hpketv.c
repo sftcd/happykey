@@ -51,6 +51,8 @@
 FAIL2BUILD("Don't build hpkeyv.c without TESTVECRTORS being defined")
 #endif
 
+#define HPKE_TV_COUNT 96 ///< number of test vectors
+
 /*!
  * @brief load test vectors from json file to array
  * @param fname is the json file
@@ -270,21 +272,39 @@ static int hpke_tv_match(unsigned int mode, hpke_tv_t *a, char *selector)
  * This function will pick the first matching test vector
  * that matches the specified criteria. 
  *
- * TODO: Change to random later, when stuff works.
- *
- * The string to use is like "1,1,2" specifying the 
- * suite in the (sorta:-) obvious manner.
+ * It looks (so far) like there's only one match for each of
+ * mode=base/psk for my default ciphersuite. So no point in 
+ * spending time now on randomly picking;-)
  */
 int hpke_tv_pick(unsigned int mode, int nelems, hpke_tv_t *arr, char *selector, hpke_tv_t **tv)
 {
     hpke_tv_t *a=arr;
-    for (int i=0;i!=nelems;i++) {
+    hpke_tv_t **resarr=NULL; ///< array of pointers to matching vectors
+    resarr=malloc(nelems*sizeof(hpke_tv_t*));
+    if (!resarr) return(__LINE__);
+    memset(resarr,0,nelems*sizeof(hpke_tv_t*));
+    int mind=0;
+    int gotmatch=0;
+    int i=0;
+    for (i=0;i!=nelems;i++) {
         if (hpke_tv_match(mode,a,selector)) {
-            *tv=a;
-            return(1);
+            resarr[mind++]=a;
+            gotmatch=i;
         }
         a++;
     }
-    return(0);
+    if (!gotmatch) {
+        free(resarr);
+        return(0);
+    }
+    if (mind==1) {
+        *tv=resarr[0];
+        free(resarr);
+        return(1);
+    }
+    *tv=resarr[0];
+    free(resarr);
+    printf("Got %d matches, last at %d\n",mind,gotmatch);
+    return(1);
 }
 

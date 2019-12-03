@@ -16,7 +16,6 @@ valgrind seems happy for the moment, at least with nominal behaviour, so things
 aren't totally shabby:-)
 
 Main TODOs (possibly in this order) are:
-- selection of test vectors (first matching mode for now)
 - arbitrary sizes for plain/cipher texts (640kB is a hard limit for now:-)
 - APIs for non single-shot operation (non-existent:-)
 - multiple suites (only one for now)
@@ -191,5 +190,9 @@ the way to checking the ciphertext from ``hpke_enc()`` matches the test
 vector... and that now works.  (That means ``-T thing`` is the same for all
 values of "thing" for now - will add code for selecting stuff later when I get
 other ciphersuites done.)
+
+So far, it appears that there is only one test vector matching mys
+supported modes and default ciphersuite. So we're not gonna do much
+better than just picking the first:-)
 
 
