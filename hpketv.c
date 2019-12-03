@@ -51,7 +51,30 @@
 FAIL2BUILD("Don't build hpkeyv.c without TESTVECRTORS being defined")
 #endif
 
-#define HPKE_TV_COUNT 96 ///< number of test vectors
+
+/*
+ * Marcros to grab a numeric or string field from json-c object 
+ * and whack in same-named field of ours
+ */
+/*!
+ * @brief copy typed/named field from json-c to hpke_tv_t
+ */
+#define grabnum(_xx)  if (!strcmp(key,""#_xx"")) { thearr[i]._xx=json_object_get_int(val); } 
+
+/*!
+ * @brief copy typed/named field from json-c to hpke_tv_t
+ */
+#define grabstr(_xx)  if (!strcmp(key,""#_xx"")) { thearr[i]._xx=json_object_get_string(val); }
+
+/*!
+ * @brief copy typed/named field from json-c to hpke_tv_t
+ */
+#define grabestr(_xx)  if (!strcmp(key1,""#_xx"")) { encs[j]._xx=json_object_get_string(val1); }
+
+/*!
+ * @brief print the name of a field and the value of that field
+ */
+#define PRINTIT(_xx) printf("\t"#_xx": %s\n",a->_xx);
 
 /*!
  * @brief load test vectors from json file to array
@@ -104,21 +127,6 @@ int hpke_tv_load(char *fname, int *nelems, hpke_tv_t **array)
      * Again, since this code will be compiled out, we're loosey-goosey
      * with error handling.
      */
-
-/*
- * Marcros to grab a numeric or string field from json-c object 
- * and whack in same-named field of ours
- */
-
-#define grabnum(_xx)  if (!strcmp(key,""#_xx"")) { \
-                        thearr[i]._xx=json_object_get_int(val); \
-                      } 
-#define grabstr(_xx)  if (!strcmp(key,""#_xx"")) { \
-                        thearr[i]._xx=json_object_get_string(val); \
-                      }
-#define grabestr(_xx)  if (!strcmp(key1,""#_xx"")) { \
-                        encs[j]._xx=json_object_get_string(val1); \
-                      }
 
     hpke_tv_t *thearr=NULL;
     int i,j;
@@ -179,7 +187,6 @@ int hpke_tv_load(char *fname, int *nelems, hpke_tv_t **array)
  * @brief free up test vector array
  * @param nelems is the number of array elements
  * @param array is a guess what?
- * @return 1 for good, other for bad
  *
  * Caller doesn't need to free "parent" array
  */
@@ -195,11 +202,6 @@ void hpke_tv_free(int nelems, hpke_tv_t *array)
     return;
 }
 
-/*!
- * @brief print the name of a field and the value of that field
- */
-#define PRINTIT(_xx) printf("\t"#_xx": %s\n",a->_xx);
-
 /*
  * @brief print test vectors
  * @param nelems is the number of array elements
@@ -211,7 +213,7 @@ void hpke_tv_print(int nelems, hpke_tv_t *array)
     hpke_tv_t *a=array;
     if (!array) return;
     for (int i=0;i!=nelems;i++) {
-        printf("Test Vector Element %d\n",i);
+        printf("Test Vector Element %d of %d\n",i+1,nelems);
         printf("\tmode: %d, suite: %d,%d,%d\n",a->mode,a->kdfID,a->kemID,a->aeadID);
         PRINTIT(pkR);
         PRINTIT(context);
@@ -242,16 +244,15 @@ void hpke_tv_print(int nelems, hpke_tv_t *array)
 
 
 /* 
- * @brief check if test vector matches selector
+ * @brief check if test vector matches mode/suite
  * @param mode is the selected mode
  * @param a is a test vector
- * @param is a selector (currently unused)
  * @return 1 for match zero otherwise
  *
  * For now, this just matches the first <mode>,default-suite
  * test vecctor.
  */
-static int hpke_tv_match(unsigned int mode, hpke_tv_t *a, char *selector)
+static int hpke_tv_match(unsigned int mode, hpke_tv_t *a)
 {
     if (a && a->mode==mode &&
         a->kdfID==HPKE_KDF_ID_HKDF_SHA256 &&
@@ -265,7 +266,6 @@ static int hpke_tv_match(unsigned int mode, hpke_tv_t *a, char *selector)
  * @param mode is the selected mode
  * @param nelems is the number of array elements
  * @param array is the elements
- * @param selector is a string to use
  * @param tv is the chosen test vector (doesn't need to be freed)
  * @return 1 for good, other for bad
  *
@@ -276,7 +276,7 @@ static int hpke_tv_match(unsigned int mode, hpke_tv_t *a, char *selector)
  * mode=base/psk for my default ciphersuite. So no point in 
  * spending time now on randomly picking;-)
  */
-int hpke_tv_pick(unsigned int mode, int nelems, hpke_tv_t *arr, char *selector, hpke_tv_t **tv)
+int hpke_tv_pick(unsigned int mode, int nelems, hpke_tv_t *arr,hpke_tv_t **tv)
 {
     hpke_tv_t *a=arr;
     hpke_tv_t **resarr=NULL; ///< array of pointers to matching vectors
@@ -287,7 +287,7 @@ int hpke_tv_pick(unsigned int mode, int nelems, hpke_tv_t *arr, char *selector, 
     int gotmatch=0;
     int i=0;
     for (i=0;i!=nelems;i++) {
-        if (hpke_tv_match(mode,a,selector)) {
+        if (hpke_tv_match(mode,a)) {
             resarr[mind++]=a;
             gotmatch=i;
         }

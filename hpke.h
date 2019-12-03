@@ -66,7 +66,7 @@ typedef struct {
  * A suite constant (the only one supported for now:-)
  * Use this as follows:
  *
- *          hpke_suit_t myvar = HPKE_SUITE_DEFAULT;
+ *          hpke_suite_t myvar = HPKE_SUITE_DEFAULT;
  */
 #define HPKE_SUITE_DEFAULT { HPKE_KEM_ID_25519, HPKE_KDF_ID_HKDF_SHA256, HPKE_AEAD_ID_AES_GCM_128 }
 
@@ -79,6 +79,8 @@ typedef struct {
  * @param psk is the psk 
  * @param publen is the length of the public key
  * @param pub is the encoded public key
+ * @param privlen is the length of the private (authentication) key
+ * @param priv is the encoded private (authentication) key
  * @param clearlen is the length of the cleartext
  * @param clear is the encoded cleartext
  * @param aadlen is the lenght of the additional data
@@ -98,6 +100,7 @@ int hpke_enc(
         unsigned int mode, hpke_suite_t suite,
         char *pskid, size_t psklen, unsigned char *psk,
         size_t publen, unsigned char *pub,
+        size_t privlen, unsigned char *priv,
         size_t clearlen, unsigned char *clear,
         size_t aadlen, unsigned char *aad,
         size_t infolen, unsigned char *info,
@@ -115,6 +118,8 @@ int hpke_enc(
  * @param pskid is the pskid string fpr a PSK mode (can be NULL)
  * @param psklen is the psk length
  * @param psk is the psk 
+ * @param publen is the length of the public (authentication) key
+ * @param pub is the encoded public (authentication) key
  * @param privlen is the length of the private key
  * @param priv is the encoded private key
  * @param enclen is the length of the peer's public value
@@ -132,6 +137,7 @@ int hpke_enc(
 int hpke_dec(
         unsigned int mode, hpke_suite_t suite,
         char *pskid, size_t psklen, unsigned char *psk,
+        size_t publen, unsigned char *pub,
         size_t privlen, unsigned char *priv,
         size_t enclen, unsigned char *enc,
         size_t cipherlen, unsigned char *cipher,

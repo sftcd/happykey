@@ -656,8 +656,10 @@ err:
  * @param suite is the ciphersuite to use
  * @param enc is the sender public key
  * @param enclen is the length of the sender public key
- * @param recippub is the encoded recipient public key
- * @param recippublen is the length of the recipient public key
+ * @param pub is the encoded recipient public key
+ * @param publen is the length of the recipient public key
+ * @param pkI_hash is the hash of the sender's authentication key (or NULL)
+ * @param pkI_hashlen is the length of the pkI_hash
  * @param pskid is a PSK ID string (can be NULL)
  * @param info is buffer of info to bind
  * @param infolen is the length of the buffer of info
@@ -668,7 +670,8 @@ err:
 static int hpke_make_context(
             int mode, hpke_suite_t suite,
             const unsigned char *enc, const size_t enclen,
-            const unsigned char *recippub, const size_t recippublen,
+            const unsigned char *pub, const size_t publen,
+            const unsigned char *pkI_hash, const size_t pkI_hashlen,
             const char *pskid,
             const unsigned char *info, const size_t infolen,
             unsigned char **context, size_t *contextlen) 
@@ -686,8 +689,12 @@ static int hpke_make_context(
     *cp++=(suite.kdf_id&0xff00)>>8; *cp++=(suite.kdf_id&0xff);  CHECK_HPKE_CTX;
     *cp++=(suite.aead_id&0xff00)>>8; *cp++=(suite.aead_id&0xff); 
     memcpy(cp,enc,enclen); cp+=enclen; CHECK_HPKE_CTX
-    memcpy(cp,recippub,recippublen); cp+=recippublen; CHECK_HPKE_CTX;
-    memcpy(cp,zero_buf,SHA256_DIGEST_LENGTH); cp+=SHA256_DIGEST_LENGTH; CHECK_HPKE_CTX;
+    memcpy(cp,pub,publen); cp+=publen; CHECK_HPKE_CTX;
+    if (pkI_hash==NULL) {
+        memcpy(cp,zero_buf,SHA256_DIGEST_LENGTH); cp+=SHA256_DIGEST_LENGTH; CHECK_HPKE_CTX;
+    } else {
+        memcpy(cp,pkI_hash,pkI_hashlen); cp+=pkI_hashlen; CHECK_HPKE_CTX;
+    }
     if (pskid==NULL) {
         memcpy(cp,zero_sha256,SHA256_DIGEST_LENGTH); cp+=SHA256_DIGEST_LENGTH; CHECK_HPKE_CTX;
     } else {
@@ -724,11 +731,8 @@ static int hpke_mode_check(unsigned int mode)
     switch (mode) {
         case HPKE_MODE_BASE:
         case HPKE_MODE_PSK:
-            break;
         case HPKE_MODE_AUTH:
         case HPKE_MODE_PSKAUTH:
-            printf("not yet!");
-            return(__LINE__);
             break;
         default:
             return(__LINE__);
@@ -767,8 +771,10 @@ static int hpke_psk_check(
  * @param pskid is the pskid string fpr a PSK mode (can be NULL)
  * @param psklen is the psk length
  * @param psk is the psk 
- * @param recippublen is the length of the recipient public key
- * @param recippub is the encoded recipient public key
+ * @param publen is the length of the recipient public key
+ * @param pub is the encoded recipient public key
+ * @param privlen is the length of the private (authentication) key
+ * @param priv is the encoded private (authentication) key
  * @param clearlen is the length of the cleartext
  * @param clear is the encoded cleartext
  * @param aadlen is the lenght of the additional data (can be zero)
@@ -784,7 +790,8 @@ static int hpke_psk_check(
 int hpke_enc(
         unsigned int mode, hpke_suite_t suite,
         char *pskid, size_t psklen, unsigned char *psk,
-        size_t recippublen, unsigned char *recippub,
+        size_t publen, unsigned char *pub,
+        size_t privlen, unsigned char *priv,
         size_t clearlen, unsigned char *clear,
         size_t aadlen, unsigned char *aad,
         size_t infolen, unsigned char *info,
@@ -800,7 +807,10 @@ int hpke_enc(
     if ((crv=hpke_psk_check(mode,pskid,psklen,psk))!=1) return(crv);
     if ((crv=hpke_suite_check(suite))!=1) return(crv);
 
-    if (!recippub || !clear || !senderpublen || !senderpub || !cipherlen  || !cipher) return(__LINE__);
+    if (!pub || !clear || !senderpublen || !senderpub || !cipherlen  || !cipher) return(__LINE__);
+    if ((mode==HPKE_MODE_AUTH || mode==HPKE_MODE_PSKAUTH) && (!priv || privlen==0)) return(__LINE__);
+    if ((mode==HPKE_MODE_PSK || mode==HPKE_MODE_PSKAUTH) && (!psk || psklen==0 || !pskid)) return(__LINE__);
+
     int erv=1; /* Our error return value - 1 is success */
 /*
  * Define this if you want loads printing of intermediate
@@ -829,6 +839,7 @@ int hpke_enc(
     EVP_PKEY_CTX *pctx=NULL;
     EVP_PKEY *pkR=NULL;
     EVP_PKEY *pkE=NULL;
+    EVP_PKEY *skI=NULL;
     size_t  zzlen=0;
     unsigned char *zz=NULL;
     size_t  enclen=0;
@@ -841,9 +852,12 @@ int hpke_enc(
     unsigned char *key=NULL;
     size_t  noncelen=0;
     unsigned char *nonce=NULL;
+    size_t pkI_buflen=0;
+    unsigned char *pkI_buf=NULL;
+    BIO *bfp=NULL;
 
     /* step 0. Initialise peer's key from string */
-    pkR = EVP_PKEY_new_raw_public_key(EVP_PKEY_X25519,NULL,recippub,recippublen);
+    pkR = EVP_PKEY_new_raw_public_key(EVP_PKEY_X25519,NULL,pub,publen);
     if (pkR == NULL) {
         erv=__LINE__; goto err;
     }
@@ -889,10 +903,49 @@ int hpke_enc(
         goto err;
     }
 
+    /* get 2nd half of zz if using an auth mode */
+    if (mode==HPKE_MODE_AUTH||mode==HPKE_MODE_PSKAUTH) {
+        skI=EVP_PKEY_new_raw_private_key(EVP_PKEY_X25519,NULL,priv,privlen);
+        if (!skI) {
+            /* check PEM decode - that might work :-) */
+            bfp=BIO_new(BIO_s_mem());
+            if (!bfp) {
+                erv=__LINE__; goto err;
+            }
+            BIO_write(bfp,priv,privlen);
+            if (!PEM_read_bio_PrivateKey(bfp,&skI,NULL,NULL)) {
+                erv=__LINE__; goto err;
+            }
+        }
+
+        /* step 2.5 run DH KEM again to get 2nd half of zz */
+        unsigned char *zz2=NULL;
+        size_t zzlen2=0;
+        erv=hpke_do_kem(skI,pkR,&zz2,&zzlen2);
+        if (erv!=1) {
+            goto err;
+        }
+        unsigned char *zzboth=OPENSSL_malloc(zzlen+zzlen2);
+        if (!zzboth) {
+            OPENSSL_free(zz2);
+            erv=__LINE__; goto err;
+        }
+        memcpy(zzboth,zz,zzlen);
+        memcpy(zzboth+zzlen,zz2,zzlen2);
+        OPENSSL_free(zz2);
+        OPENSSL_free(zz);
+        zz=zzboth;
+        zzlen=zzlen+zzlen2;
+
+        /* set the public part of skI to be included in context */
+        pkI_buflen=EVP_PKEY_get1_tls_encodedpoint(skI,&pkI_buf); 
+    } 
+
     /* step 3. create context buffer */
     erv=hpke_make_context(mode,suite,
             enc,enclen,
-            recippub,recippublen,
+            pub,publen,
+            pkI_buf,pkI_buflen,
             pskid,
             info,infolen,
             &context,&contextlen);
@@ -966,6 +1019,10 @@ int hpke_enc(
         printf("Runtime:\n");
         printf("\tmode: %d, suite; %d,%d,%d\n",mode,suite.kdf_id,suite.kem_id,suite.aead_id);
         pblen = EVP_PKEY_get1_tls_encodedpoint(pkR,&pbuf); hpke_pbuf(stdout,"\tpkR",pbuf,pblen); OPENSSL_free(pbuf);
+        pblen = EVP_PKEY_get1_tls_encodedpoint(pkE,&pbuf); hpke_pbuf(stdout,"\tpkE",pbuf,pblen); OPENSSL_free(pbuf);
+        if (mode==HPKE_MODE_AUTH || mode==HPKE_MODE_PSKAUTH) {
+            pblen = EVP_PKEY_get1_tls_encodedpoint(skI,&pbuf); hpke_pbuf(stdout,"\tpkI",pbuf,pblen); OPENSSL_free(pbuf);
+        }
         hpke_pbuf(stdout,"\tcontext",context,contextlen);
         hpke_pbuf(stdout,"\tzz",zz,zzlen);
         hpke_pbuf(stdout,"\tsecret",secret,secretlen);
@@ -974,7 +1031,6 @@ int hpke_enc(
         hpke_pbuf(stdout,"\taad",aad,aadlen);
         hpke_pbuf(stdout,"\tnonce",nonce,noncelen);
         hpke_pbuf(stdout,"\tkey",key,keylen);
-        pblen = EVP_PKEY_get1_tls_encodedpoint(pkE,&pbuf); hpke_pbuf(stdout,"\tpkE",pbuf,pblen); OPENSSL_free(pbuf);
         hpke_pbuf(stdout,"\tplaintext",clear,clearlen);
         hpke_pbuf(stdout,"\tciphertext",cipher,*cipherlen);
         if (mode==HPKE_MODE_PSK || mode==HPKE_MODE_PSKAUTH) {
@@ -990,6 +1046,8 @@ err:
     printf("Encrypting:\n");
     printf("\tmode: %d, suite; %d,%d,%d\n",mode,suite.kdf_id,suite.kem_id,suite.aead_id);
     pblen = EVP_PKEY_get1_tls_encodedpoint(pkE,&pbuf); hpke_pbuf(stdout,"\tpkE",pbuf,pblen); OPENSSL_free(pbuf);
+    pblen = EVP_PKEY_get1_tls_encodedpoint(pkR,&pbuf); hpke_pbuf(stdout,"\tpkR",pbuf,pblen); OPENSSL_free(pbuf);
+    pblen = EVP_PKEY_get1_tls_encodedpoint(skI,&pbuf); hpke_pbuf(stdout,"\tskI",pbuf,pblen); OPENSSL_free(pbuf);
     hpke_pbuf(stdout,"\tcontext",context,contextlen);
     hpke_pbuf(stdout,"\tzz",zz,zzlen);
     hpke_pbuf(stdout,"\tsecret",secret,secretlen);
@@ -998,7 +1056,6 @@ err:
     hpke_pbuf(stdout,"\taad",aad,aadlen);
     hpke_pbuf(stdout,"\tnonce",nonce,noncelen);
     hpke_pbuf(stdout,"\tkey",key,keylen);
-    pblen = EVP_PKEY_get1_tls_encodedpoint(pkR,&pbuf); hpke_pbuf(stdout,"\tpkR",pbuf,pblen); OPENSSL_free(pbuf);
     hpke_pbuf(stdout,"\tcleartext",clear,clearlen);
     hpke_pbuf(stdout,"\tciphertext",cipher,*cipherlen);
     if (mode==HPKE_MODE_PSK || mode==HPKE_MODE_PSKAUTH) {
@@ -1007,8 +1064,11 @@ err:
     }
 #endif
 
+    if (bfp!=NULL) BIO_free_all(bfp);
     if (pkR!=NULL) EVP_PKEY_free(pkR);
     if (pkE!=NULL) EVP_PKEY_free(pkE);
+    if (skI!=NULL) EVP_PKEY_free(skI);
+    if (pkI_buf!=NULL) OPENSSL_free(pkI_buf);
     if (pctx!=NULL) EVP_PKEY_CTX_free(pctx);
     if (zz!=NULL) OPENSSL_free(zz);
     if (enc!=NULL) OPENSSL_free(enc);
@@ -1026,6 +1086,8 @@ err:
  * @param pskid is the pskid string fpr a PSK mode (can be NULL)
  * @param psklen is the psk length
  * @param psk is the psk 
+ * @param publen is the length of the public (authentication) key
+ * @param pub is the encoded public (authentication) key
  * @param privlen is the length of the private key
  * @param priv is the encoded private key
  * @param enclen is the length of the peer's public value
@@ -1043,6 +1105,7 @@ err:
 int hpke_dec(
         unsigned int mode, hpke_suite_t suite,
         char *pskid, size_t psklen, unsigned char *psk,
+        size_t publen, unsigned char *pub,
         size_t privlen, unsigned char *priv,
         size_t enclen, unsigned char *enc,
         size_t cipherlen, unsigned char *cipher,
@@ -1056,6 +1119,9 @@ int hpke_dec(
     if ((crv=hpke_suite_check(suite))!=1) return(crv);
 
     if (!priv || !clearlen || !clear || !cipher) return(__LINE__);
+    if ((mode==HPKE_MODE_AUTH || mode==HPKE_MODE_PSKAUTH) && (!pub || publen==0)) return(__LINE__);
+    if ((mode==HPKE_MODE_PSK || mode==HPKE_MODE_PSKAUTH) && (!psk || psklen==0 || !pskid)) return(__LINE__);
+
     int erv=1;
 #ifdef SUPERVERBOSE
     unsigned char *pbuf;
@@ -1077,6 +1143,7 @@ int hpke_dec(
     EVP_PKEY_CTX *pctx=NULL;
     EVP_PKEY *skR=NULL;
     EVP_PKEY *pkE=NULL;
+    EVP_PKEY *pkI=NULL;
     size_t  zzlen=0;
     unsigned char *zz=NULL;
     size_t  contextlen=0;
@@ -1089,12 +1156,13 @@ int hpke_dec(
     unsigned char *nonce=NULL;
     size_t  mypublen=0;
     unsigned char *mypub=NULL;
+    size_t  otherpublen=0;
+    unsigned char *otherpub=NULL;
     BIO *bfp=NULL;
 
     /* step 0. Initialise peer's key from string */
     pkE = EVP_PKEY_new_raw_public_key(EVP_PKEY_X25519,NULL,enc,enclen);
     if (pkE == NULL) {
-        printf("Enclen: %ld\n",enclen);
         erv=__LINE__; goto err;
     }
 
@@ -1123,9 +1191,41 @@ int hpke_dec(
     if (mypub==NULL || mypublen == 0) {
         erv=__LINE__; goto err;
     }
+
+    if (mode==HPKE_MODE_AUTH||mode==HPKE_MODE_PSKAUTH) {
+
+        /* step 2.5 run DH KEM again to get 2nd half of zz */
+        pkI = EVP_PKEY_new_raw_public_key(EVP_PKEY_X25519,NULL,pub,publen);
+        if (pkI == NULL) {
+            erv=__LINE__; goto err;
+        }
+        unsigned char *zz2=NULL;
+        size_t zzlen2=0;
+        erv=hpke_do_kem(skR,pkI,&zz2,&zzlen2);
+        if (erv!=1) {
+            goto err;
+        }
+        unsigned char *zzboth=OPENSSL_malloc(zzlen+zzlen2);
+        if (!zzboth) {
+            OPENSSL_free(zz2);
+            erv=__LINE__; goto err;
+        }
+        memcpy(zzboth,zz,zzlen);
+        memcpy(zzboth+zzlen,zz2,zzlen2);
+        OPENSSL_free(zz2);
+        OPENSSL_free(zz);
+        zz=zzboth;
+        zzlen=zzlen+zzlen2;
+
+        /* feed public into context */
+        otherpub=pub;
+        otherpublen=publen;
+    }
+
     erv=hpke_make_context(mode,suite,
             enc,enclen,
             mypub,mypublen,
+            otherpub,otherpublen,
             pskid,
             info,infolen,
             &context,&contextlen);
@@ -1204,10 +1304,10 @@ err:
     if (*clearlen!=HPKE_MAXSIZE) hpke_pbuf(stdout,"\tplaintext",clear,*clearlen);
     else printf("clearlen is HPKE_MAXSIZE, so decryption probably failed\n");
 #endif
-
     if (bfp!=NULL) BIO_free_all(bfp);
     if (skR!=NULL) EVP_PKEY_free(skR);
     if (pkE!=NULL) EVP_PKEY_free(pkE);
+    if (pkI!=NULL) EVP_PKEY_free(pkI);
     if (pctx!=NULL) EVP_PKEY_CTX_free(pctx);
     if (zz!=NULL) OPENSSL_free(zz);
     if (context!=NULL) OPENSSL_free(context);

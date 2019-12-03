@@ -8,12 +8,19 @@ my [ESNI-enabled OpenSSL](https://github.com/sftcd/openssl) fork.
 (As of now, this needs to be built against a master/tip version of
 OpenSSL such as my fork.)
 
-Currently, (20191203) ``hpke_enc()`` produces output that matches a couple of
-CFRG test vectors, but lots is hard-coded to one ciphersuite (x25519,
-hkdf-sha256 and aes128gcm) with only the base and psk modes supported so far.
-In addition, ``hpke_dec()`` can decrypt what ``hpke_enc()`` produces, and
-valgrind seems happy for the moment, at least with nominal behaviour, so things
-aren't totally shabby:-)
+Currently, (20191203), ``hpke_dec()`` can decrypt what ``hpke_enc()`` produces,
+and valgrind seems happy for the moment, at least with nominal behaviour, so
+things aren't totally shabby:-)
+
+``hpke_enc()`` also produces output that matches the relevant CFRG test
+vectors. 
+
+For now, I only support one hard-coded ciphersuite (x25519, hkdf-sha256 and
+aes128gcm). 
+
+I do (seem) to support all four modes, though I can only verify three
+(base,psk,auth) against test vectors as none seem to match mode 3/pskauth and
+my chosen ciphersuite.
 
 Main TODOs (possibly in this order) are:
 - arbitrary sizes for plain/cipher texts (640kB is a hard limit for now:-)
@@ -138,8 +145,8 @@ The [infoaadtest.sh](infoaadtest.sh) script does the same as
 to encryption and checks that decryption works or fails as appropriate when
 good/bad values are provided. 
 
-The [psktest.sh](psktest.sh) script is like [infoaadtest.sh](infoaadtest.sh)
-but with the PSK mode, with good and bad PSK and PSKID values.
+The [modetest.sh](modetest.sh) script is like [infoaadtest.sh](infoaadtest.sh)
+but goes through all the modes, with good and bad PSK and PSKID values.
 
 ## Key generation
 

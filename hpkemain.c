@@ -56,8 +56,7 @@ static void usage(char *prog,char *errmsg)
     fprintf(stderr,"\t\t\t[-m mode] [-s psk] [-n pskid]\n");
 #ifdef TESTVECTORS
     fprintf(stderr,"This version is built with TESTVECTORS\n");
-    fprintf(stderr,"\tUsage: %s -T tvspec [-m mode]\n",prog);
-    fprintf(stderr,"\ttvspec is not yet implemented, 1st matching picked for now.\n");
+    fprintf(stderr,"\tUsage: %s -T [-m mode]\n",prog);
 #endif
     fprintf(stderr,"Options:\n");
     fprintf(stderr,"\t-a additional authenticated data file name or actual value\n");
@@ -69,12 +68,13 @@ static void usage(char *prog,char *errmsg)
     fprintf(stderr,"\t-k generate key pair\n");
     fprintf(stderr,"\t-P public key file name or base64 or ascii-hex encoded value\n");
     fprintf(stderr,"\t-p private key file name or base64 or ascii-hex encoded value\n");
-    fprintf(stderr,"\t-m mode (one of: base,psk,pskauth)\n");
+    fprintf(stderr,"\t-m mode (one of: %s,%s,%s or %s)\n",
+            HPKE_MODESTR_BASE,HPKE_MODESTR_PSK,HPKE_MODESTR_AUTH,HPKE_MODESTR_PSKAUTH);
     fprintf(stderr,"\t-n PSK id string\n");
     fprintf(stderr,"\t-o output file name (output to stdout if not specified) \n");
     fprintf(stderr,"\t-s psk file name or base64 or ascii-hex encoded value\n");
 #ifdef TESTVECTORS
-    fprintf(stderr,"\t-T run a testvector for mode/suite, e.g. \"-T <selector>\"\n");
+    fprintf(stderr,"\t-T run a testvector for mode/suite\n");
 #endif
     fprintf(stderr,"\t-v verbose output\n");
     fprintf(stderr,"\n");
@@ -82,7 +82,9 @@ static void usage(char *prog,char *errmsg)
     fprintf(stderr,"- Sometimes base64 or ascii-hex decoding might work when you\n");
     fprintf(stderr,"  don't want it to (sorry about that;-)\n");
     fprintf(stderr,"- If a PSK mode is used, both pskid \"-n\" and psk \"-s\" MUST\n");
-    fprintf(stderr,"   be supplied\n");
+    fprintf(stderr,"  be supplied\n");
+    fprintf(stderr,"- For %s or %s modes, provide both public and private keys\n",
+            HPKE_MODESTR_AUTH,HPKE_MODESTR_PSKAUTH);
     exit(1);
 }
 
@@ -458,7 +460,7 @@ int main(int argc, char **argv)
     char *inp_in=NULL;
     char *out_in=NULL;
 #ifdef TESTVECTORS
-    char *tvspec=NULL;
+    int dotv=0;
 #endif
     char *modestr=NULL;
     char *pskid=NULL;
@@ -473,7 +475,7 @@ int main(int argc, char **argv)
     int opt;
 
 #ifdef TESTVECTORS
-    while((opt = getopt(argc, argv, "?hkedvP:p:a:I:i:m:n:o:s:T:")) != -1) {
+    while((opt = getopt(argc, argv, "?hkedvP:p:a:I:i:m:n:o:s:T")) != -1) {
 #else
     while((opt = getopt(argc, argv, "?hkedvP:p:a:I:i:m:n:o:s:")) != -1) {
 #endif
@@ -494,7 +496,7 @@ int main(int argc, char **argv)
             case 'o': out_in=optarg; break;
             case 's': psk_in=optarg; break;
 #ifdef TESTVECTORS
-            case 'T': tvspec=optarg; break;
+            case 'T': dotv=1; break;
 #endif
             default:
                 usage(argv[0],"unknown arg");
@@ -530,8 +532,8 @@ int main(int argc, char **argv)
     }
 
 #ifdef TESTVECTORS
-    if (tvspec!=NULL) {
-        printf("Doing testvector for %s\n",tvspec);
+    if (dotv==1) {
+        printf("Checking against a test vector\n");
     } else {
 #endif
 
@@ -542,10 +544,10 @@ int main(int argc, char **argv)
 
     if (!generate) { 
         if (doing_enc && !pub_in) usage(argv[0],"No recipient public key (\"-P\") provided"); 
-        if (doing_enc && map_input(pub_in,&publen,&pub,1)!=1) usage(argv[0],"bad -P value");
+        if (pub_in && map_input(pub_in,&publen,&pub,1)!=1) usage(argv[0],"bad -P value");
 
         if (!doing_enc && !priv_in) usage(argv[0],"No recipient private key (\"-p\") provided"); 
-        if (!doing_enc && map_input(priv_in,&privlen,&priv,1)!=1) usage(argv[0],"bad -p value");
+        if (priv_in && map_input(priv_in,&privlen,&priv,1)!=1) usage(argv[0],"bad -p value");
 
         /* think again about why doing_enc is below... */
         if (doing_enc && map_input(inp_in,&plainlen,&plain,0)!=1) usage(argv[0],"bad -i value");
@@ -578,15 +580,15 @@ int main(int argc, char **argv)
     int nelems=0;
     hpke_tv_t *tvarr=NULL;
     hpke_tv_t *tv=NULL;
-    if (tvspec!=NULL) {
+    if (dotv==1) {
         int trv=hpke_tv_load(tvfname,&nelems,&tvarr);
         if (trv!=1) {
             fprintf(stderr,"Can't load %s - exiting\n",tvfname);
             exit(1);
         }
-        trv=hpke_tv_pick(hpke_mode,nelems,tvarr,tvspec,&tv);
+        trv=hpke_tv_pick(hpke_mode,nelems,tvarr,&tv);
         if (trv!=1) {
-            fprintf(stderr,"Failed selecting test vector for %s - exiting\n",tvspec);
+            fprintf(stderr,"Failed selecting test vector - exiting\n");
             exit(2);
         }
         hpke_tv_print(1,tv);
@@ -595,11 +597,12 @@ int main(int argc, char **argv)
          * exactly the same as real command line args - plaintext in particular 
          * needs to be decoded here but MUST NOT in the normal case.
          */
-        if (doing_enc && map_input(tv->pkR,&publen,&pub,1)!=1) usage(argv[0],"bad -P value");
-        if (!doing_enc && map_input(tv->skI,&privlen,&priv,1)!=1) usage(argv[0],"bad -p value");
+        if (map_input(tv->pkR,&publen,&pub,1)!=1) usage(argv[0],"bad -P value");
+        if (map_input(tv->skI,&privlen,&priv,1)!=1) usage(argv[0],"bad -p value");
         if (tv->encs && map_input(tv->encs[0].aad,&aadlen,&aad,1)!=1) usage(argv[0],"bad -a value");
         if (tv->info && map_input(tv->info,&infolen,&info,1)!=1) usage(argv[0],"bad -I value");
         if (tv->encs && map_input(tv->encs[0].plaintext,&plainlen,&plain,1)!=1) usage(argv[0],"bad -i value");
+
 
         if (hpke_mode==HPKE_MODE_PSK || hpke_mode==HPKE_MODE_PSKAUTH) {
             /*
@@ -647,6 +650,7 @@ int main(int argc, char **argv)
             hpke_mode, hpke_suite,
             pskid, psklen, psk,
             publen, pub,
+            privlen, priv,
             plainlen, plain,
             aadlen, aad,
             infolen, info,
@@ -657,6 +661,7 @@ int main(int argc, char **argv)
 #endif
             );
         if (pub!=NULL) OPENSSL_free(pub);
+        if (priv!=NULL) OPENSSL_free(priv);
         if (plain!=NULL) OPENSSL_free(plain);
         if (info!=NULL) OPENSSL_free(info);
         if (aad!=NULL) OPENSSL_free(aad);
@@ -707,16 +712,18 @@ int main(int argc, char **argv)
         }
         rv=hpke_dec( hpke_mode, hpke_suite,
                 pskid, psklen, psk,
+                publen, pub,
                 privlen, priv,
                 senderpublen, senderpub,
                 cipherlen, cipher,
                 aadlen,aad,
                 infolen,info,
                 &clearlen, clear); 
-        if (psk) OPENSSL_free(psk);
+        if (pub!=NULL) OPENSSL_free(pub);
         if (priv!=NULL) OPENSSL_free(priv);
         if (info!=NULL) OPENSSL_free(info);
         if (aad!=NULL) OPENSSL_free(aad);
+        if (psk) OPENSSL_free(psk);
         if (rv!=1) {
             fprintf(stderr,"Error decrypting (%d) - exiting\n",rv);
             exit(rv);
@@ -745,7 +752,7 @@ int main(int argc, char **argv)
     } 
 
 #ifdef TESTVECTORS
-    if (tvspec!=NULL) {
+    if (dotv==1) {
         if (pskid) OPENSSL_free(pskid);
     }
     hpke_tv_free(nelems,tvarr);

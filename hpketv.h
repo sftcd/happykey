@@ -71,7 +71,7 @@ typedef struct hpke_tv_s {
     const char *psk;
     int nencs;
     hpke_tv_encs_t *encs;
-    void *jobj;  ///< pointer to json-c object from which we derived this
+    void *jobj;  ///< pointer to json-c object into which the char* pointers above point
 } hpke_tv_t;
 
 /*!
@@ -88,7 +88,6 @@ int hpke_tv_load(char *fname, int *nelems, hpke_tv_t **array);
  * @param mode is the selected mode
  * @param nelems is the number of array elements
  * @param arr is the elements
- * @param selector is a string to use
  * @param tv is the chosen test vector (doesn't need to be freed)
  * @return 1 for good, other for bad
  *
@@ -98,13 +97,12 @@ int hpke_tv_load(char *fname, int *nelems, hpke_tv_t **array);
  * The string to use is like "0,1,1,2" specifying the 
  * mode and suite in the (sorta:-) obvious manner.
  */
-int hpke_tv_pick(unsigned int mode, int nelems, hpke_tv_t *arr, char *selector, hpke_tv_t **tv);
+int hpke_tv_pick(unsigned int mode, int nelems, hpke_tv_t *arr, hpke_tv_t **tv);
 
 /*!
  * @brief free up test vector array
  * @param nelems is the number of array elements
  * @param array is a guess what?
- * @return 1 for good, other for bad
  *
  * Caller doesn't need to free "parent" array
  */
