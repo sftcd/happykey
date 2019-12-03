@@ -67,8 +67,8 @@ If you do build this, ``hpkemain`` is the test tool, so start with
                         [-m mode] [-s psk] [-n pskid]
                         [-m mode] [-s psk] [-n pskid]
             This version is built with TESTVECTORS
-                Usage: ./hpkemain -T tvspec
-                tvspec is not yet implemented, 1st picked for now.
+                Usage: ./hpkemain -T tvspec [-m mode]
+                tvspec is not yet implemented, 1st matching picked for now.
             Options:
                 -a additional authenticated data file name or actual value
                 -d decrypt
@@ -90,7 +90,7 @@ If you do build this, ``hpkemain`` is the test tool, so start with
             - Sometimes base64 or ascii-hex decoding might work when you
               don't want it to (sorry about that;-)
             - If a PSK mode is used, both pskid "-n" and psk "-s" MUST
-               be supplied
+              be supplied
 
 There's a bit of (unfinished) doxygen-generated documentation of the [API](hpke-api.pdf).
 

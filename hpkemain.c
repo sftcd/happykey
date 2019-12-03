@@ -56,8 +56,8 @@ static void usage(char *prog,char *errmsg)
     fprintf(stderr,"\t\t\t[-m mode] [-s psk] [-n pskid]\n");
 #ifdef TESTVECTORS
     fprintf(stderr,"This version is built with TESTVECTORS\n");
-    fprintf(stderr,"\tUsage: %s -T tvspec\n",prog);
-    fprintf(stderr,"\ttvspec is not yet implemented, 1st picked for now.\n");
+    fprintf(stderr,"\tUsage: %s -T tvspec [-m mode]\n",prog);
+    fprintf(stderr,"\ttvspec is not yet implemented, 1st matching picked for now.\n");
 #endif
     fprintf(stderr,"Options:\n");
     fprintf(stderr,"\t-a additional authenticated data file name or actual value\n");
