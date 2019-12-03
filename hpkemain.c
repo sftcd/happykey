@@ -37,35 +37,36 @@ static int verbose=0; ///< global var for verbosity
 static void usage(char *prog,char *errmsg) 
 {
     if (errmsg) fprintf(stderr,"\nError! %s\n\n",errmsg);
-#ifdef TESTVECTORS
-    fprintf(stderr,"Usage: %s [-h|-v|-k|-e|-d] [-P public] [-p private] [-a aad] [-I info] [-i input] [-o output] [-T tvspec]\n",prog);
-#else
-    fprintf(stderr,"Usage: %s [-h|-v|-k|-e|-d] [-P public] [-p private] [-a aad] [-I info] [-i input] [-o output]\n",prog);
-#endif
     fprintf(stderr,"HPKE (draft-irtf-cfrg-hpke) tester, options are:\n");
-    fprintf(stderr,"\t-h help\n");
-    fprintf(stderr,"\t-v verbose output\n");
-    fprintf(stderr,"\t-e encrypt\n");
+    fprintf(stderr,"Key generaion:\n");
+    fprintf(stderr,"\tUsage: %s -k -p private [-P public]\n",prog);
+    fprintf(stderr,"Encryption:\n");
+    fprintf(stderr,"\tUsage: %s -e -P public [-p private] [-a aad] [-I info] [-i input] [-o output]\n",prog);
+    fprintf(stderr,"Decryption:\n");
+    fprintf(stderr,"\tUsage: %s -d -p private [-P public] [-a aad] [-I info] [-i input] [-o output]\n",prog);
+#ifdef TESTVECTORS
+    fprintf(stderr,"This version is built with TESTVECTORS\n");
+    fprintf(stderr,"\tUsage: %s -T tvspec\n",prog);
+    fprintf(stderr,"\tTest vector selectors are not yet implemented, just picking 1st for now.\n");
+#endif
+    fprintf(stderr,"Options:\n");
+    fprintf(stderr,"\t-a additional authenticated data file name or actual value\n");
     fprintf(stderr,"\t-d decrypt\n");
+    fprintf(stderr,"\t-e encrypt\n");
+    fprintf(stderr,"\t-h help\n");
+    fprintf(stderr,"\t-I additional info to bind to key - file name or actual value\n");
+    fprintf(stderr,"\t-i input file name or actual value (stdin if not specified)\n");
     fprintf(stderr,"\t-k generate key pair\n");
     fprintf(stderr,"\t-P public key file name or base64 or ascii-hex encoded value\n");
     fprintf(stderr,"\t-p private key file name or base64 or ascii-hex encoded value\n");
-    fprintf(stderr,"\t-a additional authenticated data file name or actual value\n");
-    fprintf(stderr,"\t-I additional info to bind to key - file name or actual value\n");
-    fprintf(stderr,"\t-i input file name or actual value (stdin if not specified)\n");
     fprintf(stderr,"\t-o output file name (output to stdout if not specified) \n");
 #ifdef TESTVECTORS
-    fprintf(stderr,"\t-T run a testvector for mode/suite, e.g. \"-T 0,1,1,2\"\n");
+    fprintf(stderr,"\t-T run a testvector for mode/suite, e.g. \"-T <selector>\"\n");
 #endif
+    fprintf(stderr,"\t-v verbose output\n");
     fprintf(stderr,"\n");
     fprintf(stderr,"note that sometimes base64 or ascii-hex decoding might work when you don't want it to\n");
     fprintf(stderr,"(sorry about that;-)\n");
-    fprintf(stderr,"\n");
-    fprintf(stderr,"When generating a key pair, supply public and private file names\n");
-#ifdef TESTVECTORS
-    fprintf(stderr,"This version is built with TESTVECTORS\n");
-    fprintf(stderr,"You should either choose \"normal\" inputs or use \"-T\" not both.\n");
-#endif
     exit(1);
 }
 
