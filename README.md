@@ -126,7 +126,7 @@ script [env](./env), looks like this:
             lwmIl7EpoPbZy3UQBM5B8gBNICHqfuNGwvkraWxFMPfOcPlH19ifEz2Qch6WLFeGGY4C5MtkbJv6A2/kJqTGOSQ7nwWZKXSgTG2wGXpXyZHN2Q==
             -----END CIPHERTEXT-----
 
-(Not sure that MIME type like stuff is wise, but we'll see - it's good enough
+(Not sure that PEM-like stuff is wise, but we'll see - it's good enough
 to let me easily test round-tripping at least.)
 
 The [roundtrip.sh](roundtrip.sh) script fetches some plaintext, generates a key
@@ -186,7 +186,7 @@ directory to this one as shown above.
 
 As of now, when the ``-T`` commnand line argument is used, the JSON file of
 test vectors is loaded into an array of ``hpke_tv_t`` and I just pick the first
-one that matches my chosen suite, then print out various intermediate values on
+one that matches my chosen mode/suite, then print out various intermediate values on
 the way to checking the ciphertext from ``hpke_enc()`` matches the test
 vector... and that now works.  (That means ``-T thing`` is the same for all
 values of "thing" for now - will add code for selecting stuff later when I get
