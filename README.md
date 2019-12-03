@@ -73,8 +73,7 @@ If you do build this, ``hpkemain`` is the test tool, so start with
                         [-m mode] [-s psk] [-n pskid]
                         [-m mode] [-s psk] [-n pskid]
             This version is built with TESTVECTORS
-                Usage: ./hpkemain -T tvspec [-m mode]
-                tvspec is not yet implemented, 1st matching picked for now.
+                Usage: ./hpkemain -T [-m mode]
             Options:
                 -a additional authenticated data file name or actual value
                 -d decrypt
@@ -85,11 +84,11 @@ If you do build this, ``hpkemain`` is the test tool, so start with
                 -k generate key pair
                 -P public key file name or base64 or ascii-hex encoded value
                 -p private key file name or base64 or ascii-hex encoded value
-                -m mode (one of: base,psk,pskauth)
+                -m mode (one of: base,psk,auth or pskauth)
                 -n PSK id string
                 -o output file name (output to stdout if not specified) 
                 -s psk file name or base64 or ascii-hex encoded value
-                -T run a testvector for mode/suite, e.g. "-T <selector>"
+                -T run a testvector for mode/suite
                 -v verbose output
 
             Notes:
@@ -97,6 +96,7 @@ If you do build this, ``hpkemain`` is the test tool, so start with
               don't want it to (sorry about that;-)
             - If a PSK mode is used, both pskid "-n" and psk "-s" MUST
               be supplied
+            - For auth or pskauth modes, provide both public and private keys
 
 There's a bit of (unfinished) doxygen-generated documentation of the [API](hpke-api.pdf).
 
