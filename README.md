@@ -8,16 +8,12 @@ my [ESNI-enabled OpenSSL](https://github.com/sftcd/openssl) fork.
 (As of now, this needs to be built against a master/tip version of
 OpenSSL such as my fork.)
 
-Currently, (20191201) ``hpke_enc()`` produces output that matches at least one
-CFRG test vector, but lots is hard-coded to one ciphersuite (x25519,
-hkdf-sha256 and aes128gcm) and plenty of code needs re-factoring. In addition,
-``hpke_dec()`` can decrypt what ``hpke_enc()`` produces, and valgrind
-seems happy for the moment, at least with nominal behaviour, so things aren't
-totally shabby:-)
-
-Latest change (20191203) is I've added support for PSK mode (not PSK-auth, just
-PSK) but that's not really tested. It does appear to  validate against a test
-vector though and round-trips work.
+Currently, (20191203) ``hpke_enc()`` produces output that matches a couple of
+CFRG test vectors, but lots is hard-coded to one ciphersuite (x25519,
+hkdf-sha256 and aes128gcm) with only the base and psk modes supported so far.
+In addition, ``hpke_dec()`` can decrypt what ``hpke_enc()`` produces, and
+valgrind seems happy for the moment, at least with nominal behaviour, so things
+aren't totally shabby:-)
 
 Main TODOs (possibly in this order) are:
 - selection of test vectors (first matching mode for now)
@@ -98,6 +94,24 @@ If you do build this, ``hpkemain`` is the test tool, so start with
 
 There's a bit of (unfinished) doxygen-generated documentation of the [API](hpke-api.pdf).
 
+## PEM-like ciphertext file format
+
+Since we need the ciphertext and sender's public key to do a decrypt,
+the ``hpkemain`` command line test tool saves both of those in one
+file. An [example](PEM-like-sample) of one of those might be:
+
+            $ ./hpkemain -P pub -i env -o PEM-like-sample
+            $ cat PEM-like-sample
+            -----BEGIN SENDERPUB-----
+            4LQhEvh+EeipiyHVYxHzbX73KqqTnMdRj08kVrceJXw=
+            -----END SENDERPUB-----
+            -----BEGIN CIPHERTEXT-----
+            oTU3z+2R2no0elqYm5N2l0H+HuI0d7wp6w20k1JMD+MZ8US//egDjU1oKByGBFbSH7AoEbe9OY7zhUExVKJnhVl0FwAL5txBPpNbwt4sgT/dpg==
+            -----END CIPHERTEXT-----
+
+My code for reading those files is a little (but not a lot:-) tolerant, e.g. it
+allows additional whitespace to be added within the base64 encoded values.
+
 ## Encrypt a file
 
 There's a file with a sample [public key](pub) to which you can encrypt things.
@@ -127,24 +141,6 @@ good/bad values are provided.
 
 The [psktest.sh](psktest.sh) script is like [infoaadtest.sh](infoaadtest.sh)
 but with the PSK mode, with good and bad PSK and PSKID values.
-
-## PEM-like ciphertext file format
-
-Since we need the ciphertext and sender's public key to do a decrypt,
-the ``hpkemain`` command line test tool saves both of those in one
-file. An [example](PEM-like-sample) of one of those might be:
-
-            $ ./hpkemain -P pub -i env -o PEM-like-sample
-            $ cat PEM-like-sample
-            -----BEGIN SENDERPUB-----
-            4LQhEvh+EeipiyHVYxHzbX73KqqTnMdRj08kVrceJXw=
-            -----END SENDERPUB-----
-            -----BEGIN CIPHERTEXT-----
-            oTU3z+2R2no0elqYm5N2l0H+HuI0d7wp6w20k1JMD+MZ8US//egDjU1oKByGBFbSH7AoEbe9OY7zhUExVKJnhVl0FwAL5txBPpNbwt4sgT/dpg==
-            -----END CIPHERTEXT-----
-
-My code for reading those files is a little (but not a lot:-) tolerant, e.g. it
-allows additional whitespace to be added within the base64 encoded values.
 
 ## Key generation
 

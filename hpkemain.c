@@ -608,7 +608,10 @@ int main(int argc, char **argv)
             unsigned char *dec_pskid=NULL;
             size_t dec_pskidlen=0;
             hpke_ah_decode(strlen(tv->pskID),tv->pskID,&dec_pskidlen,&dec_pskid);
-            pskid=dec_pskid;
+            pskid=OPENSSL_malloc(strlen(tv->pskID)); /* too much but heh it's ok */
+            memset(pskid,0,strlen(tv->pskID));
+            memcpy(pskid,dec_pskid,strlen(tv->pskID)/2);
+            OPENSSL_free(dec_pskid);
             hpke_ah_decode(strlen(tv->psk),tv->psk,&psklen,&psk);
         }
     }
@@ -657,6 +660,7 @@ int main(int argc, char **argv)
         if (plain!=NULL) OPENSSL_free(plain);
         if (info!=NULL) OPENSSL_free(info);
         if (aad!=NULL) OPENSSL_free(aad);
+        if (psk!=NULL) OPENSSL_free(psk);
 
         if (rv!=1) {
             fprintf(stderr,"Error (%d) from hpke_enc\n",rv);
@@ -677,6 +681,7 @@ int main(int argc, char **argv)
                 } else {
                     printf("Ciphertext outputs the same! Yay!\n");
                 }
+                OPENSSL_free(bcipher);
             } else {
 #endif
                 int wrv=hpkemain_write_ct(out_in,senderpublen,senderpub,cipherlen,cipher);
@@ -708,11 +713,15 @@ int main(int argc, char **argv)
                 aadlen,aad,
                 infolen,info,
                 &clearlen, clear); 
+        if (psk) OPENSSL_free(psk);
+        if (priv!=NULL) OPENSSL_free(priv);
+        if (info!=NULL) OPENSSL_free(info);
+        if (aad!=NULL) OPENSSL_free(aad);
         if (rv!=1) {
             fprintf(stderr,"Error decrypting (%d) - exiting\n",rv);
             exit(rv);
         }
-        if (priv!=NULL) OPENSSL_free(priv);
+
         FILE *fout=NULL;
         if (!out_in) {
             fout=stdout;
@@ -736,6 +745,9 @@ int main(int argc, char **argv)
     } 
 
 #ifdef TESTVECTORS
+    if (tvspec!=NULL) {
+        if (pskid) OPENSSL_free(pskid);
+    }
     hpke_tv_free(nelems,tvarr);
 #endif
     return(0);

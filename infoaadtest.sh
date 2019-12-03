@@ -17,6 +17,9 @@
 # make a tmpdir, generate a key pair, encrypt and try decrypt, with
 # various combinations of good/bad info and aad inputs
 
+# If you wanna use valgrind uncomment this
+# VALGRIND="valgrind --leak-check=full --show-leak-kinds=all"
+
 # just in case...
 BINDIR=$HOME/code/happykey
 # LD_LIBRARY_PATH...
@@ -48,10 +51,10 @@ TMPNAM=`mktemp $SCRATCH/tmpXXXX`
 cp $SCRATCH/plain $TMPNAM.plain
 
 # new key pair
-$BINDIR/hpkemain -k -p $TMPNAM.priv -P $TMPNAM.pub
+$VALGRIND $BINDIR/hpkemain -k -p $TMPNAM.priv -P $TMPNAM.pub
 
 # encrypt
-$BINDIR/hpkemain -e -P $TMPNAM.pub -i $TMPNAM.plain -o $TMPNAM.cipher -I $GOODINFO -a $GOODAAD
+$VALGRIND $BINDIR/hpkemain -e -P $TMPNAM.pub -i $TMPNAM.plain -o $TMPNAM.cipher -I $GOODINFO -a $GOODAAD
 
 # check decryption fails as expected
 echo "Good aad: $GOODAAD info $GOODINFO"
@@ -59,7 +62,12 @@ for aad in $GOODAAD $BADAAD
 do
     for info in $GOODINFO $BADINFO
     do
-        $BINDIR/hpkemain -d -p $TMPNAM.priv -i $TMPNAM.cipher -o $TMPNAM.recovered -I $info -a $aad 2>/dev/null
+        if [[ "$VALGRIND" == "" ]]
+        then
+            $BINDIR/hpkemain -d -p $TMPNAM.priv -i $TMPNAM.cipher -o $TMPNAM.recovered -I $info -a $aad 2>/dev/null
+        else
+            $VALGRIND $BINDIR/hpkemain -d -p $TMPNAM.priv -i $TMPNAM.cipher -o $TMPNAM.recovered -I $info -a $aad 
+        fi
         res=$?
         if [[ "$res" == "0" ]]
         then

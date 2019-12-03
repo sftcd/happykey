@@ -576,6 +576,7 @@ static int hpke_test_expand_extract(void)
         printf("rfc5869 check: hpke_extract gave wrong answer!\n");
         printf("rfc5869 check: hpke_extract gave wrong answer!\n");
     }
+    OPENSSL_free(calc_prk);
     rv=hpke_expand(PRK,PRKlen,"",info,infolen,&calc_okm,OKMlen);
     if (rv!=1) {
         printf("rfc5869 check: hpke_expand failed: %d\n",rv);
@@ -594,6 +595,7 @@ static int hpke_test_expand_extract(void)
         printf("rfc5869 check: hpke_expand gave wrong answer!\n");
         printf("rfc5869 check: hpke_expand gave wrong answer!\n");
     }
+    OPENSSL_free(calc_okm);
 
 
     return(rv);

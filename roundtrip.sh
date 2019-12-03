@@ -14,6 +14,9 @@
 # I plan to use this for my ESNI-enabled OpenSSL build (https://github.com/sftcd/openssl)
 # when the time is right.
 
+# If you wanna use valgrind uncomment this
+# VALGRIND="valgrind --leak-check=full --show-leak-kinds=all"
+
 # make a tmpdir, generate a key pair, encrypt and try decrypt
 
 # just in case...
@@ -40,12 +43,12 @@ fi
 TMPNAM=`mktemp $SCRATCH/tmpXXXX`
 cp $SCRATCH/plain $TMPNAM.plain
 
-$BINDIR/hpkemain -k -p $TMPNAM.priv -P $TMPNAM.pub
-$BINDIR/hpkemain -e -P $TMPNAM.pub -i $TMPNAM.plain -o $TMPNAM.cipher
+$VALGRIND $BINDIR/hpkemain -k -p $TMPNAM.priv -P $TMPNAM.pub
+$VALGRIND $BINDIR/hpkemain -e -P $TMPNAM.pub -i $TMPNAM.plain -o $TMPNAM.cipher
 
 # Next line is handy when debugging with gdb
 # echo "RUnning: $BINDIR/hpkemain -d -p $TMPNAM.priv -i $TMPNAM.cipher"
-$BINDIR/hpkemain -d -p $TMPNAM.priv -i $TMPNAM.cipher -o $TMPNAM.recovered
+$VALGRIND $BINDIR/hpkemain -d -p $TMPNAM.priv -i $TMPNAM.cipher -o $TMPNAM.recovered
 res=$?
 if [[ "$res" == "0" ]]
 then
