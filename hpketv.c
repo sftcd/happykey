@@ -246,24 +246,26 @@ void hpke_tv_print(int nelems, hpke_tv_t *array)
 /* 
  * @brief check if test vector matches mode/suite
  * @param mode is the selected mode
+ * @param suite is the ciphersuite
  * @param a is a test vector
  * @return 1 for match zero otherwise
  *
  * For now, this just matches the first <mode>,default-suite
  * test vecctor.
  */
-static int hpke_tv_match(unsigned int mode, hpke_tv_t *a)
+static int hpke_tv_match(unsigned int mode, hpke_suite_t suite,hpke_tv_t *a)
 {
     if (a && a->mode==mode &&
-        a->kdfID==HPKE_KDF_ID_HKDF_SHA256 &&
-        a->kemID==HPKE_KEM_ID_25519 &&
-        a->aeadID==HPKE_AEAD_ID_AES_GCM_128) return(1);
+        a->kdfID==suite.kdf_id && 
+        a->kemID==suite.kem_id && 
+        a->aeadID==suite.aead_id ) return(1);
     return(0);
 }
 
 /*
  * @brief select a test vector to use based on mode and suite
  * @param mode is the selected mode
+ * @param suite is the ciphersuite
  * @param nelems is the number of array elements
  * @param array is the elements
  * @param tv is the chosen test vector (doesn't need to be freed)
@@ -276,7 +278,7 @@ static int hpke_tv_match(unsigned int mode, hpke_tv_t *a)
  * mode=base/psk for my default ciphersuite. So no point in 
  * spending time now on randomly picking;-)
  */
-int hpke_tv_pick(unsigned int mode, int nelems, hpke_tv_t *arr,hpke_tv_t **tv)
+int hpke_tv_pick(unsigned int mode, hpke_suite_t suite, int nelems, hpke_tv_t *arr,hpke_tv_t **tv)
 {
     hpke_tv_t *a=arr;
     hpke_tv_t **resarr=NULL; ///< array of pointers to matching vectors
@@ -287,7 +289,7 @@ int hpke_tv_pick(unsigned int mode, int nelems, hpke_tv_t *arr,hpke_tv_t **tv)
     int gotmatch=0;
     int i=0;
     for (i=0;i!=nelems;i++) {
-        if (hpke_tv_match(mode,a)) {
+        if (hpke_tv_match(mode,suite,a)) {
             resarr[mind++]=a;
             gotmatch=i;
         }

@@ -19,10 +19,6 @@
 #ifndef HPKE_H_INCLUDED
 #define HPKE_H_INCLUDED
 
-#ifdef TESTVECTORS
-#include "hpketv.h"
-#endif
-
 /* biggest/default buffer we use */
 #define HPKE_MAXSIZE (640*1024) ///< 640k is more than enough for anyone (using this program:-)
 
@@ -69,6 +65,8 @@ typedef struct {
  *          hpke_suite_t myvar = HPKE_SUITE_DEFAULT;
  */
 #define HPKE_SUITE_DEFAULT { HPKE_KEM_ID_25519, HPKE_KDF_ID_HKDF_SHA256, HPKE_AEAD_ID_AES_GCM_128 }
+//#define HPKE_SUITE_BACKUP { HPKE_KEM_ID_X25519, HPKE_KDF_ID_HKDF_SHA512, HPKE_AEAD_ID_CHACHA_POLY1305 }
+#define HPKE_SUITE_BACKUP { HPKE_KEM_ID_448, HPKE_KDF_ID_HKDF_SHA512, HPKE_AEAD_ID_CHACHA_POLY1305 }
 
 /*
  * @brief HPKE single-shot encryption function
@@ -107,7 +105,7 @@ int hpke_enc(
         size_t *senderpublen, unsigned char *senderpub,
         size_t *cipherlen, unsigned char *cipher
 #ifdef TESTVECTORS
-        , hpke_tv_t *tv
+        , void *tv
 #endif
         );
 

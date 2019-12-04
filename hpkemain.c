@@ -60,6 +60,7 @@ static void usage(char *prog,char *errmsg)
 #endif
     fprintf(stderr,"Options:\n");
     fprintf(stderr,"\t-a additional authenticated data file name or actual value\n");
+    fprintf(stderr,"\t-b use backup ciphersuite\n");
     fprintf(stderr,"\t-d decrypt\n");
     fprintf(stderr,"\t-e encrypt\n");
     fprintf(stderr,"\t-h help\n");
@@ -85,6 +86,8 @@ static void usage(char *prog,char *errmsg)
     fprintf(stderr,"  be supplied\n");
     fprintf(stderr,"- For %s or %s modes, provide both public and private keys\n",
             HPKE_MODESTR_AUTH,HPKE_MODESTR_PSKAUTH);
+    fprintf(stderr,"- Default ciphersuite is x25519/sha256/aeg128gdm to use the\n");
+    fprintf(stderr,"  backup ciphersuite of x448/sha512/chacha20-poly1305 use \"-b\"\n");
     exit(1);
 }
 
@@ -465,39 +468,42 @@ int main(int argc, char **argv)
     char *modestr=NULL;
     char *pskid=NULL;
     char *psk_in=NULL;
+    int backupsuite=0;
 
     /*
      * Mode and ciphersuites - we're not parameterising this yet
      */
     int hpke_mode=HPKE_MODE_BASE;
     hpke_suite_t hpke_suite = HPKE_SUITE_DEFAULT;
+    hpke_suite_t hpke_backup_suite = HPKE_SUITE_BACKUP;
 
     int opt;
 
 #ifdef TESTVECTORS
-    while((opt = getopt(argc, argv, "?hkedvP:p:a:I:i:m:n:o:s:T")) != -1) {
+    while((opt = getopt(argc, argv, "?bhkedvP:p:a:I:i:m:n:o:s:T")) != -1) {
 #else
-    while((opt = getopt(argc, argv, "?hkedvP:p:a:I:i:m:n:o:s:")) != -1) {
+    while((opt = getopt(argc, argv, "?bhkedvP:p:a:I:i:m:n:o:s:")) != -1) {
 #endif
         switch(opt) {
-            case 'h':
             case '?': usage(argv[0],NULL); break;
-            case 'v': verbose++; break;
-            case 'k': generate=1; break;
-            case 'e': doing_enc=1; break;
-            case 'd': doing_enc=0; break;
-            case 'm': modestr=optarg; break;
-            case 'n': pskid=optarg; break;
-            case 'P': pub_in=optarg; break;
-            case 'p': priv_in=optarg; break;
             case 'a': aad_in=optarg; break;
+            case 'b': backupsuite=1; break;
+            case 'd': doing_enc=0; break;
+            case 'e': doing_enc=1; break;
+            case 'h': usage(argv[0],NULL); break;
             case 'I': info_in=optarg; break;
             case 'i': inp_in=optarg; break;
+            case 'k': generate=1; break;
+            case 'm': modestr=optarg; break;
+            case 'n': pskid=optarg; break;
             case 'o': out_in=optarg; break;
+            case 'P': pub_in=optarg; break;
+            case 'p': priv_in=optarg; break;
             case 's': psk_in=optarg; break;
 #ifdef TESTVECTORS
             case 'T': dotv=1; break;
 #endif
+            case 'v': verbose++; break;
             default:
                 usage(argv[0],"unknown arg");
         }
@@ -529,6 +535,11 @@ int main(int argc, char **argv)
         } else {
             usage(argv[0],"unnkown mode");
         }
+    }
+
+    if (backupsuite) {
+        if (verbose) printf("Using backup ciphersuite\n");
+        hpke_suite = hpke_backup_suite;
     }
 
 #ifdef TESTVECTORS
@@ -586,7 +597,7 @@ int main(int argc, char **argv)
             fprintf(stderr,"Can't load %s - exiting\n",tvfname);
             exit(1);
         }
-        trv=hpke_tv_pick(hpke_mode,nelems,tvarr,&tv);
+        trv=hpke_tv_pick(hpke_mode,hpke_suite,nelems,tvarr,&tv);
         if (trv!=1) {
             fprintf(stderr,"Failed selecting test vector - exiting\n");
             exit(2);

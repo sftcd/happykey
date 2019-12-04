@@ -1,31 +1,32 @@
 # happykey
 
-This is a work-in-progress implementation of 
+This is a work-in-progress implementation of
 [draft-irtf-cfrg-hpke](https://tools.ietf.org/html/draft-irtf-cfrg-hpke), using
-OpenSSL, as a precursor to using that as part of the 
-next [Encrypted SNI/ECHO draft](https://tools.ietf.org/html/draft-ietf-tls-esni) with 
-my [ESNI-enabled OpenSSL](https://github.com/sftcd/openssl) fork.
-(As of now, this needs to be built against a master/tip version of
-OpenSSL such as my fork.)
+OpenSSL, as a precursor to using that as part of the next [Encrypted SNI/ECHO
+draft](https://tools.ietf.org/html/draft-ietf-tls-esni) with my [ESNI-enabled
+OpenSSL](https://github.com/sftcd/openssl) fork.  (As of now, this needs to be
+built against a master/tip version of OpenSSL such as my fork.)
 
-Currently, (20191203), ``hpke_dec()`` can decrypt what ``hpke_enc()`` produces,
+Currently, (20191204), ``hpke_dec()`` can decrypt what ``hpke_enc()`` produces,
 and valgrind seems happy for the moment, at least with nominal behaviour, so
 things aren't totally shabby:-)
 
 ``hpke_enc()`` also produces output that matches the relevant CFRG test
 vectors. 
 
-For now, I only support one hard-coded ciphersuite (x25519, hkdf-sha256 and
-aes128gcm). 
+For now, I only support two ciphersuites: the default which is x25519/sha256/aes128gcm 
+and a backup which is x448/sha512/chacha20-poly1305. 
 
-I do (seem) to support all four modes, though I can only verify three
-(base,psk,auth) against test vectors as none seem to match mode 3/pskauth and
-my chosen ciphersuite.
+I do (seem to) support all four modes, having verified all of those against a
+test vector (I needed the chacha mode for pskauth as no other test vectors
+seemed to match mode 3/pskauth and my default ciphersuite - maybe that's a
+message that too many options damages interop and we already have too many
+options in this spec?)
 
 Main TODOs (possibly in this order) are:
+- multiple suites (only one and a bit for now)
 - arbitrary sizes for plain/cipher texts (640kB is a hard limit for now:-)
 - APIs for non single-shot operation (non-existent:-)
-- multiple suites (only one for now)
 
 ## Build 
 
@@ -76,6 +77,7 @@ If you do build this, ``hpkemain`` is the test tool, so start with
                 Usage: ./hpkemain -T [-m mode]
             Options:
                 -a additional authenticated data file name or actual value
+                -b use backup ciphersuite
                 -d decrypt
                 -e encrypt
                 -h help
@@ -97,6 +99,8 @@ If you do build this, ``hpkemain`` is the test tool, so start with
             - If a PSK mode is used, both pskid "-n" and psk "-s" MUST
               be supplied
             - For auth or pskauth modes, provide both public and private keys
+            - Default ciphersuite is x25519/sha256/aeg128gdm to use the
+              backup ciphersuite of x448/sha512/chacha20-poly1305 use "-b"
 
 There's a bit of (unfinished) doxygen-generated documentation of the [API](hpke-api.pdf).
 
@@ -143,10 +147,10 @@ files end up in ``$HOME/code/happykey/scratch`` with random looking names. (A
 The [infoaadtest.sh](infoaadtest.sh) script does the same as
 [roundtrip.sh](roundtrip.sh) but provides optional (random) AAD and Info inputs
 to encryption and checks that decryption works or fails as appropriate when
-good/bad values are provided. 
-
-The [modetest.sh](modetest.sh) script is like [infoaadtest.sh](infoaadtest.sh)
-but goes through all the modes, with good and bad PSK and PSKID values.
+good/bad values are provided.  The [modetest.sh](modetest.sh) script is like
+[infoaadtest.sh](infoaadtest.sh) but goes through all the modes, with good and
+bad PSK and PSKID values.  For both scripts, you can add extra comnand line
+parameters (e.g. "-b") and those'll be passed on to the encrypt/decrypt calls.
 
 ## Key generation
 

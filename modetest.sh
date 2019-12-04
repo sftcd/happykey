@@ -18,7 +18,7 @@
 # various combinations of good/bad info and aad inputs
 
 # If you wanna use valgrind uncomment this
-VALGRIND="valgrind --leak-check=full --show-leak-kinds=all"
+# VALGRIND="valgrind --leak-check=full --show-leak-kinds=all"
 
 # just in case...
 BINDIR=$HOME/code/happykey
@@ -50,17 +50,20 @@ fi
 TMPNAM=`mktemp $SCRATCH/tmpXXXX`
 cp $SCRATCH/plain $TMPNAM.plain
 
+# Try the backup ciphersuite
+#SUITE="-b "
+
 # new recipient key pair
-$VALGRIND $BINDIR/hpkemain -k -p $TMPNAM.rpriv -P $TMPNAM.rpub
+$VALGRIND $BINDIR/hpkemain -k -p $TMPNAM.rpriv -P $TMPNAM.rpub $SUITE $*
 # new sender key pair for auth modes
-$VALGRIND $BINDIR/hpkemain -k -p $TMPNAM.spriv -P $TMPNAM.spub
+$VALGRIND $BINDIR/hpkemain -k -p $TMPNAM.spriv -P $TMPNAM.spub $SUITE $*
 
 for mode in base psk auth pskauth
 do
 
     # encrypt
-    $VALGRIND $BINDIR/hpkemain -e -P $TMPNAM.rpub -p $TMPNAM.spriv \
-        -i $TMPNAM.plain -o $TMPNAM.cipher -m $mode -s $GOODPSK -n $GOODPSKID
+    $VALGRIND $BINDIR/hpkemain $SUITE -e -P $TMPNAM.rpub -p $TMPNAM.spriv \
+        -i $TMPNAM.plain -o $TMPNAM.cipher -m $mode -s $GOODPSK -n $GOODPSKID $*
 
     # check decryption fails as expected
     echo "Good mode: $mode psk: $GOODPSK pskid $GOODPSKID"
@@ -70,11 +73,11 @@ do
         do
             if [[ "$VALGRIND" == "" ]]
             then
-                 $BINDIR/hpkemain -d -p $TMPNAM.spriv -P $TMPNAM.rpub \
-                     -i $TMPNAM.cipher -o $TMPNAM.recovered -m $mode -s $psk -n $pskid 2>/dev/null
+                 $BINDIR/hpkemain $SUITE -d -p $TMPNAM.rpriv -P $TMPNAM.spub \
+                     -i $TMPNAM.cipher -o $TMPNAM.recovered -m $mode -s $psk -n $pskid  $* 2>/dev/null
             else
-                $VALGRIND $BINDIR/hpkemain -d -p $TMPNAM.spriv -p $TMPNAM.rpub \
-                    -i $TMPNAM.cipher -o $TMPNAM.recovered -m $mode -s $psk -n $pskid 
+                $VALGRIND $BINDIR/hpkemain $SUITE -d -p $TMPNAM.rpriv -P $TMPNAM.spub \
+                    -i $TMPNAM.cipher -o $TMPNAM.recovered -m $mode -s $psk -n $pskid $*
             fi
             res=$?
             if [[ "$res" == "0" ]]

@@ -54,7 +54,7 @@ cp $SCRATCH/plain $TMPNAM.plain
 $VALGRIND $BINDIR/hpkemain -k -p $TMPNAM.priv -P $TMPNAM.pub
 
 # encrypt
-$VALGRIND $BINDIR/hpkemain -e -P $TMPNAM.pub -i $TMPNAM.plain -o $TMPNAM.cipher -I $GOODINFO -a $GOODAAD
+$VALGRIND $BINDIR/hpkemain -e -P $TMPNAM.pub -i $TMPNAM.plain -o $TMPNAM.cipher -I $GOODINFO -a $GOODAAD $*
 
 # check decryption fails as expected
 echo "Good aad: $GOODAAD info $GOODINFO"
@@ -64,9 +64,9 @@ do
     do
         if [[ "$VALGRIND" == "" ]]
         then
-            $BINDIR/hpkemain -d -p $TMPNAM.priv -i $TMPNAM.cipher -o $TMPNAM.recovered -I $info -a $aad 2>/dev/null
+            $BINDIR/hpkemain -d -p $TMPNAM.priv -i $TMPNAM.cipher -o $TMPNAM.recovered -I $info -a $aad $* 2>/dev/null
         else
-            $VALGRIND $BINDIR/hpkemain -d -p $TMPNAM.priv -i $TMPNAM.cipher -o $TMPNAM.recovered -I $info -a $aad 
+            $VALGRIND $BINDIR/hpkemain -d -p $TMPNAM.priv -i $TMPNAM.cipher -o $TMPNAM.recovered -I $info -a $aad  $*
         fi
         res=$?
         if [[ "$res" == "0" ]]
