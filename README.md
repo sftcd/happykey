@@ -24,9 +24,9 @@ message that too many options damages interop and we already have too many
 options in this spec?)
 
 Main TODOs (possibly in this order) are:
-- multiple suites (only one and a bit for now)
 - arbitrary sizes for plain/cipher texts (640kB is a hard limit for now:-)
 - APIs for non single-shot operation (non-existent:-)
+- yet more suites (only 2 for now)
 
 ## Build 
 
@@ -64,17 +64,17 @@ If you do build this, ``hpkemain`` is the test tool, so start with
             $ ./hpkemain -h
             HPKE (draft-irtf-cfrg-hpke) tester, options are:
             Key generaion:
-                Usage: ./hpkemain -k -p private [-P public]
+                Usage: ./hpkemain -k -p private [-P public] [-b]
             Encryption:
                 Usage: ./hpkemain -e -P public [-p private] [-a aad] [-I info]
                         [-i input] [-o output]
-                        [-m mode] [-s psk] [-n pskid]
+                        [-m mode] [-s psk] [-n pskid] [-b]
             Decryption:
                 Usage: ./hpkemain -d -p private [-P public] [-a aad] [-I info]
-                        [-m mode] [-s psk] [-n pskid]
-                        [-m mode] [-s psk] [-n pskid]
+                        [-i input] [-o output]
+                        [-m mode] [-s psk] [-n pskid] [-b]
             This version is built with TESTVECTORS
-                Usage: ./hpkemain -T [-m mode]
+                Usage: ./hpkemain -T [-m mode] [-b]
             Options:
                 -a additional authenticated data file name or actual value
                 -b use backup ciphersuite
@@ -202,8 +202,8 @@ vector... and that now works.  (That means ``-T thing`` is the same for all
 values of "thing" for now - will add code for selecting stuff later when I get
 other ciphersuites done.)
 
-So far, it appears that there is only one test vector matching mys
-supported modes and default ciphersuite. So we're not gonna do much
+So far, it appears that there is only one test vector matching each
+of my supported modes and ciphersuites. So we're not gonna do much
 better than just picking the first:-)
 
 

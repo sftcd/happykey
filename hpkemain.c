@@ -45,18 +45,18 @@ static void usage(char *prog,char *errmsg)
     if (errmsg) fprintf(stderr,"\nError! %s\n\n",errmsg);
     fprintf(stderr,"HPKE (draft-irtf-cfrg-hpke) tester, options are:\n");
     fprintf(stderr,"Key generaion:\n");
-    fprintf(stderr,"\tUsage: %s -k -p private [-P public]\n",prog);
+    fprintf(stderr,"\tUsage: %s -k -p private [-P public] [-b]\n",prog);
     fprintf(stderr,"Encryption:\n");
     fprintf(stderr,"\tUsage: %s -e -P public [-p private] [-a aad] [-I info]\n",prog);
     fprintf(stderr,"\t\t\t[-i input] [-o output]\n");
-    fprintf(stderr,"\t\t\t[-m mode] [-s psk] [-n pskid]\n");
+    fprintf(stderr,"\t\t\t[-m mode] [-s psk] [-n pskid] [-b]\n");
     fprintf(stderr,"Decryption:\n");
     fprintf(stderr,"\tUsage: %s -d -p private [-P public] [-a aad] [-I info]\n",prog);
-    fprintf(stderr,"\t\t\t[-m mode] [-s psk] [-n pskid]\n");
-    fprintf(stderr,"\t\t\t[-m mode] [-s psk] [-n pskid]\n");
+    fprintf(stderr,"\t\t\t[-i input] [-o output]\n");
+    fprintf(stderr,"\t\t\t[-m mode] [-s psk] [-n pskid] [-b]\n");
 #ifdef TESTVECTORS
     fprintf(stderr,"This version is built with TESTVECTORS\n");
-    fprintf(stderr,"\tUsage: %s -T [-m mode]\n",prog);
+    fprintf(stderr,"\tUsage: %s -T [-m mode] [-b]\n",prog);
 #endif
     fprintf(stderr,"Options:\n");
     fprintf(stderr,"\t-a additional authenticated data file name or actual value\n");
