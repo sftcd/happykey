@@ -42,7 +42,6 @@ typedef struct {
     const EVP_CIPHER*   (*aead_init_func)(void); ///< the aead we're using
     const EVP_MD*       (*hash_init_func)(void); ///< the hash alg we're using
     int                 kemid; ///< NID of KEM
-    size_t              contextlen; ///< hard-coded for now, will replace with addition func
     size_t              taglen; ///< aead tag len
     size_t              Nenc; ///< length of encapsulated key
     size_t              Npk; ///< length of public key
@@ -55,9 +54,9 @@ typedef struct {
  * @brief table of ciphersuite parameters
  */
 hpke_sizes_tab_t hpke_sz_tab[]={
-    { HPKE_SUITE_DEFAULT, EVP_aes_128_gcm, EVP_sha256, EVP_PKEY_X25519, 167, 16, 32, 32, 32, 16, 12 },
-    //{ HPKE_SUITE_BACKUP, EVP_chacha20_poly1305, EVP_sha512, EVP_PKEY_X25519, 231, 16, 32, 32, 64, 32, 12 }
-    { HPKE_SUITE_BACKUP, EVP_chacha20_poly1305, EVP_sha512, EVP_PKEY_X448, 303, 16, 56, 56, 64, 32, 12 }
+    { HPKE_SUITE_DEFAULT, EVP_aes_128_gcm, EVP_sha256, EVP_PKEY_X25519, 16, 32, 32, 32, 16, 12 },
+    //{ HPKE_SUITE_BACKUP, EVP_chacha20_poly1305, EVP_sha512, EVP_PKEY_X25519, 16, 32, 32, 64, 32, 12 }
+    { HPKE_SUITE_BACKUP, EVP_chacha20_poly1305, EVP_sha512, EVP_PKEY_X448, 16, 56, 56, 64, 32, 12 }
 };
 
 /*!
@@ -199,16 +198,35 @@ static int hpke_suite_check(hpke_suite_t suite)
 
 /*!
  * @brief return the length of the context for this suite
- * @param suite is the externally supplied cipheruite
+ * @param sind is the ciphersuite index
  * @return the length (in octets) of the context 
- *
- * For now, we only recognise HPKE_SUITE_DEFAULT
  */
-static int figure_contextlen(hpke_suite_t suite)
+static size_t figure_contextlen(int sind)
 {
-    /* for now, I'm using the test vector, we'll see how that goes */
-    //return strlen("00000200010001ef0bf7ee58713568663204cf720cff64a852c77ace25f478cfe7dc0721508e03186c394e175b7b161760b1bd5b822a0804bd066b170c695c0df123176fa7df6f0000000000000000000000000000000000000000000000000000000000000000e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b85555c4040629c64c5efec2f7230407d612d16289d7c5d7afcf9340280abd2de1ab")/2;
-    return(167);
+    /*
+     * From the I-D:
+     *  struct {
+     *  // Mode and algorithms
+     *  uint8 mode;
+     *  uint16 kem_id;
+     *  uint16 kdf_id;
+     *  uint16 aead_id;
+     *
+     *  // Public inputs to this key exchange
+     *  opaque enc[Nenc];
+     *  opaque pkR[Npk];
+     *  opaque pkI[Npk];
+     *
+     *  // Cryptographic hash of application-supplied pskID
+     *  opaque pskID_hash[Nh];
+     *
+     *  // Cryptographic hash of application-supplied info
+     *  opaque info_hash[Nh];
+     * } HPKEContext;
+     */
+    hpke_sizes_tab_t *entry=&hpke_sz_tab[sind];
+    size_t ans=7+entry->Nenc+2*entry->Npk+2*entry->Nh;
+    return(ans);
 }
 
 /*
@@ -739,7 +757,7 @@ static int hpke_make_context(
             unsigned char **context, size_t *contextlen) 
 {
     int erv=1;
-    *contextlen=hpke_sz_tab[sind].contextlen;
+    *contextlen=figure_contextlen(sind);
     /* allocate space incl. some o/h just in case */
     *context=OPENSSL_malloc(*contextlen+1024);
     if (*context==NULL) {

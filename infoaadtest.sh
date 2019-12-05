@@ -58,25 +58,28 @@ $VALGRIND $BINDIR/hpkemain -e -P $TMPNAM.pub -i $TMPNAM.plain -o $TMPNAM.cipher 
 
 # check decryption fails as expected
 echo "Good aad: $GOODAAD info $GOODINFO"
-for aad in $GOODAAD $BADAAD
+for mode in base psk auth pskauth
 do
-    for info in $GOODINFO $BADINFO
-    do
-        if [[ "$VALGRIND" == "" ]]
-        then
-            $BINDIR/hpkemain -d -p $TMPNAM.priv -i $TMPNAM.cipher -o $TMPNAM.recovered -I $info -a $aad $* 2>/dev/null
-        else
-            $VALGRIND $BINDIR/hpkemain -d -p $TMPNAM.priv -i $TMPNAM.cipher -o $TMPNAM.recovered -I $info -a $aad  $*
-        fi
-        res=$?
-        if [[ "$res" == "0" ]]
-        then
-            strres="good"
-        else
-            strres="error"
-        fi
-        echo "$aad $info results in $res/$strres"
-    done
+	for aad in $GOODAAD $BADAAD
+	do
+	    for info in $GOODINFO $BADINFO
+	    do
+	        if [[ "$VALGRIND" == "" ]]
+	        then
+	            $BINDIR/hpkemain -d -m $mode -p $TMPNAM.priv -i $TMPNAM.cipher -o $TMPNAM.recovered -I $info -a $aad $* 2>/dev/null
+	        else
+	            $VALGRIND $BINDIR/hpkemain -d -m $mode -p $TMPNAM.priv -i $TMPNAM.cipher -o $TMPNAM.recovered -I $info -a $aad  $*
+	        fi
+	        res=$?
+	        if [[ "$res" == "0" ]]
+	        then
+	            strres="good"
+	        else
+	            strres="error"
+	        fi
+	        echo "$mode $aad $info results in $res/$strres"
+	    done
+	done
 done
-
-
+	
+	
