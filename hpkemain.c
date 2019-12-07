@@ -45,22 +45,22 @@ static void usage(char *prog,char *errmsg)
     if (errmsg) fprintf(stderr,"\nError! %s\n\n",errmsg);
     fprintf(stderr,"HPKE (draft-irtf-cfrg-hpke) tester, options are:\n");
     fprintf(stderr,"Key generaion:\n");
-    fprintf(stderr,"\tUsage: %s -k -p private [-P public] [-b]\n",prog);
+    fprintf(stderr,"\tUsage: %s -k -p private [-P public] [-c suite]\n",prog);
     fprintf(stderr,"Encryption:\n");
     fprintf(stderr,"\tUsage: %s -e -P public [-p private] [-a aad] [-I info]\n",prog);
     fprintf(stderr,"\t\t\t[-i input] [-o output]\n");
-    fprintf(stderr,"\t\t\t[-m mode] [-s psk] [-n pskid] [-b]\n");
+    fprintf(stderr,"\t\t\t[-m mode] [-c suite] [-s psk] [-n pskid]\n");
     fprintf(stderr,"Decryption:\n");
     fprintf(stderr,"\tUsage: %s -d -p private [-P public] [-a aad] [-I info]\n",prog);
     fprintf(stderr,"\t\t\t[-i input] [-o output]\n");
-    fprintf(stderr,"\t\t\t[-m mode] [-s psk] [-n pskid] [-b]\n");
+    fprintf(stderr,"\t\t\t[-m mode] [-c suite] [-s psk] [-n pskid]\n");
 #ifdef TESTVECTORS
     fprintf(stderr,"This version is built with TESTVECTORS\n");
-    fprintf(stderr,"\tUsage: %s -T [-m mode] [-b]\n",prog);
+    fprintf(stderr,"\tUsage: %s -T [-m mode] [-c suite]\n",prog);
 #endif
     fprintf(stderr,"Options:\n");
     fprintf(stderr,"\t-a additional authenticated data file name or actual value\n");
-    fprintf(stderr,"\t-b use backup ciphersuite\n");
+    fprintf(stderr,"\t-c specify iphersuite\n");
     fprintf(stderr,"\t-d decrypt\n");
     fprintf(stderr,"\t-e encrypt\n");
     fprintf(stderr,"\t-h help\n");
@@ -86,8 +86,8 @@ static void usage(char *prog,char *errmsg)
     fprintf(stderr,"  be supplied\n");
     fprintf(stderr,"- For %s or %s modes, provide both public and private keys\n",
             HPKE_MODESTR_AUTH,HPKE_MODESTR_PSKAUTH);
-    fprintf(stderr,"- Default ciphersuite is x25519/sha256/aeg128gdm to use the\n");
-    fprintf(stderr,"  backup ciphersuite of x448/sha512/chacha20-poly1305 use \"-b\"\n");
+    fprintf(stderr,"- Ciphersuites are specified in a comma separated number list, so \n");
+    fprintf(stderr,"  2,1,3 is x25519/sha256/chacha20-poly1305\n");
     exit(1);
 }
 
@@ -451,6 +451,7 @@ static int hpkemain_read_ct(const char *fname,
  */
 int main(int argc, char **argv)
 {
+    int overallreturn=0;
     int doing_enc=1; ///< whether we're encrypting (default) or decrypting 
     int generate=0; ///< whether we're generating a key pair (default off)
     /*
@@ -468,26 +469,25 @@ int main(int argc, char **argv)
     char *modestr=NULL;
     char *pskid=NULL;
     char *psk_in=NULL;
-    int backupsuite=0;
+    char *suitestr=NULL;
 
     /*
      * Mode and ciphersuites - we're not parameterising this yet
      */
     int hpke_mode=HPKE_MODE_BASE;
     hpke_suite_t hpke_suite = HPKE_SUITE_DEFAULT;
-    hpke_suite_t hpke_backup_suite = HPKE_SUITE_BACKUP;
 
     int opt;
 
 #ifdef TESTVECTORS
-    while((opt = getopt(argc, argv, "?bhkedvP:p:a:I:i:m:n:o:s:T")) != -1) {
+    while((opt = getopt(argc, argv, "?c:hkedvP:p:a:I:i:m:n:o:s:T")) != -1) {
 #else
-    while((opt = getopt(argc, argv, "?bhkedvP:p:a:I:i:m:n:o:s:")) != -1) {
+    while((opt = getopt(argc, argv, "?c:hkedvP:p:a:I:i:m:n:o:s:")) != -1) {
 #endif
         switch(opt) {
             case '?': usage(argv[0],NULL); break;
             case 'a': aad_in=optarg; break;
-            case 'b': backupsuite=1; break;
+            case 'c': suitestr=optarg; break;
             case 'd': doing_enc=0; break;
             case 'e': doing_enc=1; break;
             case 'h': usage(argv[0],NULL); break;
@@ -537,9 +537,18 @@ int main(int argc, char **argv)
         }
     }
 
-    if (backupsuite) {
-        if (verbose) printf("Using backup ciphersuite\n");
-        hpke_suite = hpke_backup_suite;
+    if (suitestr) {
+        if (verbose) printf("Using ciphersuite %s\n",suitestr);
+        uint16_t kem,kdf,aead;
+        if (strlen(suitestr)!=5) usage(argv[0],"Bad ciphersuite");
+        kem=(uint16_t)suitestr[0]-'0';
+        if (suitestr[1]!=',') usage(argv[0],"Bad ciphersuite");
+        kdf=(uint16_t)suitestr[2]-'0';
+        if (suitestr[3]!=',') usage(argv[0],"Bad ciphersuite");
+        aead=(uint16_t)suitestr[4]-'0';
+        hpke_suite.kem_id=kem;
+        hpke_suite.kdf_id=kdf;
+        hpke_suite.aead_id=aead;
     }
 
 #ifdef TESTVECTORS
@@ -680,6 +689,7 @@ int main(int argc, char **argv)
 
         if (rv!=1) {
             fprintf(stderr,"Error (%d) from hpke_enc\n",rv);
+            overallreturn=100;
         } else {
 #ifdef TESTVECTORS
             if (tv && tv->encs) {
@@ -768,6 +778,6 @@ int main(int argc, char **argv)
     }
     hpke_tv_free(nelems,tvarr);
 #endif
-    return(0);
+    return(overallreturn);
 }
 

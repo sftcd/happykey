@@ -7,17 +7,22 @@ draft](https://tools.ietf.org/html/draft-ietf-tls-esni) with my [ESNI-enabled
 OpenSSL](https://github.com/sftcd/openssl) fork.  (As of now, this needs to be
 built against a master/tip version of OpenSSL such as my fork.)
 
-Currently, (20191204), ``hpke_dec()`` can decrypt what ``hpke_enc()`` produces,
+Currently, (20191207), ``hpke_dec()`` can decrypt what ``hpke_enc()`` produces,
 and valgrind seems happy for the moment, at least with nominal behaviour, so
 things aren't totally shabby:-)
 
 ``hpke_enc()`` also produces output that matches the relevant CFRG test
 vectors. 
 
-For now, I only support two ciphersuites: the default which is x25519/sha256/aes128gcm 
-and a backup which is x448/sha512/chacha20-poly1305. 
+I this the code now supports all ciphersuites from draft-02 of the spec, but I
+still need to get the NIST curve stuff actually working ( I gotta figure out
+how to combine a public key buffer and group id to make a key;-)
 
-I do (seem to) support all four modes, having verified all of those against a
+The default ciphersuite is x25519/hkdf-sha256/aes128gcm. To specify other
+suites use "-c 3,2,1" to pick KEM number 3, KDF number 2 and AEAD number 1 from
+the registry. (Yeah that's not usable, but this is just a test tool:-)
+
+I also (seem to) support all four modes, having verified all of those against a
 test vector (I needed the chacha mode for pskauth as no other test vectors
 seemed to match mode 3/pskauth and my default ciphersuite - maybe that's a
 message that too many options damages interop and we already have too many
@@ -26,7 +31,6 @@ options in this spec?)
 Main TODOs (possibly in this order) are:
 - arbitrary sizes for plain/cipher texts (640kB is a hard limit for now:-)
 - APIs for non single-shot operation (non-existent:-)
-- yet more suites (only 2 for now)
 
 ## Build 
 
@@ -150,7 +154,11 @@ to encryption and checks that decryption works or fails as appropriate when
 good/bad values are provided.  The [modetest.sh](modetest.sh) script is like
 [infoaadtest.sh](infoaadtest.sh) but goes through all the modes, with good and
 bad PSK and PSKID values.  For both scripts, you can add extra comnand line
-parameters (e.g. "-b") and those'll be passed on to the encrypt/decrypt calls.
+parameters (e.g. "-c 1,1,1") and those'll be passed on to the key generation
+and encrypt/decrypt calls.
+
+The [tvtest.sh](tvtest.sh) script tests all cipheruite options (but not
+yet modes), against test vectors...
 
 ## Key generation
 

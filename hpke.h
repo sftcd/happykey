@@ -39,15 +39,18 @@
 #define HPKE_KEM_ID_25519            0x0002 ///< Curve25519
 #define HPKE_KEM_ID_P521             0x0003 ///< NIST P-521
 #define HPKE_KEM_ID_448              0x0004 ///< Curve448
+#define HPKE_KEM_ID_MAX              0x0004 ///< Curve448
 
 #define HPKE_KDF_ID_RESERVED         0x0000 ///< not used
 #define HPKE_KDF_ID_HKDF_SHA256      0x0001 ///< HKDF-SHA256
 #define HPKE_KDF_ID_HKDF_SHA512      0x0002 ///< HKDF-SHA512
+#define HPKE_KDF_ID_MAX              0x0002 ///< HKDF-SHA512
 
 #define HPKE_AEAD_ID_RESERVED        0x0000 ///< not used
 #define HPKE_AEAD_ID_AES_GCM_128     0x0001 ///< AES-GCM-128
 #define HPKE_AEAD_ID_AES_GCM_256     0x0002 ///< AES-GCM-256
 #define HPKE_AEAD_ID_CHACHA_POLY1305 0x0003 ///< Chacha20-Poly1305
+#define HPKE_AEAD_ID_MAX             0x0003 ///< Chacha20-Poly1305
 
 /*!
  * @brief ciphersuite combination
@@ -59,14 +62,12 @@ typedef struct {
 } hpke_suite_t;
 
 /*!
- * A suite constant (the only one supported for now:-)
- * Use this as follows:
+ * Two suite constants, use this like: 
  *
  *          hpke_suite_t myvar = HPKE_SUITE_DEFAULT;
  */
 #define HPKE_SUITE_DEFAULT { HPKE_KEM_ID_25519, HPKE_KDF_ID_HKDF_SHA256, HPKE_AEAD_ID_AES_GCM_128 }
-//#define HPKE_SUITE_BACKUP { HPKE_KEM_ID_X25519, HPKE_KDF_ID_HKDF_SHA512, HPKE_AEAD_ID_CHACHA_POLY1305 }
-#define HPKE_SUITE_BACKUP { HPKE_KEM_ID_448, HPKE_KDF_ID_HKDF_SHA512, HPKE_AEAD_ID_CHACHA_POLY1305 }
+#define HPKE_SUITE_TURNITUPTO11 { HPKE_KEM_ID_448, HPKE_KDF_ID_HKDF_SHA512, HPKE_AEAD_ID_CHACHA_POLY1305 }
 
 /*
  * @brief HPKE single-shot encryption function
