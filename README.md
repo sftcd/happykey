@@ -7,14 +7,11 @@ draft](https://tools.ietf.org/html/draft-ietf-tls-esni) with my [ESNI-enabled
 OpenSSL](https://github.com/sftcd/openssl) fork.  (As of now, this needs to be
 built against a master/tip version of OpenSSL such as my fork.)
 
-Currently, (20191207), ``hpke_dec()`` can decrypt what ``hpke_enc()`` produces,
+Currently, (20191209), ``hpke_dec()`` can decrypt what ``hpke_enc()`` produces,
 and valgrind seems happy for the moment, at least with nominal behaviour, so
 things aren't totally shabby:-)
-
 ``hpke_enc()`` also produces output that matches the relevant CFRG test
-vectors. 
-
-The code supports all ciphersuites from draft-02 of the spec,
+vectors.  The code supports all modes and ciphersuites from draft-02 of the spec,
 and verifies with the test vectors. (See below.)
 
 The default ciphersuite is x25519/hkdf-sha256/aes128gcm. To specify other
@@ -28,8 +25,7 @@ message that too many options damages interop and we already have too many
 options in this spec?)
 
 Main TODOs (possibly in this order) are:
-- I still need to get the NIST curve stuff working in round-trip mode - only 
-  have the test vectors working so far
+- a script to test 'em all
 - arbitrary sizes for plain/cipher texts (640kB is a hard limit for now:-)
 - APIs for non single-shot operation (non-existent:-)
 
@@ -69,20 +65,20 @@ If you do build this, ``hpkemain`` is the test tool, so start with
             $ ./hpkemain -h
             HPKE (draft-irtf-cfrg-hpke) tester, options are:
             Key generaion:
-                Usage: ./hpkemain -k -p private [-P public] [-b]
+                Usage: ./hpkemain -k -p private [-P public] [-c suite]
             Encryption:
                 Usage: ./hpkemain -e -P public [-p private] [-a aad] [-I info]
                         [-i input] [-o output]
-                        [-m mode] [-s psk] [-n pskid] [-b]
+                        [-m mode] [-c suite] [-s psk] [-n pskid]
             Decryption:
                 Usage: ./hpkemain -d -p private [-P public] [-a aad] [-I info]
                         [-i input] [-o output]
-                        [-m mode] [-s psk] [-n pskid] [-b]
+                        [-m mode] [-c suite] [-s psk] [-n pskid]
             This version is built with TESTVECTORS
-                Usage: ./hpkemain -T [-m mode] [-b]
+                Usage: ./hpkemain -T [-m mode] [-c suite]
             Options:
                 -a additional authenticated data file name or actual value
-                -b use backup ciphersuite
+                -c specify iphersuite
                 -d decrypt
                 -e encrypt
                 -h help
@@ -104,8 +100,8 @@ If you do build this, ``hpkemain`` is the test tool, so start with
             - If a PSK mode is used, both pskid "-n" and psk "-s" MUST
               be supplied
             - For auth or pskauth modes, provide both public and private keys
-            - Default ciphersuite is x25519/sha256/aeg128gdm to use the
-              backup ciphersuite of x448/sha512/chacha20-poly1305 use "-b"
+            - Ciphersuites are specified in a comma separated number list, so 
+              2,1,3 is x25519/sha256/chacha20-poly1305
 
 There's a bit of (unfinished) doxygen-generated documentation of the [API](hpke-api.pdf).
 

@@ -33,6 +33,16 @@
 #include "hpketv.h"
 #endif
 
+/*
+ * Define this if you want loads printing of intermediate
+ * cryptographic values
+ */
+#undef SUPERVERBOSE
+#ifdef SUPERVERBOSE
+unsigned char *pbuf; ///< global var for debug printing
+size_t pblen=1024; ///< global var for debug printing
+#endif
+
 /*!
  * @brief info about an AEAD
  */
@@ -62,6 +72,7 @@ typedef struct {
     int                 groupid; ///< NID of KEM
     size_t              Nenc; ///< length of encapsulated key
     size_t              Npk; ///< length of public key
+    size_t              Npriv; ///< length of raw private key
 } hpke_kem_info_t;
 
 /*!
@@ -70,10 +81,10 @@ typedef struct {
 hpke_kem_info_t hpke_kem_tab[]={
     { 0, 0, 0, 0 }, // this is needed to keep indexing correct
     //{ HPKE_KEM_ID_P256, NID_secp256k1, 32, 32 },
-    { HPKE_KEM_ID_P256, NID_X9_62_prime256v1, 65, 65 },
-    { HPKE_KEM_ID_25519, EVP_PKEY_X25519, 32, 32 },
-    { HPKE_KEM_ID_P521, NID_secp521r1, 133, 133 },
-    { HPKE_KEM_ID_448, EVP_PKEY_X448, 56, 56 } 
+    { HPKE_KEM_ID_P256, NID_X9_62_prime256v1, 65, 65, 32 },
+    { HPKE_KEM_ID_25519, EVP_PKEY_X25519, 32, 32, 32 },
+    { HPKE_KEM_ID_P521, NID_secp521r1, 133, 133, 64 },
+    { HPKE_KEM_ID_448, EVP_PKEY_X448, 56, 56, 56 } 
 };
 
 /*!
@@ -882,6 +893,55 @@ static int hpke_psk_check(
 }
 
 /*!
+ * @brief hpke wrapper to import NIST curve public key as easily as x25519/x448
+ * @param curve is the curve NID
+ * @param buf is the binary buffer with the (uncompressed) public value
+ * @param buflen is the length of the private key buffer
+ * @return a working EVP_PKEY * or NULL
+ *
+ */
+static EVP_PKEY* hpke_EVP_PKEY_new_raw_nist_public_key(
+        int curve,
+        unsigned char *buf,
+        size_t buflen) 
+{
+    int erv=1;
+    EVP_PKEY *ret=NULL;
+    // following s3_lib.c:ssl_generate_param_group
+    EVP_PKEY_CTX *cctx=EVP_PKEY_CTX_new_id(EVP_PKEY_EC,NULL);
+    if (cctx==NULL) {
+        erv=__LINE__; goto err;
+    }
+    if (EVP_PKEY_paramgen_init(cctx) <= 0) {
+        EVP_PKEY_CTX_free(cctx);
+        erv=__LINE__; goto err;
+    }
+    if (EVP_PKEY_CTX_set_ec_paramgen_curve_nid(cctx, curve) <= 0) {
+        EVP_PKEY_CTX_free(cctx);
+        erv=__LINE__; goto err;
+    }
+    if (EVP_PKEY_paramgen(cctx, &ret) <= 0) {
+        EVP_PKEY_CTX_free(cctx);
+        erv=__LINE__; goto err;
+    }
+    // For some reason this returns zero for p256 but works!
+    EVP_PKEY_set1_tls_encodedpoint(ret,buf,buflen);
+    //if (!EVP_PKEY_set1_tls_encodedpoint(pkR,pub,publen)) {
+        //erv=__LINE__; goto err;
+    //}
+ 
+err:
+#ifdef SUPERVERBOSE
+    pblen = EVP_PKEY_get1_tls_encodedpoint(ret,&pbuf); 
+    hpke_pbuf(stdout,"EARLY public",pbuf,pblen); 
+    if (pblen) OPENSSL_free(pbuf);
+#endif
+    if (cctx) EVP_PKEY_CTX_free(cctx);
+    if (erv==1) return(ret);
+    else return NULL;
+}
+
+/*!
  * @brief hpke wrapper to import NIST curve private key as easily as x25519/x448
  * @param curve is the curve NID
  * @param buf is the binary buffer with the private value
@@ -921,6 +981,14 @@ static EVP_PKEY* hpke_EVP_PKEY_new_raw_nist_private_key(
     }
 
 err:
+#ifdef SUPERVERBOSE
+    pblen = EVP_PKEY_get1_tls_encodedpoint(ret,&pbuf); 
+    hpke_pbuf(stdout,"EARLY re-calc public",pbuf,pblen); 
+    if (pblen) OPENSSL_free(pbuf);
+    pblen=EC_KEY_priv2buf(ec_key,&pbuf);
+    hpke_pbuf(stdout,"EARLY private",pbuf,pblen); 
+#endif
+
     if (pub_key) EC_POINT_free(pub_key);
     if (erv==1) return(ret);
     else return NULL;
@@ -977,15 +1045,6 @@ int hpke_enc(
 #ifdef TESTVECTORS
     hpke_tv_t *ltv=(hpke_tv_t*)tv;
 #endif
-/*
- * Define this if you want loads printing of intermediate
- * cryptographic values
- */
-#undef SUPERVERBOSE 
-#ifdef SUPERVERBOSE
-    unsigned char *pbuf;
-    size_t pblen=1024;
-#endif
 
     /*
      * The plan:
@@ -1023,42 +1082,12 @@ int hpke_enc(
 
     /* step 0. Initialise peer's key from string */
     if (suite.kem_id%2) {
-        // following s3_lib.c:ssl_generate_param_group
-        EVP_PKEY_CTX *cctx=EVP_PKEY_CTX_new_id(EVP_PKEY_EC,NULL);
-        if (cctx==NULL) {
-            erv=__LINE__; goto err;
-        }
-        if (EVP_PKEY_paramgen_init(cctx) <= 0) {
-            EVP_PKEY_CTX_free(cctx);
-            erv=__LINE__; goto err;
-        }
-        if (EVP_PKEY_CTX_set_ec_paramgen_curve_nid(cctx, hpke_kem_tab[suite.kem_id].groupid) <= 0) {
-            EVP_PKEY_CTX_free(cctx);
-            erv=__LINE__; goto err;
-        }
-        if (EVP_PKEY_paramgen(cctx, &pkR) <= 0) {
-            EVP_PKEY_CTX_free(cctx);
-            erv=__LINE__; goto err;
-        }
-        EVP_PKEY_CTX_free(cctx);
-        // For some reason this returns zero but works!
-        EVP_PKEY_set1_tls_encodedpoint(pkR,pub,publen);
-
-        //if (!EVP_PKEY_set1_tls_encodedpoint(pkR,pub,publen)) {
-            //erv=__LINE__; goto err;
-        //}
-#ifdef SUPERVERBOSE
-        pblen = EVP_PKEY_get1_tls_encodedpoint(pkR,&pbuf); 
-        hpke_pbuf(stdout,"EARLY pkR",pbuf,pblen); 
-        if (pblen) OPENSSL_free(pbuf);
-#endif
-
+        pkR = hpke_EVP_PKEY_new_raw_nist_public_key(hpke_kem_tab[suite.kem_id].groupid,pub,publen);
     } else {
-
         pkR = EVP_PKEY_new_raw_public_key(hpke_kem_tab[suite.kem_id].groupid,NULL,pub,publen);
-        if (pkR == NULL) {
-            erv=__LINE__; goto err;
-        }
+    }
+    if (pkR == NULL) {
+        erv=__LINE__; goto err;
     }
 
     /* step 1. generate sender's key pair */
@@ -1104,11 +1133,17 @@ int hpke_enc(
 
     /* get 2nd half of zz if using an auth mode */
     if (mode==HPKE_MODE_AUTH||mode==HPKE_MODE_PSKAUTH) {
-        if (suite.kem_id%2) {
-            skI = hpke_EVP_PKEY_new_raw_nist_private_key(hpke_kem_tab[suite.kem_id].groupid,priv,privlen);
-        } else {
-            skI=EVP_PKEY_new_raw_private_key(hpke_kem_tab[suite.kem_id].groupid,NULL,priv,privlen);
+        if (hpke_kem_tab[suite.kem_id].Npriv==privlen) {
+            if (suite.kem_id%2) {
+                skI = hpke_EVP_PKEY_new_raw_nist_private_key(hpke_kem_tab[suite.kem_id].groupid,priv,privlen);
+            } else {
+                skI=EVP_PKEY_new_raw_private_key(hpke_kem_tab[suite.kem_id].groupid,NULL,priv,privlen);
+            }
         }
+        /* 
+         * we'll fall through to this test even if the above was
+         * tried and failed
+         */
         if (!skI) {
             /* check PEM decode - that might work :-) */
             bfp=BIO_new(BIO_s_mem());
@@ -1257,6 +1292,7 @@ err:
 #ifdef SUPERVERBOSE
     printf("Encrypting:\n");
     printf("\tmode: %d, kem: %d, kdf: %d, aead: %d\n",mode,suite.kem_id,suite.kdf_id,suite.aead_id);
+
     if (pkE) { 
         pblen = EVP_PKEY_get1_tls_encodedpoint(pkE,&pbuf); 
         hpke_pbuf(stdout,"\tpkE",pbuf,pblen); 
@@ -1279,8 +1315,8 @@ err:
         fprintf(stdout,"\tskI is NULL\n"); 
     }
  
-    hpke_pbuf(stdout,"\tcontext",context,contextlen);
     hpke_pbuf(stdout,"\tzz",zz,zzlen);
+    hpke_pbuf(stdout,"\tcontext",context,contextlen);
     hpke_pbuf(stdout,"\tsecret",secret,secretlen);
     hpke_pbuf(stdout,"\tenc",enc,enclen);
     hpke_pbuf(stdout,"\tinfo",info,infolen);
@@ -1392,16 +1428,22 @@ int hpke_dec(
     BIO *bfp=NULL;
 
     /* step 0. Initialise peer's key from string */
-    pkE = EVP_PKEY_new_raw_public_key(hpke_kem_tab[suite.kem_id].groupid,NULL,enc,enclen);
+    if (suite.kem_id%2) {
+        pkE = hpke_EVP_PKEY_new_raw_nist_public_key(hpke_kem_tab[suite.kem_id].groupid,enc,enclen);
+    } else {
+        pkE = EVP_PKEY_new_raw_public_key(hpke_kem_tab[suite.kem_id].groupid,NULL,enc,enclen);
+    }
     if (pkE == NULL) {
         erv=__LINE__; goto err;
     }
 
     /* step 1. load decryptors private key */
-    if (suite.kem_id%2) {
-        skR = hpke_EVP_PKEY_new_raw_nist_private_key(hpke_kem_tab[suite.kem_id].groupid,priv,privlen);
-    } else {
-        skR=EVP_PKEY_new_raw_private_key(hpke_kem_tab[suite.kem_id].groupid,NULL,priv,privlen);
+    if (hpke_kem_tab[suite.kem_id].Npriv==privlen) {
+        if (suite.kem_id%2) {
+            skR = hpke_EVP_PKEY_new_raw_nist_private_key(hpke_kem_tab[suite.kem_id].groupid,priv,privlen);
+        } else {
+            skR=EVP_PKEY_new_raw_private_key(hpke_kem_tab[suite.kem_id].groupid,NULL,priv,privlen);
+        }
     }
     if (!skR) {
         /* check PEM decode - that might work :-) */
@@ -1430,7 +1472,11 @@ int hpke_dec(
     if (mode==HPKE_MODE_AUTH||mode==HPKE_MODE_PSKAUTH) {
 
         /* step 2.5 run DH KEM again to get 2nd half of zz */
-        pkI = EVP_PKEY_new_raw_public_key(hpke_kem_tab[suite.kem_id].groupid,NULL,pub,publen);
+        if (suite.kem_id%2) {
+            pkI = hpke_EVP_PKEY_new_raw_nist_public_key(hpke_kem_tab[suite.kem_id].groupid,pub,publen);
+        } else {
+            pkI = EVP_PKEY_new_raw_public_key(hpke_kem_tab[suite.kem_id].groupid,NULL,pub,publen);
+        }
         if (pkI == NULL) {
             erv=__LINE__; goto err;
         }
@@ -1525,16 +1571,37 @@ err:
 #ifdef SUPERVERBOSE
     printf("Decrypting:\n");
     printf("\tmode: %d, suite: %d,%d,%d\n",mode,suite.kem_id,suite.kdf_id,suite.aead_id);
-    pblen = EVP_PKEY_get1_tls_encodedpoint(pkE,&pbuf); hpke_pbuf(stdout,"\tpkE",pbuf,pblen); OPENSSL_free(pbuf);
-    hpke_pbuf(stdout,"\tcontext",context,contextlen);
+
+    if (pkE) { 
+        pblen = EVP_PKEY_get1_tls_encodedpoint(pkE,&pbuf); 
+        hpke_pbuf(stdout,"\tpkE",pbuf,pblen); 
+        if (pblen) OPENSSL_free(pbuf); 
+    } else { 
+        fprintf(stdout,"\tpkE is NULL\n"); 
+    }
+    if (skR) { 
+        pblen = EVP_PKEY_get1_tls_encodedpoint(skR,&pbuf); 
+        hpke_pbuf(stdout,"\tpkR",pbuf,pblen); 
+        if (pblen) OPENSSL_free(pbuf); 
+    } else { 
+        fprintf(stdout,"\tpkR is NULL\n"); 
+    }
+    if (pkI) { 
+        pblen = EVP_PKEY_get1_tls_encodedpoint(pkI,&pbuf); 
+        hpke_pbuf(stdout,"\tpkI",pbuf,pblen); 
+        if (pblen) OPENSSL_free(pbuf); 
+    } else { 
+        fprintf(stdout,"\tskI is NULL\n"); 
+    }
+ 
     hpke_pbuf(stdout,"\tzz",zz,zzlen);
+    hpke_pbuf(stdout,"\tcontext",context,contextlen);
     hpke_pbuf(stdout,"\tsecret",secret,secretlen);
     hpke_pbuf(stdout,"\tenc",enc,enclen);
     hpke_pbuf(stdout,"\tinfo",info,infolen);
     hpke_pbuf(stdout,"\taad",aad,aadlen);
     hpke_pbuf(stdout,"\tnonce",nonce,noncelen);
     hpke_pbuf(stdout,"\tkey",key,keylen);
-    pblen = EVP_PKEY_get1_tls_encodedpoint(skR,&pbuf); hpke_pbuf(stdout,"\tpkR",pbuf,pblen); OPENSSL_free(pbuf);
     hpke_pbuf(stdout,"\tciphertext",cipher,cipherlen);
     if (mode==HPKE_MODE_PSK || mode==HPKE_MODE_PSKAUTH) {
         fprintf(stdout,"\tpskid: %s\n",pskid);
@@ -1543,6 +1610,7 @@ err:
     if (*clearlen!=HPKE_MAXSIZE) hpke_pbuf(stdout,"\tplaintext",clear,*clearlen);
     else printf("clearlen is HPKE_MAXSIZE, so decryption probably failed\n");
 #endif
+
     if (bfp!=NULL) BIO_free_all(bfp);
     if (skR!=NULL) EVP_PKEY_free(skR);
     if (pkE!=NULL) EVP_PKEY_free(pkE);
