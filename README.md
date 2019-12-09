@@ -14,9 +14,8 @@ things aren't totally shabby:-)
 ``hpke_enc()`` also produces output that matches the relevant CFRG test
 vectors. 
 
-I this the code now supports all ciphersuites from draft-02 of the spec, but I
-still need to get the NIST curve stuff actually working ( I gotta figure out
-how to combine a public key buffer and group id to make a key;-)
+The code supports all ciphersuites from draft-02 of the spec,
+and verifies with the test vectors. (See below.)
 
 The default ciphersuite is x25519/hkdf-sha256/aes128gcm. To specify other
 suites use "-c 3,2,1" to pick KEM number 3, KDF number 2 and AEAD number 1 from
@@ -29,6 +28,8 @@ message that too many options damages interop and we already have too many
 options in this spec?)
 
 Main TODOs (possibly in this order) are:
+- I still need to get the NIST curve stuff working in round-trip mode - only 
+  have the test vectors working so far
 - arbitrary sizes for plain/cipher texts (640kB is a hard limit for now:-)
 - APIs for non single-shot operation (non-existent:-)
 

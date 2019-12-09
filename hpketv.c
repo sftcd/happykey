@@ -29,6 +29,7 @@
 #include <stddef.h>
 #include <stdint.h>
 #include <string.h>
+#include <ctype.h>
 /*
  * Since this is only used for test vectors and hence
  * from the command line, we don't need to care about
@@ -75,6 +76,31 @@ FAIL2BUILD("Don't build hpkeyv.c without TESTVECRTORS being defined")
  * @brief print the name of a field and the value of that field
  */
 #define PRINTIT(_xx) printf("\t"#_xx": %s\n",a->_xx);
+
+
+/*
+ * @brief go from uncompressed to compressed NIST curve public key
+ * @param uncomp is the ascii-hex uncompressed point
+ * @return is the uppercase ascii-hex for the compressed point
+ */
+static char *u2c_transform(const char *uncomp)
+{
+    size_t pklen=(strlen(uncomp)-2)/4;
+    char *pnew=malloc(2*pklen+2+1);
+    memset(pnew,0,2*pklen+2+1);
+    memcpy(pnew,uncomp,2*pklen+2);
+    pnew[0]='0'; 
+    char last=uncomp[strlen(uncomp)-1];
+    if (HPKE_A2B(last)%2) {
+        pnew[1]='3';
+    } else {
+        pnew[1]='2';
+    }
+    for (int i=0;i!=strlen(pnew);i++) {
+        pnew[i]=toupper(pnew[i]);
+    }
+    return(pnew);
+}
 
 /*!
  * @brief load test vectors from json file to array
@@ -179,6 +205,29 @@ int hpke_tv_load(char *fname, int *nelems, hpke_tv_t **array)
 
     *nelems=i;
     *array=thearr;
+
+#if 0
+    /* 
+     * We need special handling for NIST curve values as 
+     * stored in test vectors (for now)
+     */
+    for (i=0;i!=*nelems;i++) {
+        if (thearr[i].kemID==0x01) {
+            /* we don't really want uncompressed points */
+            /* this is utterly messing about ... */
+            if (thearr[i].pkR) {
+                thearr[i].pkR=u2c_transform(thearr[i].pkR);
+            }
+            if (thearr[1].pkI) {
+                thearr[i].pkI=u2c_transform(thearr[i].pkI);
+            }
+            if (thearr[1].pkE) {
+                thearr[i].pkE=u2c_transform(thearr[i].pkE);
+            }
+        }
+    }
+#endif
+
     return(1);
 }
 
@@ -214,23 +263,22 @@ void hpke_tv_print(int nelems, hpke_tv_t *array)
     if (!array) return;
     for (int i=0;i!=nelems;i++) {
         printf("Test Vector Element %d of %d\n",i+1,nelems);
-        printf("\tmode: %d, suite: %d,%d,%d\n",a->mode,a->kdfID,a->kemID,a->aeadID);
+        printf("\tmode: %d, kem: %d, kdf: %d, aead: %d\n",a->mode,a->kemID,a->kdfID,a->aeadID);
         PRINTIT(pkR);
-        PRINTIT(context);
-        PRINTIT(skI)
-        PRINTIT(pkI)
+        PRINTIT(skR)
+        PRINTIT(pkE)
+        PRINTIT(skE)
         PRINTIT(zz)
-        PRINTIT(secret)
         PRINTIT(enc)
         PRINTIT(info)
         PRINTIT(pskID)
+        PRINTIT(psk)
+        PRINTIT(pkI)
+        PRINTIT(skI)
+        PRINTIT(context);
+        PRINTIT(secret)
         PRINTIT(nonce)
         PRINTIT(key)
-        PRINTIT(pkR)
-        PRINTIT(pkE)
-        PRINTIT(skR)
-        PRINTIT(skE)
-        PRINTIT(psk)
         if (a->encs) {
             printf("\taad: %s\n",a->encs[0].aad);
             printf("\tplaintext: %s\n",a->encs[0].plaintext);

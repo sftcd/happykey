@@ -43,7 +43,7 @@ fi
 TMPNAM=`mktemp $SCRATCH/tmpXXXX`
 cp $SCRATCH/plain $TMPNAM.plain
 
-$VALGRIND $BINDIR/hpkemain -k -p $TMPNAM.priv -P $TMPNAM.pub
+$VALGRIND $BINDIR/hpkemain -k -p $TMPNAM.priv -P $TMPNAM.pub $*
 $VALGRIND $BINDIR/hpkemain -e -P $TMPNAM.pub -i $TMPNAM.plain -o $TMPNAM.cipher  $*
 
 # Next line is handy when debugging with gdb
