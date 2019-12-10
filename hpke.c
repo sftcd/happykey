@@ -18,8 +18,6 @@
 #include <stddef.h>
 #include <stdint.h>
 #include <string.h>
-// for toupper
-#include <ctype.h>
 
 #include <openssl/ssl.h>
 #include <openssl/rand.h>
@@ -38,7 +36,8 @@
  * cryptographic values
  */
 #undef SUPERVERBOSE
-#ifdef SUPERVERBOSE
+
+#if defined(SUPERVERBOSE) || defined(TESTVECTORS)
 unsigned char *pbuf; ///< global var for debug printing
 size_t pblen=1024; ///< global var for debug printing
 #endif
@@ -119,6 +118,7 @@ static const unsigned char zero_buf[SHA512_DIGEST_LENGTH] = {
         0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00 };
 
 /*!
+ * Since I always have to reconstruct this again in my head...
  * Bash command line hashing starting from ascii hex example:
  *
  *    $ echo -e "4f6465206f6e2061204772656369616e2055726e" | xxd -r -p | openssl sha256
@@ -221,8 +221,6 @@ static int hpke_pbuf(FILE *fout, char *msg,unsigned char *buf,size_t blen)
  * @brief Check if ciphersuite is ok/known to us
  * @param suite is the externally supplied cipheruite
  * @return 1 for good, not-1 for error
- *
- * For now, we only recognise HPKE_SUITE_DEFAULT
  */
 static int hpke_suite_check(hpke_suite_t suite)
 {
@@ -260,6 +258,11 @@ static size_t figure_contextlen(hpke_suite_t suite)
      *  // Cryptographic hash of application-supplied info
      *  opaque info_hash[Nh];
      * } HPKEContext;
+     *
+     * Note that the lengths in hpke_kem_tab are not the same
+     * as in the I-D - the test vectors and this code use
+     * uncompressed form NIST curve values, so that's 65 for
+     * p256 and not 33 or 32.
      */
     size_t ans=
         7+hpke_kem_tab[suite.kem_id].Nenc+
@@ -269,7 +272,7 @@ static size_t figure_contextlen(hpke_suite_t suite)
 }
 
 /*
- * Ok, there's an odd accidental coding style feature here:
+ * There's an odd accidental coding style feature here:
  * For all the externally visible functions in hpke.h, when
  * passing in a buffer, the length parameter precedes the 
  * associated buffer pointer. It turns out that, entirely by
@@ -330,7 +333,6 @@ static int hpke_aead_dec(
     if(1 != EVP_DecryptInit_ex(ctx, enc, NULL, NULL, NULL)) {
         erv=__LINE__; goto err;
     }
-    /* Set IV length if default 12 bytes (96 bits) is not appropriate */
     if(1 != EVP_CIPHER_CTX_ctrl(ctx, EVP_CTRL_GCM_SET_IVLEN, ivlen, NULL)) {
         erv=__LINE__; goto err;
     }
@@ -432,7 +434,6 @@ static int hpke_aead_enc(
     if(1 != EVP_EncryptInit_ex(ctx, enc, NULL, NULL, NULL)) {
         erv=__LINE__; goto err;
     }
-    /* Set IV length if default 12 bytes (96 bits) is not appropriate */
     if(1 != EVP_CIPHER_CTX_ctrl(ctx, EVP_CTRL_GCM_SET_IVLEN, ivlen, NULL)) {
         erv=__LINE__; goto err;
     }
@@ -876,7 +877,7 @@ static int hpke_mode_check(unsigned int mode)
  * @param psk the psk itself
  * @return 1 for good (OpenSSL style), not-1 for error
  *
- * If a PSK mode is used both * pskid and psk must be 
+ * If a PSK mode is used both pskid and psk must be 
  * non-default. Otherwise we ignore the PSK params.
  */
 static int hpke_psk_check(
@@ -898,7 +899,6 @@ static int hpke_psk_check(
  * @param buf is the binary buffer with the (uncompressed) public value
  * @param buflen is the length of the private key buffer
  * @return a working EVP_PKEY * or NULL
- *
  */
 static EVP_PKEY* hpke_EVP_PKEY_new_raw_nist_public_key(
         int curve,
@@ -948,7 +948,7 @@ err:
  * @param buflen is the length of the private key buffer
  * @return a working EVP_PKEY * or NULL
  *
- * Loadsa malarky required as it turns out
+ * Loadsa malarky required as it turns out...
  * You gotta: 1) name group 2) import private 3) then
  * manually re-calc public key before 4) make an EVP_PKEY
  */
@@ -1256,13 +1256,11 @@ int hpke_enc(
     memcpy(senderpub,enc,enclen);
     *senderpublen=enclen;
 
-#ifdef TESTVECTORS
+#ifdef WASTESTVECTORS
     /*
      * print stuff
      */
     if (ltv) {
-        unsigned char *pbuf;
-        size_t pblen=1024;
         printf("Runtime:\n");
         printf("\tmode: %d, kem: %d, kdf: %d, aead: %d\n",mode,suite.kem_id,suite.kdf_id,suite.aead_id);
         pblen = EVP_PKEY_get1_tls_encodedpoint(pkR,&pbuf); hpke_pbuf(stdout,"\tpkR",pbuf,pblen); if (pblen) OPENSSL_free(pbuf);
@@ -1289,7 +1287,11 @@ int hpke_enc(
 
 err:
 
-#ifdef SUPERVERBOSE
+#if defined(SUPERVERBOSE) || defined(TESTVECTORS)
+
+#ifdef TESTVECTORS
+    if (ltv) {
+#endif
     printf("Encrypting:\n");
     printf("\tmode: %d, kem: %d, kdf: %d, aead: %d\n",mode,suite.kem_id,suite.kdf_id,suite.aead_id);
 
@@ -1314,7 +1316,6 @@ err:
     } else { 
         fprintf(stdout,"\tskI is NULL\n"); 
     }
- 
     hpke_pbuf(stdout,"\tzz",zz,zzlen);
     hpke_pbuf(stdout,"\tcontext",context,contextlen);
     hpke_pbuf(stdout,"\tsecret",secret,secretlen);
@@ -1329,6 +1330,9 @@ err:
         fprintf(stdout,"\tpskid: %s\n",pskid);
         hpke_pbuf(stdout,"\tpsk",psk,psklen);
     }
+#ifdef TESTVECTORS
+    }
+#endif
 #endif
 
     if (bfp!=NULL) BIO_free_all(bfp);
@@ -1390,10 +1394,6 @@ int hpke_dec(
     if ((mode==HPKE_MODE_PSK || mode==HPKE_MODE_PSKAUTH) && (!psk || psklen==0 || !pskid)) return(__LINE__);
 
     int erv=1;
-#ifdef SUPERVERBOSE
-    unsigned char *pbuf;
-    size_t pblen=1024;
-#endif
 
     /*
      * The plan:

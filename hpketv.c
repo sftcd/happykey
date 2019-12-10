@@ -208,8 +208,9 @@ int hpke_tv_load(char *fname, int *nelems, hpke_tv_t **array)
 
 #if 0
     /* 
-     * We need special handling for NIST curve values as 
-     * stored in test vectors (for now)
+     * We may need special handling for NIST curve values as 
+     * stored in test vectors if cmopressed form ends up being
+     * really used. So keep this code for a bit.
      */
     for (i=0;i!=*nelems;i++) {
         if (thearr[i].kemID==0x01) {

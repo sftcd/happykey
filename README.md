@@ -7,25 +7,25 @@ draft](https://tools.ietf.org/html/draft-ietf-tls-esni) with my [ESNI-enabled
 OpenSSL](https://github.com/sftcd/openssl) fork.  (As of now, this needs to be
 built against a master/tip version of OpenSSL such as my fork.)
 
-Currently, (20191209), ``hpke_dec()`` can decrypt what ``hpke_enc()`` produces,
+Currently, (20191210), ``hpke_dec()`` can decrypt what ``hpke_enc()`` produces,
 and valgrind seems happy for the moment, at least with nominal behaviour, so
-things aren't totally shabby:-)
-``hpke_enc()`` also produces output that matches the relevant CFRG test
-vectors.  The code supports all modes and ciphersuites from draft-02 of the spec,
-and verifies with the test vectors. (See below.)
+things aren't totally shabby:-) ``hpke_enc()`` also produces output that
+matches the relevant CFRG test vectors.  The code supports all modes and
+ciphersuites from draft-02 of the spec, and verifies with the test vectors.
+(See below.)
 
 The default ciphersuite is x25519/hkdf-sha256/aes128gcm. To specify other
 suites use "-c 3,2,1" to pick KEM number 3, KDF number 2 and AEAD number 1 from
 the registry. (Yeah that's not usable, but this is just a test tool:-)
 
-I also (seem to) support all four modes, having verified all of those against a
-test vector (I needed the chacha mode for pskauth as no other test vectors
-seemed to match mode 3/pskauth and my default ciphersuite - maybe that's a
-message that too many options damages interop and we already have too many
-options in this spec?)
+I verified all of the modes against some test vector but I needed the chacha
+mode for pskauth as no other test vectors seemed to match mode 3/pskauth and my
+default ciphersuite - maybe that's a message that too many options damages
+interop and we already have too many options in this spec? There are also
+a few mode/ciphersuite combinations that seem to fail - still checking 
+that out.
 
 Main TODOs (possibly in this order) are:
-- a script to test 'em all
 - arbitrary sizes for plain/cipher texts (640kB is a hard limit for now:-)
 - APIs for non single-shot operation (non-existent:-)
 
@@ -154,8 +154,8 @@ bad PSK and PSKID values.  For both scripts, you can add extra comnand line
 parameters (e.g. "-c 1,1,1") and those'll be passed on to the key generation
 and encrypt/decrypt calls.
 
-The [tvtest.sh](tvtest.sh) script tests all cipheruite options (but not
-yet modes), against test vectors...
+The [tvtest.sh](tvtest.sh) script tests all combinations of mode/cipheruite.
+That currently shows 13 out of 96 failures. Still checking that. 
 
 ## Key generation
 
@@ -203,12 +203,10 @@ As of now, when the ``-T`` commnand line argument is used, the JSON file of
 test vectors is loaded into an array of ``hpke_tv_t`` and I just pick the first
 one that matches my chosen mode/suite, then print out various intermediate values on
 the way to checking the ciphertext from ``hpke_enc()`` matches the test
-vector... and that now works.  (That means ``-T thing`` is the same for all
-values of "thing" for now - will add code for selecting stuff later when I get
-other ciphersuites done.)
+vector... and that now works.  
 
-So far, it appears that there is only one test vector matching each
+It appears that there is only one test vector matching each
 of my supported modes and ciphersuites. So we're not gonna do much
-better than just picking the first:-)
+better than just picking the first match:-)
 
 

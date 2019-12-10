@@ -28,21 +28,23 @@ then
     exit 1
 fi
 
-for kem in 1 2 3 4
+for mode in base psk auth pskauth
 do
-    for kdf in 1 2 
-    do
-        for aead in 1 2 3 
-        do
-            $BINDIR/hpkemain -T -c $kem,$kdf,$aead >/dev/null 
-            res=$?
-            if [[ "$res" == "0" ]]
-            then
-                echo "$kem,$kdf,$aead is good"
-            else
-                echo "$kem,$kdf,$aead is BAD!"
-            fi
-        done
-    done
+	for kem in 1 2 3 4
+	do
+	    for kdf in 1 2 
+	    do
+	        for aead in 1 2 3 
+	        do
+	            $BINDIR/hpkemain -T -m $mode -c $kem,$kdf,$aead >/dev/null 
+	            res=$?
+	            if [[ "$res" == "0" ]]
+	            then
+	                echo "$mode,$kem,$kdf,$aead is good"
+	            else
+	                echo "$mode,$kem,$kdf,$aead is BAD!"
+	            fi
+	        done
+	    done
+	done
 done
-
