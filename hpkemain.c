@@ -540,10 +540,10 @@ int main(int argc, char **argv)
             hpke_mode=HPKE_MODE_PSKAUTH;
         } else if (strlen(modestr)==1) {
             switch(modestr[0]) {
-                case '1': hpke_mode=HPKE_MODE_BASE; break;
-                case '2': hpke_mode=HPKE_MODE_PSK; break;
-                case '3': hpke_mode=HPKE_MODE_AUTH; break;
-                case '4': hpke_mode=HPKE_MODE_PSKAUTH; break;
+                case '0': hpke_mode=HPKE_MODE_BASE; break;
+                case '1': hpke_mode=HPKE_MODE_PSK; break;
+                case '2': hpke_mode=HPKE_MODE_AUTH; break;
+                case '3': hpke_mode=HPKE_MODE_PSKAUTH; break;
                 default: usage(argv[0],"unnkown mode");
             }
         } else {
