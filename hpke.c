@@ -42,6 +42,15 @@ unsigned char *pbuf; ///< global var for debug printing
 size_t pblen=1024; ///< global var for debug printing
 #endif
 
+/*
+ * @brief table of mode strings
+ */
+const char *hpke_mode_strtab[]={
+    HPKE_MODESTR_BASE,
+    HPKE_MODESTR_PSK,
+    HPKE_MODESTR_AUTH,
+    HPKE_MODESTR_PSKAUTH};
+
 /*!
  * @brief info about an AEAD
  */
@@ -63,6 +72,16 @@ hpke_aead_info_t hpke_aead_tab[]={
     { HPKE_AEAD_ID_CHACHA_POLY1305, EVP_chacha20_poly1305, 16, 32, 12 } 
 };
 
+/*
+ * @brief table of AEAD strings
+ */
+const char *hpke_aead_strtab[]={
+    NULL,
+    HPKE_AEADSTR_AES128GCM,
+    HPKE_AEADSTR_AES256GCM,
+    HPKE_AEADSTR_CP};
+
+
 /*!
  * @brief info about a KEM
  */
@@ -82,9 +101,19 @@ hpke_kem_info_t hpke_kem_tab[]={
     //{ HPKE_KEM_ID_P256, NID_secp256k1, 32, 32 },
     { HPKE_KEM_ID_P256, NID_X9_62_prime256v1, 65, 65, 32 },
     { HPKE_KEM_ID_25519, EVP_PKEY_X25519, 32, 32, 32 },
-    { HPKE_KEM_ID_P521, NID_secp521r1, 133, 133, 64 },
+    { HPKE_KEM_ID_P521, NID_secp521r1, 133, 133, 66 },
     { HPKE_KEM_ID_448, EVP_PKEY_X448, 56, 56, 56 } 
 };
+
+/*
+ * @brief table of KEM strings
+ */
+const char *hpke_kem_strtab[]={
+    NULL,
+    HPKE_KEMSTR_P256,
+    HPKE_KEMSTR_X25519,
+    HPKE_KEMSTR_P521,
+    HPKE_KEMSTR_X448};
 
 /*!
  * @brief info about a KDF
@@ -103,6 +132,14 @@ hpke_kdf_info_t hpke_kdf_tab[]={
     { HPKE_KDF_ID_HKDF_SHA256, EVP_sha256, 32 },
     { HPKE_KDF_ID_HKDF_SHA512, EVP_sha512, 64 }
 };
+
+/*
+ * @brief table of KDF strings
+ */
+const char *hpke_kdf_strtab[]={
+    NULL,
+    HPKE_KDFSTR_256,
+    HPKE_KDFSTR_512};
 
 /**
  * handy thing to have :-)
@@ -1262,7 +1299,11 @@ int hpke_enc(
      */
     if (ltv) {
         printf("Runtime:\n");
-        printf("\tmode: %d, kem: %d, kdf: %d, aead: %d\n",mode,suite.kem_id,suite.kdf_id,suite.aead_id);
+        printf("\tmode: %s (%d), kem: %s (%d), kdf: %s (%d), aead: %s (%d)\n",
+                hpke_mode_strtab[mode],mode,
+                hpke_kem_strtab[suite.kem_id],suite.kem_id,
+                hkpe_kdf_strtab[suite.kdf_id], suite.kdf_id,
+                hpke_aead_strtab[suite.aead_id], suite.aead_id);
         pblen = EVP_PKEY_get1_tls_encodedpoint(pkR,&pbuf); hpke_pbuf(stdout,"\tpkR",pbuf,pblen); if (pblen) OPENSSL_free(pbuf);
         pblen = EVP_PKEY_get1_tls_encodedpoint(pkE,&pbuf); hpke_pbuf(stdout,"\tpkE",pbuf,pblen); if (pblen) OPENSSL_free(pbuf);
         if (mode==HPKE_MODE_AUTH || mode==HPKE_MODE_PSKAUTH) {
@@ -1293,7 +1334,11 @@ err:
     if (ltv) {
 #endif
     printf("Encrypting:\n");
-    printf("\tmode: %d, kem: %d, kdf: %d, aead: %d\n",mode,suite.kem_id,suite.kdf_id,suite.aead_id);
+    printf("\tmode: %s (%d), kem: %s (%d), kdf: %s (%d), aead: %s (%d)\n",
+                hpke_mode_strtab[mode],mode,
+                hpke_kem_strtab[suite.kem_id],suite.kem_id,
+                hpke_kdf_strtab[suite.kdf_id], suite.kdf_id,
+                hpke_aead_strtab[suite.aead_id], suite.aead_id);
 
     if (pkE) { 
         pblen = EVP_PKEY_get1_tls_encodedpoint(pkE,&pbuf); 
@@ -1570,7 +1615,11 @@ err:
 
 #ifdef SUPERVERBOSE
     printf("Decrypting:\n");
-    printf("\tmode: %d, suite: %d,%d,%d\n",mode,suite.kem_id,suite.kdf_id,suite.aead_id);
+    printf("\tmode: %s (%d), kem: %s (%d), kdf: %s (%d), aead: %s (%d)\n",
+                hpke_mode_strtab[mode],mode,
+                hpke_kem_strtab[suite.kem_id],suite.kem_id,
+                hkpe_kdf_strtab[suite.kdf_id], suite.kdf_id,
+                hpke_aead_strtab[suite.aead_id], suite.aead_id);
 
     if (pkE) { 
         pblen = EVP_PKEY_get1_tls_encodedpoint(pkE,&pbuf); 

@@ -52,6 +52,23 @@
 #define HPKE_AEAD_ID_CHACHA_POLY1305 0x0003 ///< Chacha20-Poly1305
 #define HPKE_AEAD_ID_MAX             0x0003 ///< Chacha20-Poly1305
 
+/* strings for modes */
+#define HPKE_MODESTR_BASE       "base"              ///< base mode (1), no sender auth
+#define HPKE_MODESTR_PSK        "psk"               ///< psk mode (2)
+#define HPKE_MODESTR_AUTH       "auth"              ///< auth (3), with a sender-key pair
+#define HPKE_MODESTR_PSKAUTH    "pskauth"           ///< psk+sender-key pair (4)
+
+/* strings for suites */
+#define HPKE_KEMSTR_P256        "p256"              ///< KEM id 1
+#define HPKE_KEMSTR_X25519      "x25519"            ///< KEM id 2
+#define HPKE_KEMSTR_P521        "p521"              ///< KEM id 3
+#define HPKE_KEMSTR_X448        "x448"              ///< KEM id 4
+#define HPKE_KDFSTR_256         "hkdf-sha256"       ///< KDF id 1
+#define HPKE_KDFSTR_512         "hkdf-sha512"       ///< KDF id 2
+#define HPKE_AEADSTR_AES128GCM  "aes128gcm"         ///< AEAD id 1
+#define HPKE_AEADSTR_AES256GCM  "aes256gcm"         ///< AEAD id 2
+#define HPKE_AEADSTR_CP         "chachapoly1305"    ///< AEAD id 3
+
 /*!
  * @brief ciphersuite combination
  */

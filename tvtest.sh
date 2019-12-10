@@ -28,6 +28,15 @@ then
     exit 1
 fi
 
+# check hpkemain is built with testvectors
+$BINDIR/hpkemain -T >/dev/null 2>&1
+res=$?
+if [[ "$res" != "0" ]]
+then
+    echo "You need to build hpkemain with testvectors - see README.md"
+    exit 2
+fi
+
 for mode in base psk auth pskauth
 do
 	for kem in 1 2 3 4

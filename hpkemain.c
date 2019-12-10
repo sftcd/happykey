@@ -32,12 +32,6 @@
 #include "hpketv.h"
 #endif
 
-/* command line strings for modes */
-#define HPKE_MODESTR_BASE "base" ///< base mode, no sender auth
-#define HPKE_MODESTR_PSK "psk" ///< psk mode
-#define HPKE_MODESTR_AUTH "auth" ///< sender-key pair
-#define HPKE_MODESTR_PSKAUTH "pskauth" ///< psk+sender-key pair
-
 static int verbose=0; ///< global var for verbosity
 
 static void usage(char *prog,char *errmsg) 
@@ -60,7 +54,7 @@ static void usage(char *prog,char *errmsg)
 #endif
     fprintf(stderr,"Options:\n");
     fprintf(stderr,"\t-a additional authenticated data file name or actual value\n");
-    fprintf(stderr,"\t-c specify iphersuite\n");
+    fprintf(stderr,"\t-c specify ciphersuite\n");
     fprintf(stderr,"\t-d decrypt\n");
     fprintf(stderr,"\t-e encrypt\n");
     fprintf(stderr,"\t-h help\n");
@@ -69,7 +63,7 @@ static void usage(char *prog,char *errmsg)
     fprintf(stderr,"\t-k generate key pair\n");
     fprintf(stderr,"\t-P public key file name or base64 or ascii-hex encoded value\n");
     fprintf(stderr,"\t-p private key file name or base64 or ascii-hex encoded value\n");
-    fprintf(stderr,"\t-m mode (one of: %s,%s,%s or %s)\n",
+    fprintf(stderr,"\t-m mode (a number or one of: %s,%s,%s or %s)\n",
             HPKE_MODESTR_BASE,HPKE_MODESTR_PSK,HPKE_MODESTR_AUTH,HPKE_MODESTR_PSKAUTH);
     fprintf(stderr,"\t-n PSK id string\n");
     fprintf(stderr,"\t-o output file name (output to stdout if not specified) \n");
@@ -86,8 +80,16 @@ static void usage(char *prog,char *errmsg)
     fprintf(stderr,"  be supplied\n");
     fprintf(stderr,"- For %s or %s modes, provide both public and private keys\n",
             HPKE_MODESTR_AUTH,HPKE_MODESTR_PSKAUTH);
-    fprintf(stderr,"- Ciphersuites are specified in a comma separated number list, so \n");
-    fprintf(stderr,"  2,1,3 is x25519/sha256/chacha20-poly1305\n");
+    fprintf(stderr,"- Ciphersuites are specified using a comma-separated list of numbers\n");
+    fprintf(stderr,"  e.g. \"-c 2,1,3\" or a comma-separated list of strings from:\n");
+    fprintf(stderr,"      KEMs: %s, %s, %s or %s\n",
+            HPKE_KEMSTR_P256, HPKE_KEMSTR_X25519, HPKE_KEMSTR_P521, HPKE_KEMSTR_X448);
+    fprintf(stderr,"      KDFs: %s or %s\n",
+            HPKE_KDFSTR_256, HPKE_KDFSTR_512);
+    fprintf(stderr,"      AEADs: %s, %s or %s\n",
+            HPKE_AEADSTR_AES128GCM, HPKE_AEADSTR_AES256GCM, HPKE_AEADSTR_CP);
+    fprintf(stderr,"  For example \"-c %s,%s,%s\" (the default)\n",
+            HPKE_KEMSTR_X25519, HPKE_KDFSTR_256, HPKE_AEADSTR_AES128GCM);
     exit(1);
 }
 
@@ -444,6 +446,10 @@ static int hpkemain_read_ct(const char *fname,
     return(1);
 }
 
+/*
+ * @brief string matching for suites
+ */
+#define HPKE_MSMATCH(inp,known) (strlen(inp)==strlen(known) && !strcasecmp(inp,known))
 
 
 /*!
@@ -532,6 +538,14 @@ int main(int argc, char **argv)
         } else if (strlen(modestr)==strlen(HPKE_MODESTR_PSKAUTH) && 
                 !strncmp(modestr,HPKE_MODESTR_PSKAUTH,strlen(HPKE_MODESTR_PSKAUTH))) {
             hpke_mode=HPKE_MODE_PSKAUTH;
+        } else if (strlen(modestr)==1) {
+            switch(modestr[0]) {
+                case '1': hpke_mode=HPKE_MODE_BASE; break;
+                case '2': hpke_mode=HPKE_MODE_PSK; break;
+                case '3': hpke_mode=HPKE_MODE_AUTH; break;
+                case '4': hpke_mode=HPKE_MODE_PSKAUTH; break;
+                default: usage(argv[0],"unnkown mode");
+            }
         } else {
             usage(argv[0],"unnkown mode");
         }
@@ -539,13 +553,49 @@ int main(int argc, char **argv)
 
     if (suitestr) {
         if (verbose) printf("Using ciphersuite %s\n",suitestr);
-        uint16_t kem,kdf,aead;
-        if (strlen(suitestr)!=5) usage(argv[0],"Bad ciphersuite");
-        kem=(uint16_t)suitestr[0]-'0';
-        if (suitestr[1]!=',') usage(argv[0],"Bad ciphersuite");
-        kdf=(uint16_t)suitestr[2]-'0';
-        if (suitestr[3]!=',') usage(argv[0],"Bad ciphersuite");
-        aead=(uint16_t)suitestr[4]-'0';
+        uint16_t kem=0,kdf=0,aead=0;
+        if (strlen(suitestr)!=5) {
+            /* See if it contains a mix of our strings and numbers  */
+            char *st=strtok(suitestr,",");
+            if (!st) usage(argv[0],"Bad ciphersuite");
+            while (st!=NULL) {
+                printf("st: %s\n",st);
+                /* check if string is known or number and if so handle appropriately */
+                if (kem==0) {
+                    if (HPKE_MSMATCH(st,HPKE_KEMSTR_P256)) kem=1;
+                    if (HPKE_MSMATCH(st,HPKE_KEMSTR_X25519)) kem=2;
+                    if (HPKE_MSMATCH(st,HPKE_KEMSTR_P521)) kem=3;
+                    if (HPKE_MSMATCH(st,HPKE_KEMSTR_X448)) kem=4;
+                    if (HPKE_MSMATCH(st,"1")) kem=1;
+                    if (HPKE_MSMATCH(st,"2")) kem=2;
+                    if (HPKE_MSMATCH(st,"3")) kem=3;
+                    if (HPKE_MSMATCH(st,"4")) kem=4;
+                }
+                if (kem!=0 && kdf==0) {
+                    if (HPKE_MSMATCH(st,HPKE_KDFSTR_256)) kdf=1;
+                    if (HPKE_MSMATCH(st,HPKE_KDFSTR_512)) kdf=2;
+                    if (HPKE_MSMATCH(st,"1")) kdf=1;
+                    if (HPKE_MSMATCH(st,"2")) kdf=2;
+                }
+                if (kem!=0 && kdf!=0 && aead==0) {
+                    if (HPKE_MSMATCH(st,HPKE_AEADSTR_AES128GCM)) aead=1;
+                    if (HPKE_MSMATCH(st,HPKE_AEADSTR_AES256GCM)) aead=2;
+                    if (HPKE_MSMATCH(st,HPKE_AEADSTR_CP)) aead=3;
+                    if (HPKE_MSMATCH(st,"1")) aead=1;
+                    if (HPKE_MSMATCH(st,"2")) aead=2;
+                    if (HPKE_MSMATCH(st,"3")) aead=3;
+                }
+                st=strtok(NULL,",");
+            }
+            if (kem==0||kdf==0||aead==0) usage(argv[0],"Bad ciphersuite");
+        } else {
+            /* check if numbers are ok */
+            kem=(uint16_t)suitestr[0]-'0';
+            if (suitestr[1]!=',') usage(argv[0],"Bad ciphersuite");
+            kdf=(uint16_t)suitestr[2]-'0';
+            if (suitestr[3]!=',') usage(argv[0],"Bad ciphersuite");
+            aead=(uint16_t)suitestr[4]-'0';
+        }
         hpke_suite.kem_id=kem;
         hpke_suite.kdf_id=kdf;
         hpke_suite.aead_id=aead;

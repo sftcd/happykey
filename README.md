@@ -78,7 +78,7 @@ If you do build this, ``hpkemain`` is the test tool, so start with
                 Usage: ./hpkemain -T [-m mode] [-c suite]
             Options:
                 -a additional authenticated data file name or actual value
-                -c specify iphersuite
+                -c specify ciphersuite
                 -d decrypt
                 -e encrypt
                 -h help
@@ -87,7 +87,7 @@ If you do build this, ``hpkemain`` is the test tool, so start with
                 -k generate key pair
                 -P public key file name or base64 or ascii-hex encoded value
                 -p private key file name or base64 or ascii-hex encoded value
-                -m mode (one of: base,psk,auth or pskauth)
+                -m mode (a number or one of: base,psk,auth or pskauth)
                 -n PSK id string
                 -o output file name (output to stdout if not specified) 
                 -s psk file name or base64 or ascii-hex encoded value
@@ -100,8 +100,12 @@ If you do build this, ``hpkemain`` is the test tool, so start with
             - If a PSK mode is used, both pskid "-n" and psk "-s" MUST
               be supplied
             - For auth or pskauth modes, provide both public and private keys
-            - Ciphersuites are specified in a comma separated number list, so 
-              2,1,3 is x25519/sha256/chacha20-poly1305
+            - Ciphersuites are specified using a comma-separated list of numbers
+              e.g. "-c 2,1,3" or a comma-separated list of strings from:
+                  KEMs: p256, x25519, p521 or x448
+                  KDFs: hkdf-sha256 or hkdf-sha512
+                  AEADs: aes128gcm, aes256gcm or chachapoly1305
+              For example "-c x25519,hkdf-sha256,aes128gcm" (the default)
 
 There's a bit of (unfinished) doxygen-generated documentation of the [API](hpke-api.pdf).
 
@@ -155,7 +159,8 @@ parameters (e.g. "-c 1,1,1") and those'll be passed on to the key generation
 and encrypt/decrypt calls.
 
 The [tvtest.sh](tvtest.sh) script tests all combinations of mode/cipheruite.
-That currently shows 13 out of 96 failures. Still checking that. 
+That currently shows 1 out of 96 failures where there is no match in the
+set of test vectors (for mode=pskauth, suite=2,1,1).
 
 ## Key generation
 
