@@ -25,7 +25,8 @@ interop and we already have too many options in this spec? There are also
 a few mode/ciphersuite combinations that seem to fail - still checking 
 that out.
 
-Main TODOs (possibly in this order) are:
+Some non-urgent TODOs (possibly in this order) are:
+- add more test cases to [alltest.sh](alltest.sh)
 - arbitrary sizes for plain/cipher texts (640kB is a hard limit for now:-)
 - APIs for non single-shot operation (non-existent:-)
 
@@ -144,23 +145,31 @@ script [env](./env), looks like this:
 (Not sure that PEM-like stuff is wise, but we'll see - it's good enough
 to let me easily test round-tripping at least.)
 
-The [roundtrip.sh](roundtrip.sh) script fetches some plaintext, generates a key
-pair, encrypts a file to that public key, then decrypts that. All relevant
-files end up in ``$HOME/code/happykey/scratch`` with random looking names. (A 
+The [tvtest.sh](tvtest.sh) script tests all combinations of mode/cipheruite
+against test vectors.
+That currently shows 1 out of 96 failures where there is no match in the
+set of test vectors (for mode=pskauth, suite=2,1,1).
+
+The [alltest.sh](alltest.sh) script tests key generation, encryption and
+decryption for all combinations of mode/cipheruite. That also tests for some
+expected failed decryptions (e.g. presenting bad PSK values).  All relevant
+files end up in ``$HOME/code/happykey/scratch`` with random looking names. (A
 ``make clean`` will clean those out too.)
 
+The [roundtrip.sh](roundtrip.sh) script fetches some plaintext, generates a key
+pair, encrypts a file to that public key, then tries to decrypt that.  You can
+add extra comnand line parameters (e.g. "-c 1,1,1") and those'll be passed on
+to the key generation and encrypt/decrypt calls.
+
 The [infoaadtest.sh](infoaadtest.sh) script does the same as
-[roundtrip.sh](roundtrip.sh) but provides optional (random) AAD and Info inputs
+[roundtrip.sh](roundtrip.sh) but provides (random) AAD and Info inputs
 to encryption and checks that decryption works or fails as appropriate when
 good/bad values are provided.  The [modetest.sh](modetest.sh) script is like
 [infoaadtest.sh](infoaadtest.sh) but goes through all the modes, with good and
-bad PSK and PSKID values.  For both scripts, you can add extra comnand line
+bad PSK and PSKID values.  Both of these scripts were precursors to [alltest.sh](alltest.sh)
+so will likely disappear. As before, you can add extra comnand line
 parameters (e.g. "-c 1,1,1") and those'll be passed on to the key generation
 and encrypt/decrypt calls.
-
-The [tvtest.sh](tvtest.sh) script tests all combinations of mode/cipheruite.
-That currently shows 1 out of 96 failures where there is no match in the
-set of test vectors (for mode=pskauth, suite=2,1,1).
 
 ## Key generation
 

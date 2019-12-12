@@ -559,7 +559,6 @@ int main(int argc, char **argv)
             char *st=strtok(suitestr,",");
             if (!st) usage(argv[0],"Bad ciphersuite");
             while (st!=NULL) {
-                printf("st: %s\n",st);
                 /* check if string is known or number and if so handle appropriately */
                 if (kem==0) {
                     if (HPKE_MSMATCH(st,HPKE_KEMSTR_P256)) kem=1;
