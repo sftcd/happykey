@@ -146,7 +146,7 @@ static int map_input(const char *inp, size_t *outlen, unsigned char **outbuf, in
     /* if no input, try stdin */
     if (!inp) {
         toutlen=fread(tbuf,1,HPKE_MAXSIZE,stdin);
-        if (verbose) fprintf(stderr,"got %zd bytes from stdin\n",toutlen);
+        if (verbose) fprintf(stderr,"got %lu bytes from stdin\n",(unsigned long)toutlen);
         if (!feof(stdin)) return(__LINE__);
     } else {
         toutlen=strlen(inp);
@@ -155,11 +155,12 @@ static int map_input(const char *inp, size_t *outlen, unsigned char **outbuf, in
         if (fp) {
             /* that worked - so read file up to max into buffer */
             toutlen=fread(tbuf,1,HPKE_MAXSIZE,fp);
-            if (verbose) fprintf(stderr,"got %zd bytes from file %s\n",toutlen,inp);
+            if (verbose) fprintf(stderr,"got %lu bytes from file %s\n",(unsigned long)toutlen,inp);
             if (ferror(fp)) { fclose(fp); return(__LINE__); }
             fclose(fp);
         } else {
-            if (verbose) fprintf(stderr,"got %zd bytes direct from commandline %s\n",toutlen,inp);
+            if (verbose) fprintf(stderr,"got %lu bytes direct from commandline %s\n",
+                            (unsigned long)toutlen,inp);
             memcpy(tbuf,inp,toutlen);
         }
     }
@@ -183,7 +184,9 @@ static int map_input(const char *inp, size_t *outlen, unsigned char **outbuf, in
 	        if (!*outbuf) return(__LINE__);
 	        *outlen=EVP_DecodeBlock(*outbuf, (unsigned char *)tbuf, toutlen);
 	        if (*outlen!=-1) {
-	            if (verbose) fprintf(stderr,"base64 decode worked for %s - going with the %zd bytes that provided\n",tbuf,*outlen);
+	            if (verbose) 
+                    fprintf(stderr,"base64 decode ok for %s - using the %lu bytes that provided\n",
+                                tbuf,(unsigned long)*outlen);
 	            return(1);
 	        } else {
 	            /* base64 decode failed so maybe the content was good as-is */
@@ -266,7 +269,7 @@ static int hpkemain_write_keys(
         char b64pub[HPKE_MAXSIZE];
         size_t b64publen=HPKE_MAXSIZE;
         if (publen>HPKE_MAXSIZE) {
-            fprintf(stderr,"Error key too big %zd bytes\n",publen);
+            fprintf(stderr,"Error key too big %lu bytes\n",(unsigned long)publen);
             return(__LINE__);
         }
         fprintf(fp,"%s\n",HPKE_START_PUB);
@@ -310,26 +313,28 @@ static int hpkemain_write_ct(const char *fname,
     char eb[HPKE_MAXSIZE];
     size_t eblen=HPKE_MAXSIZE;
     if (splen>HPKE_MAXSIZE) {
-        fprintf(stderr,"Error key too big %zd bytes\n",splen);
+        fprintf(stderr,"Error key too big %lu bytes\n",(unsigned long)splen);
         return(__LINE__);
     }
     eblen=EVP_EncodeBlock(eb, sp, splen);
     fprintf(fout,"%s\n",HPKE_START_SP);
     size_t rrv=fwrite(eb,1,eblen,fout);
     if (rrv!=eblen) {
-        fprintf(stderr,"Error writing %zd bytes of output to %s (only %zd written)\n",splen,fname,rrv);
+        fprintf(stderr,"Error writing %lu bytes of output to %s (only %lu written)\n",
+                    (unsigned long)splen,fname,(unsigned long)rrv);
         return(__LINE__);
     }
     fprintf(fout,"\n%s\n",HPKE_END_SP);
     fprintf(fout,"%s\n",HPKE_START_CP);
     if (ctlen>HPKE_MAXSIZE) {
-        fprintf(stderr,"Error ciphertext too big %zd bytes\n",ctlen);
+        fprintf(stderr,"Error ciphertext too big %lu bytes\n",(unsigned long)ctlen);
         return(__LINE__);
     }
     eblen=EVP_EncodeBlock(eb, ct, ctlen);
     rrv=fwrite(eb,1,eblen,fout);
     if (rrv!=eblen) {
-        fprintf(stderr,"Error writing %zd bytes of output to %s (only %zd written)\n",ctlen,fname,rrv);
+        fprintf(stderr,"Error writing %lu bytes of output to %s (only %lu written)\n",
+                    (unsigned long)ctlen,fname,(unsigned long)rrv);
         return(__LINE__);
     }
     fprintf(fout,"\n%s\n",HPKE_END_CP);
@@ -749,8 +754,8 @@ int main(int argc, char **argv)
                             &bcipherlen,
                             &bcipher);
                 if (bcipherlen!=cipherlen) {
-                    printf("Ciphertext output lengths differ: %zd vs %zd\n",
-                            bcipherlen,cipherlen);
+                    printf("Ciphertext output lengths differ: %lu vs %lu\n",
+                            (unsigned long)bcipherlen,(unsigned long)cipherlen);
                 } else if (memcmp(cipher,bcipher,cipherlen)) {
                     printf("Ciphertext outputs differ, sorry\n");
                 } else {
@@ -811,13 +816,14 @@ int main(int argc, char **argv)
         }
         size_t frv=fwrite(clear,1,clearlen,fout);
         if (frv!=clearlen) {
-            fprintf(stderr,"Error writing %zd bytes of output to %s (only %zd written)\n",
-                        clearlen,(out_in?out_in:"STDOUT"),frv);
+            fprintf(stderr,"Error writing %lu bytes of output to %s (only %lu written)\n",
+                        (unsigned long)clearlen,(out_in?out_in:"STDOUT"),(unsigned long)frv);
             exit(1);
         }
         if (out_in!=NULL) {
             fclose(fout);
-            if (verbose) printf("All worked: Recovered plain is %zd octets.\n",clearlen);
+            if (verbose) printf("All worked: Recovered plain is %lu octets.\n",
+                        (unsigned long)clearlen);
         }
     } 
 
