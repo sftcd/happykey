@@ -19,6 +19,8 @@
 #ifndef HPKE_H_INCLUDED
 #define HPKE_H_INCLUDED
 
+#include <openssl/ssl.h>
+
 /* biggest/default buffer we use */
 #define HPKE_MAXSIZE (640*1024) ///< 640k is more than enough for anyone (using this program:-)
 
@@ -26,7 +28,7 @@
  * The HPKE modes 
  * We only support base for now
  */
-#define HPKE_MODE_BASE              0 ///< Base mode (all that we support for now)
+#define HPKE_MODE_BASE              0 ///< Base mode 
 #define HPKE_MODE_PSK               1 ///< Pre-shared key mode
 #define HPKE_MODE_AUTH              2 ///< Authenticated mode
 #define HPKE_MODE_PSKAUTH           3 ///< PSK+authenticated mode

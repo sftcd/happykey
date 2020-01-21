@@ -7,8 +7,15 @@ draft](https://tools.ietf.org/html/draft-ietf-tls-esni) with my [ESNI-enabled
 OpenSSL](https://github.com/sftcd/openssl) fork.  (As of now, this needs to be
 built against a master/tip version of OpenSSL such as my fork.)
 
-Currently, (20191210), ``hpke_dec()`` can decrypt what ``hpke_enc()`` produces,
-and valgrind seems happy for the moment, at least with nominal behaviour, so
+On 20200121, I started to integrate this into a guess as to what the next ESNI
+draft (version -06) might involve. That needed a couple of minor changes so I
+could build this code either standalone here or as part of a test branch
+(called "encch") of my [ESNI-enabled OpenSSL fork](https://github.com/sftcd/openssl).
+There were also a couple of tweaks as the OpenSSL build generates more
+warnings than this one, so I cleaned those up too.
+
+As of 20191210, ``hpke_dec()`` can decrypt what ``hpke_enc()`` produces,
+and valgrind seems happy, at least with nominal behaviour, so
 things aren't totally shabby:-) ``hpke_enc()`` also produces output that
 matches the relevant CFRG test vectors.  The code supports all modes and
 ciphersuites from draft-02 of the spec, and verifies with the test vectors.

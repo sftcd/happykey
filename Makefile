@@ -18,7 +18,7 @@ INCL=../openssl/include
 # the next line:
 # testvectors=-D TESTVECTORS -I ../json-c
 
-CFLAGS=-g ${testvectors}
+CFLAGS=-g ${testvectors} -DHAPPYKEY
 CC=gcc
 
 all: hpkemain

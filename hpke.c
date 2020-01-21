@@ -25,7 +25,16 @@
 #include <openssl/evp.h>
 #include <openssl/params.h>
 
+/*
+ * If we're building standalone (from github.com/sftcd/happykey) then
+ * include the former, if building from github.com/sftcd/openssl) then
+ * the latter
+ */
+#ifdef HAPPYKEY
 #include "hpke.h"
+#else
+#include <openssl/hpke.h>
+#endif
 
 #ifdef TESTVECTORS
 #include "hpketv.h"
@@ -217,6 +226,7 @@ int hpke_ah_decode(size_t ahlen, const char *ah, size_t *blen, unsigned char **b
     return 1;
 }
 
+#if defined(SUPERVERBOSE) || defined(TESTVECTORS)
 /*!
  * @brief for odd/occasional debugging
  *
@@ -255,6 +265,7 @@ static int hpke_pbuf(FILE *fout, char *msg,unsigned char *buf,size_t blen)
     fprintf(fout,"\n");
     return 1;
 }
+#endif
 
 /*!
  * @brief Check if ciphersuite is ok/known to us
@@ -263,7 +274,6 @@ static int hpke_pbuf(FILE *fout, char *msg,unsigned char *buf,size_t blen)
  */
 static int hpke_suite_check(hpke_suite_t suite)
 {
-    int rv=1;
     if (suite.kem_id>HPKE_KEM_ID_MAX) return(__LINE__);
     if (suite.kdf_id>HPKE_KDF_ID_MAX) return(__LINE__);
     if (suite.aead_id>HPKE_AEAD_ID_MAX) return(__LINE__);
@@ -355,7 +365,6 @@ static int hpke_aead_dec(
     size_t plaintextlen=0;
     unsigned char *plaintext=NULL;
     size_t taglen=hpke_aead_tab[suite.aead_id].taglen;
-    unsigned char tag[taglen];
     plaintext=OPENSSL_malloc(cipherlen);
     if (plaintext==NULL) {
         erv=__LINE__; goto err;
@@ -449,7 +458,7 @@ static int hpke_aead_enc(
     size_t ciphertextlen;
     unsigned char *ciphertext=NULL;
     size_t taglen=hpke_aead_tab[suite.aead_id].taglen;
-    unsigned char tag[taglen]; 
+    unsigned char tag[taglen];
     if (taglen+plainlen>*cipherlen) {
         erv=__LINE__; goto err;
     }
@@ -866,7 +875,7 @@ static int hpke_make_context(
         memcpy(cp,pkI_hash,pkI_hashlen); cp+=pkI_hashlen; CHECK_HPKE_CTX;
     }
     EVP_MD_CTX *mdctx = EVP_MD_CTX_new();
-    int md_len;
+    unsigned int md_len;
     const EVP_MD *md=hpke_kdf_tab[suite.kdf_id].hash_init_func();
     EVP_DigestInit_ex(mdctx, md, NULL);
     if (!ISPSKMODE(mode) || pskid==NULL) {
