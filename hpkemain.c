@@ -788,7 +788,7 @@ int main(int argc, char **argv)
         rv=hpke_dec( hpke_mode, hpke_suite,
                 pskid, psklen, psk,
                 publen, pub,
-                privlen, priv,
+                privlen, priv, NULL,
                 senderpublen, senderpub,
                 cipherlen, cipher,
                 aadlen,aad,

@@ -12,7 +12,11 @@ draft (version -06) might involve. That needed a couple of minor changes so I
 could build this code either standalone here or as part of a test branch
 (called "encch") of my [ESNI-enabled OpenSSL fork](https://github.com/sftcd/openssl).
 There were also a couple of tweaks as the OpenSSL build generates more
-warnings than this one, so I cleaned those up too.
+warnings than this one, so I cleaned those up too. One non-minor change
+was to add the option to input the private key for decryption (to ``hpke_dec``)
+as an ``EVP_PKEY`` pointer, so that we don't need to mess about with
+raw private key bits, if we already have the private key in an internal
+format.
 
 As of 20191210, ``hpke_dec()`` can decrypt what ``hpke_enc()`` produces,
 and valgrind seems happy, at least with nominal behaviour, so
