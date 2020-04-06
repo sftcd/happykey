@@ -33,7 +33,7 @@
 #ifdef HAPPYKEY
 #include "hpke.h"
 #else
-#include <openssl/hpke.h>
+#include <crypto/hpke.h>
 #endif
 
 #ifdef TESTVECTORS
