@@ -1313,7 +1313,7 @@ int hpke_enc(
         printf("\tmode: %s (%d), kem: %s (%d), kdf: %s (%d), aead: %s (%d)\n",
                 hpke_mode_strtab[mode],mode,
                 hpke_kem_strtab[suite.kem_id],suite.kem_id,
-                hkpe_kdf_strtab[suite.kdf_id], suite.kdf_id,
+                hpke_kdf_strtab[suite.kdf_id], suite.kdf_id,
                 hpke_aead_strtab[suite.aead_id], suite.aead_id);
         pblen = EVP_PKEY_get1_tls_encodedpoint(pkR,&pbuf); hpke_pbuf(stdout,"\tpkR",pbuf,pblen); if (pblen) OPENSSL_free(pbuf);
         pblen = EVP_PKEY_get1_tls_encodedpoint(pkE,&pbuf); hpke_pbuf(stdout,"\tpkE",pbuf,pblen); if (pblen) OPENSSL_free(pbuf);
@@ -1635,7 +1635,7 @@ err:
     printf("\tmode: %s (%d), kem: %s (%d), kdf: %s (%d), aead: %s (%d)\n",
                 hpke_mode_strtab[mode],mode,
                 hpke_kem_strtab[suite.kem_id],suite.kem_id,
-                hkpe_kdf_strtab[suite.kdf_id], suite.kdf_id,
+                hpke_kdf_strtab[suite.kdf_id], suite.kdf_id,
                 hpke_aead_strtab[suite.aead_id], suite.aead_id);
 
     if (pkE) { 
