@@ -104,14 +104,45 @@ typedef struct {
 
 /*!
  * @brief table of KEMs
+ *
+ * Ok we're wasting space here, but not much and it's ok
  */
 hpke_kem_info_t hpke_kem_tab[]={
     { 0, 0, 0, 0 }, // this is needed to keep indexing correct
-    //{ HPKE_KEM_ID_P256, NID_secp256k1, 32, 32 },
+    { 1, 0, 0, 0 }, // this is needed to keep indexing correct
+    { 2, 0, 0, 0 }, // this is needed to keep indexing correct
+    { 3, 0, 0, 0 }, // this is needed to keep indexing correct
+    { 4, 0, 0, 0 }, // this is needed to keep indexing correct
+    { 5, 0, 0, 0 }, // this is needed to keep indexing correct
+    { 6, 0, 0, 0 }, // this is needed to keep indexing correct
+    { 7, 0, 0, 0 }, // this is needed to keep indexing correct
+    { 8, 0, 0, 0 }, // this is needed to keep indexing correct
+    { 9, 0, 0, 0 }, // this is needed to keep indexing correct
+    {10, 0, 0, 0 }, // this is needed to keep indexing correct
+    {11, 0, 0, 0 }, // this is needed to keep indexing correct
+    {12, 0, 0, 0 }, // this is needed to keep indexing correct
+    {13, 0, 0, 0 }, // this is needed to keep indexing correct
+    {14, 0, 0, 0 }, // this is needed to keep indexing correct
+    {15, 0, 0, 0 }, // this is needed to keep indexing correct
     { HPKE_KEM_ID_P256, NID_X9_62_prime256v1, 65, 65, 32 },
-    { HPKE_KEM_ID_25519, EVP_PKEY_X25519, 32, 32, 32 },
+    { HPKE_KEM_ID_P384, NID_secp384r1, 97, 97, 48 },
     { HPKE_KEM_ID_P521, NID_secp521r1, 133, 133, 66 },
-    { HPKE_KEM_ID_448, EVP_PKEY_X448, 56, 56, 56 } 
+    {19, 0, 0, 0 }, // this is needed to keep indexing correct
+    {20, 0, 0, 0 }, // this is needed to keep indexing correct
+    {21, 0, 0, 0 }, // this is needed to keep indexing correct
+    {22, 0, 0, 0 }, // this is needed to keep indexing correct
+    {23, 0, 0, 0 }, // this is needed to keep indexing correct
+    {24, 0, 0, 0 }, // this is needed to keep indexing correct
+    {25, 0, 0, 0 }, // this is needed to keep indexing correct
+    {26, 0, 0, 0 }, // this is needed to keep indexing correct
+    {27, 0, 0, 0 }, // this is needed to keep indexing correct
+    {28, 0, 0, 0 }, // this is needed to keep indexing correct
+    {29, 0, 0, 0 }, // this is needed to keep indexing correct
+    {30, 0, 0, 0 }, // this is needed to keep indexing correct
+    {31, 0, 0, 0 }, // this is needed to keep indexing correct
+    { HPKE_KEM_ID_25519, EVP_PKEY_X25519, 32, 32, 32 },
+    { HPKE_KEM_ID_448, EVP_PKEY_X448, 56, 56, 56 },
+    {34, 0, 0, 0 }, // this is needed to keep indexing correct
 };
 
 /*
@@ -120,8 +151,9 @@ hpke_kem_info_t hpke_kem_tab[]={
 const char *hpke_kem_strtab[]={
     NULL,
     HPKE_KEMSTR_P256,
-    HPKE_KEMSTR_X25519,
+    HPKE_KEMSTR_P384,
     HPKE_KEMSTR_P521,
+    HPKE_KEMSTR_X25519,
     HPKE_KEMSTR_X448};
 
 /*!
@@ -139,6 +171,7 @@ typedef struct {
 hpke_kdf_info_t hpke_kdf_tab[]={
     { 0, NULL, 0 }, // this is needed to keep indexing correct
     { HPKE_KDF_ID_HKDF_SHA256, EVP_sha256, 32 },
+    { HPKE_KDF_ID_HKDF_SHA384, EVP_sha384, 48 },
     { HPKE_KDF_ID_HKDF_SHA512, EVP_sha512, 64 }
 };
 
@@ -148,6 +181,7 @@ hpke_kdf_info_t hpke_kdf_tab[]={
 const char *hpke_kdf_strtab[]={
     NULL,
     HPKE_KDFSTR_256,
+    HPKE_KDFSTR_384,
     HPKE_KDFSTR_512};
 
 /**
@@ -268,13 +302,45 @@ static int hpke_pbuf(FILE *fout, char *msg,unsigned char *buf,size_t blen)
 #endif
 
 /*!
+ * @brief Check if kem_id is ok/known to us
+ * @param kem_id is the externally supplied kem_id
+ * @return 1 for good, not-1 for error
+ */
+static int hpke_kem_id_check(uint16_t kem_id)
+{
+    switch (kem_id) {
+        case HPKE_KEM_ID_P256:
+        case HPKE_KEM_ID_P384:
+        case HPKE_KEM_ID_P521:
+        case HPKE_KEM_ID_25519:
+        case HPKE_KEM_ID_448:
+            break;
+        default:
+            return(__LINE__);
+    }
+    return(1);
+}
+
+/*!
+ * @brief check if KEM uses NIST curve or not
+ * @param kem_id is the externally supplied kem_id
+ * @return 1 for NIST, 0 otherwise, -1 for error
+ */
+static int hpke_kem_id_nist_curve(uint16_t kem_id)
+{
+    if (hpke_kem_id_check(kem_id)!=1) return(__LINE__);
+    if (kem_id >=0x10 && kem_id <0x20) return(1);
+    return(0);
+}
+
+/*!
  * @brief Check if ciphersuite is ok/known to us
  * @param suite is the externally supplied cipheruite
  * @return 1 for good, not-1 for error
  */
 static int hpke_suite_check(hpke_suite_t suite)
 {
-    if (suite.kem_id>HPKE_KEM_ID_MAX) return(__LINE__);
+    if (hpke_kem_id_check(suite.kem_id)!=1) return(__LINE__);
     if (suite.kdf_id>HPKE_KDF_ID_MAX) return(__LINE__);
     if (suite.aead_id>HPKE_AEAD_ID_MAX) return(__LINE__);
     return(1);
@@ -1129,7 +1195,7 @@ int hpke_enc(
     BIO *bfp=NULL;
 
     /* step 0. Initialise peer's key from string */
-    if (suite.kem_id%2) {
+    if (hpke_kem_id_nist_curve(suite.kem_id)==1) {
         pkR = hpke_EVP_PKEY_new_raw_nist_public_key(hpke_kem_tab[suite.kem_id].groupid,pub,publen);
     } else {
         pkR = EVP_PKEY_new_raw_public_key(hpke_kem_tab[suite.kem_id].groupid,NULL,pub,publen);
@@ -1152,13 +1218,13 @@ int hpke_enc(
          * Read DH private from tv, then use that instead of 
          * a newly generated key pair
          */
-        if (ltv->kemID>HPKE_KEM_ID_MAX) return(__LINE__);
+        if (hpke_kem_id_check(ltv->kemID)!=1) return(__LINE__);
         unsigned char *bin_skE=NULL;
         size_t bin_skElen=0;
         if (1!=hpke_ah_decode(strlen(ltv->skE),ltv->skE,&bin_skElen,&bin_skE)) { 
             erv=__LINE__; goto err; 
         }
-        if (ltv->kemID%2) {
+        if (hpke_kem_id_nist_curve(ltv->kemID)==1) {
             pkE = hpke_EVP_PKEY_new_raw_nist_private_key(hpke_kem_tab[ltv->kemID].groupid,bin_skE,bin_skElen);
         } else {
             pkE = EVP_PKEY_new_raw_private_key(hpke_kem_tab[ltv->kemID].groupid,NULL,bin_skE,bin_skElen);
@@ -1182,7 +1248,7 @@ int hpke_enc(
     /* get 2nd half of zz if using an auth mode */
     if (mode==HPKE_MODE_AUTH||mode==HPKE_MODE_PSKAUTH) {
         if (hpke_kem_tab[suite.kem_id].Npriv==privlen) {
-            if (suite.kem_id%2) {
+            if (hpke_kem_id_nist_curve(suite.kem_id)==1) {
                 skI = hpke_EVP_PKEY_new_raw_nist_private_key(hpke_kem_tab[suite.kem_id].groupid,priv,privlen);
             } else {
                 skI=EVP_PKEY_new_raw_private_key(hpke_kem_tab[suite.kem_id].groupid,NULL,priv,privlen);
@@ -1486,7 +1552,7 @@ int hpke_dec(
     BIO *bfp=NULL;
 
     /* step 0. Initialise peer's key from string */
-    if (suite.kem_id%2) {
+    if (hpke_kem_id_nist_curve(suite.kem_id)==1) {
         pkE = hpke_EVP_PKEY_new_raw_nist_public_key(hpke_kem_tab[suite.kem_id].groupid,enc,enclen);
     } else {
         pkE = EVP_PKEY_new_raw_public_key(hpke_kem_tab[suite.kem_id].groupid,NULL,enc,enclen);
@@ -1498,7 +1564,7 @@ int hpke_dec(
     /* step 1. load decryptors private key */
     if (!evppriv) {
         if (hpke_kem_tab[suite.kem_id].Npriv==privlen) {
-            if (suite.kem_id%2) {
+            if (hpke_kem_id_nist_curve(suite.kem_id)==1) {
                 skR = hpke_EVP_PKEY_new_raw_nist_private_key(hpke_kem_tab[suite.kem_id].groupid,priv,privlen);
             } else {
                 skR=EVP_PKEY_new_raw_private_key(hpke_kem_tab[suite.kem_id].groupid,NULL,priv,privlen);
@@ -1534,7 +1600,7 @@ int hpke_dec(
     if (mode==HPKE_MODE_AUTH||mode==HPKE_MODE_PSKAUTH) {
 
         /* step 2.5 run DH KEM again to get 2nd half of zz */
-        if (suite.kem_id%2) {
+        if (hpke_kem_id_nist_curve(suite.kem_id)==1) {
             pkI = hpke_EVP_PKEY_new_raw_nist_public_key(hpke_kem_tab[suite.kem_id].groupid,pub,publen);
         } else {
             pkI = EVP_PKEY_new_raw_public_key(hpke_kem_tab[suite.kem_id].groupid,NULL,pub,publen);
@@ -1716,7 +1782,7 @@ int hpke_kg(
     BIO *bfp=NULL;
 
     /* step 1. generate sender's key pair */
-    if (suite.kem_id%2) {
+    if (hpke_kem_id_nist_curve(suite.kem_id)==1) {
         pctx = EVP_PKEY_CTX_new_id(EVP_PKEY_EC, NULL);
         if (pctx == NULL) {
             erv=__LINE__; goto err;

@@ -49,10 +49,14 @@ cp $SCRATCH/plain $TMPNAM.plain
 # overall result
 overall=0
 
-# go throught the modes, kems... (kdfs,aeads later)
+# count things
+passed=0
+failed=0
+
+# go through the modes, kems... (kdfs,aeads later)
 for mode in base psk auth pskauth
 do
-	for kem in 1 2 3 4
+	for kem in 0x10 0x11 0x12 0x20 0x21
 	do
         # new recipient key pair - only the KEM matters for key generation
         $VALGRIND $BINDIR/hpkemain -k -p $TMPNAM.$mode.$kem.rpriv -P $TMPNAM.$mode.$kem.rpub -m $mode -c $kem,1,1
@@ -61,7 +65,10 @@ do
         then
             echo "$mode,$kem recipient key gen failed!"
             overall=1
+            failed=$((failed+1))
             continue
+        else
+            passed=$((passed+1))
         fi
 
 
@@ -84,6 +91,9 @@ do
                 echo "$mode,$kem sender key gen failed!"
                 overall=1
                 continue
+                failed=$((failed+1))
+            else
+                passed=$((passed+1))
             fi
             AUTHEPARMS="-p $TMPNAM.$mode.$kem.spriv "
             AUTHDPARMS="-P $TMPNAM.$mode.$kem.spub "
@@ -111,7 +121,7 @@ do
                 if [[ "$res" != 0 ]]
                 then
                     # encrypt failed!
-	                echo "$mode,$kem,$kdf,$aead ENCRYPT FAILED!\n"
+	                echo "$mode,$kem,$kdf,$aead ENCRYPT FAILED!"
                     ores=1
                     overall=1
                 else
@@ -123,10 +133,12 @@ do
                     if [[ "$res" != "0" || ! -f $TMPNAM.$mode.$kem.$kdf.$aead.recovered ]]
                     then
                         # decrypt failed!
-                        echo "$mode,$kem,$kdf,$aead DECRYPT FAILED when it shouldn't!\n"
+                        echo "$mode,$kem,$kdf,$aead DECRYPT FAILED when it shouldn't!"
                         overall=1
                         ores=1
+                        failed=$((failed+1))
                     else
+                        passed=$((passed+1))
                         # try some bad decrypts - these should fail
                         ores=0
 
@@ -142,6 +154,9 @@ do
                                 echo "$mode,$kem,$kdf,$aead DECRYPT WORKED when it shouldn't!\n"
                                 overall=1
                                 ores=1
+                                failed=$((failed+1))
+                            else
+                                passed=$((passed+1))
                             fi
                         fi
 
@@ -168,5 +183,5 @@ if [[ "$overall" == "0" ]]
 then
     echo "All done. All good."
 else
-    echo "Some problem."
+    echo "Some problems - passed: $passed but failed: $failed "
 fi
