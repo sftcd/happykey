@@ -639,7 +639,7 @@ err:
 static int hpke_extract(
         hpke_suite_t suite, int mode5869,
         const unsigned char *salt, const size_t saltlen,
-        unsigned char *zz, const size_t zzlen,
+        unsigned char *ikm, const size_t ikmlen,
         const unsigned char *label, const size_t labellen,
         unsigned char **secret, const size_t secretlen)
 {
@@ -649,13 +649,14 @@ static int hpke_extract(
     size_t labeled_ikmlen=0;
     int erv=1;
     size_t concat_offset=0;
+
     /*
      * Handle oddities of HPKE labels (or not)
      */
     switch (mode5869) {
         case HPKE_5869_MODE_PURE:
-            labeled_ikmlen=zzlen;
-            labeled_ikm=zz;
+            labeled_ikmlen=ikmlen;
+            labeled_ikm=ikm;
             break;
         case HPKE_5869_MODE_KEM:
             concat_offset=0;
@@ -674,8 +675,8 @@ static int hpke_extract(
             memcpy(labeled_ikm+concat_offset,label,labellen);
             concat_offset+=labellen;
             if (concat_offset>=HPKE_MAXSIZE) { erv=__LINE__; goto err; }
-            memcpy(labeled_ikm+concat_offset,zz,zzlen);
-            concat_offset+=zzlen;
+            memcpy(labeled_ikm+concat_offset,ikm,ikmlen);
+            concat_offset+=ikmlen;
             if (concat_offset>=HPKE_MAXSIZE) { erv=__LINE__; goto err; }
             labeled_ikmlen=concat_offset;
             break;
@@ -708,15 +709,15 @@ static int hpke_extract(
             memcpy(labeled_ikm+concat_offset,label,labellen);
             concat_offset+=labellen;
             if (concat_offset>=HPKE_MAXSIZE) { erv=__LINE__; goto err; }
-            memcpy(labeled_ikm+concat_offset,zz,zzlen);
-            concat_offset+=zzlen;
+            memcpy(labeled_ikm+concat_offset,ikm,ikmlen);
+            concat_offset+=ikmlen;
             if (concat_offset>=HPKE_MAXSIZE) { erv=__LINE__; goto err; }
             labeled_ikmlen=concat_offset;
-            break;
             break;
         default:
             erv=__LINE__; goto err;
     }
+
     pctx = EVP_PKEY_CTX_new_id(EVP_PKEY_HKDF, NULL);
     if (!pctx) {
         erv=__LINE__; goto err;
@@ -758,8 +759,9 @@ err:
  * brief RFC5869 HKDF-Expand
  *
  * @param suite is the ciphersuite 
- * @param secret - the initial key material (IKM)
- * @param secretlen - length of above
+ * @param mode5869 - controls labelling specifics
+ * @param prk - the initial pseudo-random key material 
+ * @param prk - length of above
  * @param label - label to prepend to info
  * @param context - the info
  * @param contextlen - length of above
@@ -767,25 +769,90 @@ err:
  * @param outlen - an input only!
  * @return 1 for good otherwise bad
  */
-static int hpke_expand(hpke_suite_t suite, unsigned char *secret, size_t secretlen,
-                char *label, unsigned char *context, size_t contextlen,
+static int hpke_expand(hpke_suite_t suite, int mode5869, 
+                unsigned char *prk, size_t prklen,
+                unsigned char *label, size_t labellen,
+                unsigned char *info, size_t infolen,
+                uint32_t L,
                 unsigned char **out, size_t outlen)
 {
     EVP_PKEY_CTX *pctx=NULL;
     int erv=1;
-    unsigned char *clbuf=NULL;
-    size_t clbuflen;
-    size_t lablen=0;
+    unsigned char libuf[HPKE_MAXSIZE];
+    unsigned char *lip=libuf;
+    size_t concat_offset=0;
 
-    if (label) lablen=strlen(label);
+    /*
+     * Handle oddities of HPKE labels (or not)
+     */
+    switch (mode5869) {
+        case HPKE_5869_MODE_PURE:
+            if ((labellen+infolen)>=HPKE_MAXSIZE) { erv=__LINE__; goto err;}
+            memcpy(lip,label,labellen);
+            memcpy(lip+labellen,info,infolen);
+            concat_offset=labellen+infolen;
+            break;
+        case HPKE_5869_MODE_KEM:
+            lip[0]=(L/256)%256;
+            lip[1]=L%256;
+            concat_offset=2;
+            memcpy(lip+concat_offset,HPKE_VERLABEL,strlen(HPKE_VERLABEL)); 
+            concat_offset+=strlen(HPKE_VERLABEL);
+            if (concat_offset>=HPKE_MAXSIZE) { erv=__LINE__; goto err; }
+            memcpy(lip+concat_offset,HPKE_VERLABEL,strlen(HPKE_SEC41LABEL));
+            concat_offset+=strlen(HPKE_SEC41LABEL);
+            if (concat_offset>=HPKE_MAXSIZE) { erv=__LINE__; goto err; }
+            lip[concat_offset]=(suite.kem_id/256)%256;
+            concat_offset+=1;
+            if (concat_offset>=HPKE_MAXSIZE) { erv=__LINE__; goto err; }
+            lip[concat_offset]=suite.kem_id%256;
+            concat_offset+=1;
+            if (concat_offset>=HPKE_MAXSIZE) { erv=__LINE__; goto err; }
+            memcpy(lip+concat_offset,label,labellen);
+            concat_offset+=labellen;
+            if (concat_offset>=HPKE_MAXSIZE) { erv=__LINE__; goto err; }
+            memcpy(lip+concat_offset,info,infolen);
+            concat_offset+=infolen;
+            if (concat_offset>=HPKE_MAXSIZE) { erv=__LINE__; goto err; }
+            break;
 
-    clbuflen=contextlen+lablen;
-    clbuf=OPENSSL_malloc(clbuflen);
-    if (!clbuf) {
-        erv=__LINE__; goto err;
+        case HPKE_6859_MODE_FULL:
+            lip[0]=(L/256)%256;
+            lip[1]=L%256;
+            concat_offset=2;
+            memcpy(lip+concat_offset,HPKE_VERLABEL,strlen(HPKE_VERLABEL)); 
+            concat_offset+=strlen(HPKE_VERLABEL);
+            if (concat_offset>=HPKE_MAXSIZE) { erv=__LINE__; goto err; }
+            memcpy(lip+concat_offset,HPKE_VERLABEL,strlen(HPKE_SEC41LABEL));
+            concat_offset+=strlen(HPKE_SEC41LABEL);
+            if (concat_offset>=HPKE_MAXSIZE) { erv=__LINE__; goto err; }
+            lip[concat_offset]=(suite.kem_id/256)%256;
+            concat_offset+=1;
+            if (concat_offset>=HPKE_MAXSIZE) { erv=__LINE__; goto err; }
+            lip[concat_offset]=suite.kem_id%256;
+            concat_offset+=1;
+            if (concat_offset>=HPKE_MAXSIZE) { erv=__LINE__; goto err; }
+            lip[concat_offset]=(suite.kdf_id/256)%256;
+            concat_offset+=1;
+            if (concat_offset>=HPKE_MAXSIZE) { erv=__LINE__; goto err; }
+            lip[concat_offset]=suite.kdf_id%256;
+            concat_offset+=1;
+            if (concat_offset>=HPKE_MAXSIZE) { erv=__LINE__; goto err; }
+            lip[concat_offset]=(suite.aead_id/256)%256;
+            concat_offset+=1;
+            if (concat_offset>=HPKE_MAXSIZE) { erv=__LINE__; goto err; }
+            lip[concat_offset]=suite.aead_id%256;
+            concat_offset+=1;
+            memcpy(lip+concat_offset,label,labellen);
+            concat_offset+=labellen;
+            if (concat_offset>=HPKE_MAXSIZE) { erv=__LINE__; goto err; }
+            memcpy(lip+concat_offset,info,infolen);
+            concat_offset+=infolen;
+            if (concat_offset>=HPKE_MAXSIZE) { erv=__LINE__; goto err; }
+            break;
+        default:
+            erv=__LINE__; goto err;
     }
-    if (label) memcpy(clbuf,label,lablen);
-    memcpy(clbuf+lablen,context,contextlen);
 
     pctx = EVP_PKEY_CTX_new_id(EVP_PKEY_HKDF, NULL);
     if (!pctx) {
@@ -800,10 +867,10 @@ static int hpke_expand(hpke_suite_t suite, unsigned char *secret, size_t secretl
     if (EVP_PKEY_CTX_set_hkdf_md(pctx, hpke_kdf_tab[suite.kdf_id].hash_init_func())!=1) {
         erv=__LINE__; goto err;
     }
-    if (EVP_PKEY_CTX_set1_hkdf_key(pctx, secret, secretlen)!=1) {
+    if (EVP_PKEY_CTX_set1_hkdf_key(pctx, prk, prklen)!=1) {
         erv=__LINE__; goto err;
     }
-    if (EVP_PKEY_CTX_add1_hkdf_info(pctx, clbuf, clbuflen)!=1) {
+    if (EVP_PKEY_CTX_add1_hkdf_info(pctx, libuf, concat_offset)!=1) {
         erv=__LINE__; goto err;
     }
     *out=OPENSSL_malloc(outlen);
@@ -820,7 +887,7 @@ static int hpke_expand(hpke_suite_t suite, unsigned char *secret, size_t secretl
     EVP_PKEY_CTX_free(pctx); pctx=NULL;
 err:
     if (pctx!=NULL) EVP_PKEY_CTX_free(pctx);
-    if (clbuf!=NULL) OPENSSL_free(clbuf);
+    memset(libuf,0,HPKE_MAXSIZE);
     return erv;
 }
 
@@ -909,7 +976,7 @@ static int hpke_test_expand_extract(void)
         printf("rfc5869 check: hpke_extract gave wrong answer!\n");
     }
     OPENSSL_free(calc_prk);
-    rv=hpke_expand(suite,PRK,PRKlen,"",info,infolen,&calc_okm,OKMlen);
+    rv=hpke_expand(suite,HPKE_5869_MODE_PURE,PRK,PRKlen,"",0,info,infolen,0,&calc_okm,OKMlen);
     if (rv!=1) {
         printf("rfc5869 check: hpke_expand failed: %d\n",rv);
         printf("rfc5869 check: hpke_expand failed: %d\n",rv);
@@ -1431,14 +1498,14 @@ int hpke_enc(
      * key = Expand(secret, concat("hpke key", context), Nk)
     */
     keylen=hpke_aead_tab[suite.aead_id].Nk;
-    if (hpke_expand(suite,secret,secretlen,"hpke key",context,contextlen,&key,keylen)!=1) {
+    if (hpke_expand(suite,HPKE_5869_MODE_PURE,secret,secretlen,"hpke key",8,context,contextlen,0,&key,keylen)!=1) {
         erv=__LINE__; goto err;
     }
     /*
      * nonce = Expand(secret, concat("hpke nonce", context), Nn)
     */
     noncelen=12;
-    if (hpke_expand(suite,secret,secretlen,"hpke nonce",context,contextlen,&nonce,noncelen)!=1) {
+    if (hpke_expand(suite,HPKE_5869_MODE_PURE,secret,secretlen,"hpke nonce",10,context,contextlen,0,&nonce,noncelen)!=1) {
         erv=__LINE__; goto err;
     }
 
@@ -1760,14 +1827,14 @@ int hpke_dec(
      * key = Expand(secret, concat("hpke key", context), Nk)
     */
     keylen=hpke_aead_tab[suite.aead_id].Nk;
-    if (hpke_expand(suite,secret,secretlen,"hpke key",context,contextlen,&key,keylen)!=1) {
+    if (hpke_expand(suite,HPKE_5869_MODE_PURE,secret,secretlen,"hpke key",8,context,contextlen,0,&key,keylen)!=1) {
         erv=__LINE__; goto err;
     }
     /*
      * nonce = Expand(secret, concat("hpke nonce", context), Nn)
     */
     noncelen=12;
-    if (hpke_expand(suite,secret,secretlen,"hpke nonce",context,contextlen,&nonce,noncelen)!=1) {
+    if (hpke_expand(suite,HPKE_5869_MODE_PURE,secret,secretlen,"hpke nonce",10,context,contextlen,0,&nonce,noncelen)!=1) {
         erv=__LINE__; goto err;
     }
 
