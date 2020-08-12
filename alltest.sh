@@ -126,7 +126,7 @@ do
                     overall=1
                 else
                     # should be good decrypt
-                    $BINDIR/hpkemain -d -p $TMPNAM.$mode.$kem.rpriv $AUTHDPARMS $GOODPSKPARMS \
+                    $VALGRIND $BINDIR/hpkemain -d -p $TMPNAM.$mode.$kem.rpriv $AUTHDPARMS $GOODPSKPARMS \
                         -i $TMPNAM.$mode.$kem.$kdf.$aead.cipher -o $TMPNAM.$mode.$kem.$kdf.$aead.recovered \
                         -m $mode -c $kem,$kdf,$aead 
 	                res=$?
@@ -145,7 +145,7 @@ do
                         # give bad PSK stuff
                         if [[ "$mode" == "psk" || "$mode" == "pskauth" ]]
                         then
-                            $BINDIR/hpkemain -d -p $TMPNAM.$mode.$kem.rpriv $AUTHDPARMS $BADPSKPARMS \
+                            $VALGRIND $BINDIR/hpkemain -d -p $TMPNAM.$mode.$kem.rpriv $AUTHDPARMS $BADPSKPARMS \
                                 -i $TMPNAM.$mode.$kem.$kdf.$aead.cipher -o $TMPNAM.$mode.$kem.$kdf.$aead.unrecovered \
                                 -m $mode -c $kem,$kdf,$aead  2>/dev/null
                             res=$?

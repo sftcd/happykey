@@ -22,7 +22,7 @@
 #include <openssl/ssl.h>
 
 /* biggest/default buffer we use */
-#define HPKE_MAXSIZE (640*1024) ///< 640k is more than enough for anyone (using this program:-)
+#define HPKE_MAXSIZE (40*1024) ///< 40k is more than enough for anyone (using this program:-)
 
 /*
  * The HPKE modes 

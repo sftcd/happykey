@@ -606,6 +606,7 @@ err:
 #define HPKE_SEC41LABEL  "KEM"       ///< The "suite_id" label for 4.1
 #define HPKE_SEC51LABEL  "HPKE"      ///< The "suite_id" label for 5.1
 
+#define HPKE_EAE_PRK_LABEL "eae_prk"  ///< The label within ExtractAndExpand
 /*!
  * brief RFC5869 HKDF-Extract
  *
@@ -618,7 +619,7 @@ err:
  * @param label - label for separation
  * @param labellen - length of above
  * @param secret - the result of extraction (allocated inside)
- * @param secretlen - an input only!
+ * @param secretlen - bufsize on input, used size on output
  * @return 1 for good otherwise bad
  *
  * Mode can be:
@@ -641,7 +642,7 @@ static int hpke_extract(
         const unsigned char *salt, const size_t saltlen,
         unsigned char *ikm, const size_t ikmlen,
         const unsigned char *label, const size_t labellen,
-        unsigned char **secret, const size_t secretlen)
+        unsigned char *secret, size_t *secretlen)
 {
     EVP_PKEY_CTX *pctx=NULL;
     unsigned char labeled_ikmbuf[HPKE_MAXSIZE];
@@ -737,17 +738,14 @@ static int hpke_extract(
     if (EVP_PKEY_CTX_set1_hkdf_salt(pctx, salt, saltlen)!=1) {
         erv=__LINE__; goto err;
     }
-    *secret=OPENSSL_malloc(secretlen);
-    if (!secret) {
+    size_t lsecretlen=*secretlen;
+    if (EVP_PKEY_derive(pctx, secret, &lsecretlen)!=1) {
         erv=__LINE__; goto err;
     }
-    size_t lsecretlen=secretlen;
-    if (EVP_PKEY_derive(pctx, *secret, &lsecretlen)!=1) {
+    if (lsecretlen>=*secretlen) { /* just in case it changed */
         erv=__LINE__; goto err;
     }
-    if (lsecretlen!=secretlen) { /* just in case it changed */
-        erv=__LINE__; goto err;
-    }
+    *secretlen=lsecretlen;
     EVP_PKEY_CTX_free(pctx); pctx=NULL;
 err:
     if (pctx!=NULL) EVP_PKEY_CTX_free(pctx);
@@ -763,10 +761,11 @@ err:
  * @param prk - the initial pseudo-random key material 
  * @param prk - length of above
  * @param label - label to prepend to info
+ * @param labellen - label to prepend to info
  * @param context - the info
  * @param contextlen - length of above
  * @param out - the result of expansion (allocated inside)
- * @param outlen - an input only!
+ * @param outlen - buf size on input
  * @return 1 for good otherwise bad
  */
 static int hpke_expand(hpke_suite_t suite, int mode5869, 
@@ -774,7 +773,7 @@ static int hpke_expand(hpke_suite_t suite, int mode5869,
                 unsigned char *label, size_t labellen,
                 unsigned char *info, size_t infolen,
                 uint32_t L,
-                unsigned char **out, size_t outlen)
+                unsigned char *out, size_t *outlen)
 {
     EVP_PKEY_CTX *pctx=NULL;
     int erv=1;
@@ -873,17 +872,11 @@ static int hpke_expand(hpke_suite_t suite, int mode5869,
     if (EVP_PKEY_CTX_add1_hkdf_info(pctx, libuf, concat_offset)!=1) {
         erv=__LINE__; goto err;
     }
-    *out=OPENSSL_malloc(outlen);
-    if (!out) {
+    size_t loutlen=*outlen; /* just in case it changes */
+    if (EVP_PKEY_derive(pctx, out, &loutlen)!=1) {
         erv=__LINE__; goto err;
     }
-    size_t loutlen=outlen; /* just in case it changes */
-    if (EVP_PKEY_derive(pctx, *out, &loutlen)!=1) {
-        erv=__LINE__; goto err;
-    }
-    if (loutlen!=outlen) {
-        erv=__LINE__; goto err;
-    }
+    *outlen=loutlen;
     EVP_PKEY_CTX_free(pctx); pctx=NULL;
 err:
     if (pctx!=NULL) EVP_PKEY_CTX_free(pctx);
@@ -891,9 +884,49 @@ err:
     return erv;
 }
 
+/*!
+ * @brief ExtractAndExpand
+ * @param suite is the ciphersuite 
+ * @param mode5869 - controls labelling specifics
+ * @param dh - the initial DH shared secret
+ * @param dhlen - length of above
+ * @param context - the info
+ * @param contextlen - length of above
+ * @param secret - the result of extract&expand
+ * @param secretlen - buf size on input
+ * @return 1 for good otherwise bad
+ */
+static int hpke_extract_and_expand(
+					hpke_suite_t suite, int mode5869,
+					unsigned char *dh , size_t dhlen,
+					unsigned char *context, size_t contextlen,
+					unsigned char *secret, size_t *secretlen
+			)
+{
+	int erv=1;
+	int rv=0;
+	unsigned char eae_prkbuf[HPKE_MAXSIZE];
+	size_t eae_prklen=HPKE_MAXSIZE;
+	rv=hpke_extract(suite,mode5869,
+            "",0,HPKE_EAE_PRK_LABEL,strlen(HPKE_EAE_PRK_LABEL),
+			dh,dhlen,
+			eae_prkbuf,&eae_prklen);
+	if (rv!=1) { erv=__LINE__; goto err; }
+    rv=hpke_expand(suite,mode5869,
+            eae_prkbuf,eae_prklen,
+            "",0,
+            context,contextlen,
+            0,
+            secret,secretlen);
+	if (rv!=1) { erv=__LINE__; goto err; }
+err:
+	memset(eae_prkbuf,0,HPKE_MAXSIZE);
+	return(erv);
+}
+
 #ifdef TESTVECTORS
 /*!
- * @brief specific test for epxand/extract
+ * @brief specific RFC5869 test for epxand/extract
  *
  * This uses the test vectors from https://tools.ietf.org/html/rfc5869
  * I added this as my expand is not agreeing with the HPKE test vectors.
@@ -941,7 +974,6 @@ static int hpke_test_expand_extract(void)
                             0xb5,0x0f,0x9c,0x31,
                             0x22,0xec,0x84,0x4a,
                             0xd7,0xc2,0xb3,0xe5};
-    size_t PRKlen=32;
     unsigned char OKM[42]={ 0x3c,0xb2,0x5f,0x25,
                             0xfa,0xac,0xd5,0x7a,
                             0x90,0x43,0x4f,0x64,
@@ -953,12 +985,13 @@ static int hpke_test_expand_extract(void)
                             0x34,0x00,0x72,0x08,
                             0xd5,0xb8,0x87,0x18,
                             0x58,0x65 }; /* 42 octets */
-    size_t OKMlen=42;
-    unsigned char *calc_prk;
-    unsigned char *calc_okm;
+    size_t OKMlen=HPKE_MAXSIZE;
+    unsigned char calc_prk[HPKE_MAXSIZE];
+    size_t PRKlen=HPKE_MAXSIZE;
+    unsigned char calc_okm[HPKE_MAXSIZE];
     int rv=1;
     hpke_suite_t suite=HPKE_SUITE_DEFAULT;
-    rv=hpke_extract(suite,HPKE_5869_MODE_PURE,salt,saltlen,IKM,IKMlen,"",0,&calc_prk,PRKlen);
+    rv=hpke_extract(suite,HPKE_5869_MODE_PURE,salt,saltlen,IKM,IKMlen,"",0,calc_prk,&PRKlen);
     if (rv!=1) {
         printf("rfc5869 check: hpke_extract failed: %d\n",rv);
         printf("rfc5869 check: hpke_extract failed: %d\n",rv);
@@ -975,8 +1008,8 @@ static int hpke_test_expand_extract(void)
         printf("rfc5869 check: hpke_extract gave wrong answer!\n");
         printf("rfc5869 check: hpke_extract gave wrong answer!\n");
     }
-    OPENSSL_free(calc_prk);
-    rv=hpke_expand(suite,HPKE_5869_MODE_PURE,PRK,PRKlen,"",0,info,infolen,0,&calc_okm,OKMlen);
+    OKMlen=42;
+    rv=hpke_expand(suite,HPKE_5869_MODE_PURE,PRK,PRKlen,"",0,info,infolen,0,calc_okm,&OKMlen);
     if (rv!=1) {
         printf("rfc5869 check: hpke_expand failed: %d\n",rv);
         printf("rfc5869 check: hpke_expand failed: %d\n",rv);
@@ -994,9 +1027,6 @@ static int hpke_test_expand_extract(void)
         printf("rfc5869 check: hpke_expand gave wrong answer!\n");
         printf("rfc5869 check: hpke_expand gave wrong answer!\n");
     }
-    OPENSSL_free(calc_okm);
-
-
     return(rv);
 }
 #endif
@@ -1350,12 +1380,12 @@ int hpke_enc(
     unsigned char *enc=NULL;
     size_t  contextlen=0;
     unsigned char *context=NULL;
-    size_t  secretlen=0;
-    unsigned char *secret=NULL;
-    size_t  keylen=0;
-    unsigned char *key=NULL;
-    size_t  noncelen=0;
-    unsigned char *nonce=NULL;
+    size_t  secretlen=HPKE_MAXSIZE;
+    unsigned char secret[HPKE_MAXSIZE];
+    size_t  keylen=HPKE_MAXSIZE;
+    unsigned char key[HPKE_MAXSIZE];
+    size_t  noncelen=HPKE_MAXSIZE;
+    unsigned char nonce[HPKE_MAXSIZE];
     size_t pkI_buflen=0;
     unsigned char *pkI_buf=NULL;
     BIO *bfp=NULL;
@@ -1490,22 +1520,30 @@ int hpke_enc(
         IKM=psk;
         IKM_len=psklen;
     }
-    secretlen=hpke_kdf_tab[suite.kdf_id].Nh;
-    if (hpke_extract(suite,HPKE_5869_MODE_PURE,IKM,IKM_len,zz,zzlen,"",0,&secret,secretlen)!=1) {
+    if (hpke_extract(suite,HPKE_5869_MODE_PURE,IKM,IKM_len,zz,zzlen,"",0,secret,&secretlen)!=1) {
+        erv=__LINE__; goto err;
+    }
+    if (secretlen!=hpke_kdf_tab[suite.kdf_id].Nh) {
         erv=__LINE__; goto err;
     }
     /*
      * key = Expand(secret, concat("hpke key", context), Nk)
     */
     keylen=hpke_aead_tab[suite.aead_id].Nk;
-    if (hpke_expand(suite,HPKE_5869_MODE_PURE,secret,secretlen,"hpke key",8,context,contextlen,0,&key,keylen)!=1) {
+    if (hpke_expand(suite,HPKE_5869_MODE_PURE,secret,secretlen,"hpke key",8,context,contextlen,0,key,&keylen)!=1) {
+        erv=__LINE__; goto err;
+    }
+    if (keylen!=hpke_aead_tab[suite.aead_id].Nk) {
         erv=__LINE__; goto err;
     }
     /*
      * nonce = Expand(secret, concat("hpke nonce", context), Nn)
     */
     noncelen=12;
-    if (hpke_expand(suite,HPKE_5869_MODE_PURE,secret,secretlen,"hpke nonce",10,context,contextlen,0,&nonce,noncelen)!=1) {
+    if (hpke_expand(suite,HPKE_5869_MODE_PURE,secret,secretlen,"hpke nonce",10,context,contextlen,0,nonce,&noncelen)!=1) {
+        erv=__LINE__; goto err;
+    }
+    if (noncelen!=12) {
         erv=__LINE__; goto err;
     }
 
@@ -1632,9 +1670,6 @@ err:
     if (zz!=NULL) OPENSSL_free(zz);
     if (enc!=NULL) OPENSSL_free(enc);
     if (context!=NULL) OPENSSL_free(context);
-    if (secret!=NULL) OPENSSL_free(secret);
-    if (key!=NULL) OPENSSL_free(key);
-    if (nonce!=NULL) OPENSSL_free(nonce);
     return erv;
 }
 
@@ -1705,12 +1740,12 @@ int hpke_dec(
     unsigned char *zz=NULL;
     size_t  contextlen=0;
     unsigned char *context=NULL;
-    size_t  secretlen=0;
-    unsigned char *secret=NULL;
-    size_t  keylen=0;
-    unsigned char *key=NULL;
-    size_t  noncelen=0;
-    unsigned char *nonce=NULL;
+    size_t  secretlen=HPKE_MAXSIZE;
+    unsigned char secret[HPKE_MAXSIZE];
+    size_t  keylen=HPKE_MAXSIZE;
+    unsigned char key[HPKE_MAXSIZE];
+    size_t  noncelen=HPKE_MAXSIZE;
+    unsigned char nonce[HPKE_MAXSIZE];
     size_t  mypublen=0;
     unsigned char *mypub=NULL;
     size_t  otherpublen=0;
@@ -1815,26 +1850,34 @@ int hpke_dec(
         erv=__LINE__; goto err;
     }
     const unsigned char *IKM=zero_buf;
-    secretlen=hpke_kdf_tab[suite.kdf_id].Nh;
     if (mode==HPKE_MODE_PSK || mode==HPKE_MODE_PSKAUTH) {
         IKM=psk;
         IKM_len=psklen;
     }
-    if (hpke_extract(suite,HPKE_5869_MODE_PURE,IKM,IKM_len,zz,zzlen,"",0,&secret,secretlen)!=1) {
+    if (hpke_extract(suite,HPKE_5869_MODE_PURE,IKM,IKM_len,zz,zzlen,"",0,secret,&secretlen)!=1) {
+        erv=__LINE__; goto err;
+    }
+    if (secretlen!=hpke_kdf_tab[suite.kdf_id].Nh) {
         erv=__LINE__; goto err;
     }
     /*
      * key = Expand(secret, concat("hpke key", context), Nk)
     */
     keylen=hpke_aead_tab[suite.aead_id].Nk;
-    if (hpke_expand(suite,HPKE_5869_MODE_PURE,secret,secretlen,"hpke key",8,context,contextlen,0,&key,keylen)!=1) {
+    if (hpke_expand(suite,HPKE_5869_MODE_PURE,secret,secretlen,"hpke key",8,context,contextlen,0,key,&keylen)!=1) {
+        erv=__LINE__; goto err;
+    }
+    if (keylen!=hpke_aead_tab[suite.aead_id].Nk) {
         erv=__LINE__; goto err;
     }
     /*
      * nonce = Expand(secret, concat("hpke nonce", context), Nn)
     */
     noncelen=12;
-    if (hpke_expand(suite,HPKE_5869_MODE_PURE,secret,secretlen,"hpke nonce",10,context,contextlen,0,&nonce,noncelen)!=1) {
+    if (hpke_expand(suite,HPKE_5869_MODE_PURE,secret,secretlen,"hpke nonce",10,context,contextlen,0,nonce,&noncelen)!=1) {
+        erv=__LINE__; goto err;
+    }
+    if (noncelen!=12) {
         erv=__LINE__; goto err;
     }
 
@@ -1916,10 +1959,7 @@ err:
     if (pctx!=NULL) EVP_PKEY_CTX_free(pctx);
     if (zz!=NULL) OPENSSL_free(zz);
     if (context!=NULL) OPENSSL_free(context);
-    if (secret!=NULL) OPENSSL_free(secret);
-    if (key!=NULL) OPENSSL_free(key);
     if (mypub!=NULL) OPENSSL_free(mypub);
-    if (nonce!=NULL) OPENSSL_free(nonce);
     return erv;
 }
 
