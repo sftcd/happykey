@@ -90,7 +90,11 @@ static void usage(char *prog,char *errmsg)
             HPKE_AEADSTR_AES128GCM, HPKE_AEADSTR_AES256GCM, HPKE_AEADSTR_CP);
     fprintf(stderr,"  For example \"-c %s,%s,%s\" (the default)\n",
             HPKE_KEMSTR_X25519, HPKE_KDFSTR_256, HPKE_AEADSTR_AES128GCM);
-    exit(1);
+    if (errmsg==NULL) {
+        exit(0);
+    } else {
+        exit(1);
+    }
 }
 
 /*
@@ -476,6 +480,7 @@ int main(int argc, char **argv)
     char *out_in=NULL;
 #ifdef TESTVECTORS
     int dotv=0;
+    char *tvfname=NULL;
 #endif
     char *modestr=NULL;
     char *pskid=NULL;
@@ -491,12 +496,12 @@ int main(int argc, char **argv)
     int opt;
 
 #ifdef TESTVECTORS
-    while((opt = getopt(argc, argv, "?c:hkedvP:p:a:I:i:m:n:o:s:T")) != -1) {
+    while((opt = getopt(argc, argv, "?c:hkedvP:p:a:I:i:m:n:o:s:T::")) != -1) {
 #else
     while((opt = getopt(argc, argv, "?c:hkedvP:p:a:I:i:m:n:o:s:")) != -1) {
 #endif
         switch(opt) {
-            case '?': usage(argv[0],NULL); break;
+            case '?': usage(argv[0],"Unexpected option"); break;
             case 'a': aad_in=optarg; break;
             case 'c': suitestr=optarg; break;
             case 'd': doing_enc=0; break;
@@ -512,7 +517,7 @@ int main(int argc, char **argv)
             case 'p': priv_in=optarg; break;
             case 's': psk_in=optarg; break;
 #ifdef TESTVECTORS
-            case 'T': dotv=1; break;
+            case 'T': dotv=1; tvfname=optarg; break;
 #endif
             case 'v': verbose++; break;
             default:
@@ -559,54 +564,49 @@ int main(int argc, char **argv)
     if (suitestr) {
         if (verbose) printf("Using ciphersuite %s\n",suitestr);
         uint16_t kem=0,kdf=0,aead=0;
-        if (strlen(suitestr)!=5) {
-            /* See if it contains a mix of our strings and numbers  */
-            char *st=strtok(suitestr,",");
-            if (!st) usage(argv[0],"Bad ciphersuite");
-            while (st!=NULL) {
-                /* check if string is known or number and if so handle appropriately */
-                if (kem==0) {
-                    if (HPKE_MSMATCH(st,HPKE_KEMSTR_P256)) kem=HPKE_KEM_ID_P256;
-                    if (HPKE_MSMATCH(st,HPKE_KEMSTR_P384)) kem=HPKE_KEM_ID_P384;
-                    if (HPKE_MSMATCH(st,HPKE_KEMSTR_P521)) kem=HPKE_KEM_ID_P521;
-                    if (HPKE_MSMATCH(st,HPKE_KEMSTR_X25519)) kem=HPKE_KEM_ID_25519;
-                    if (HPKE_MSMATCH(st,HPKE_KEMSTR_X448)) kem=HPKE_KEM_ID_448;
-                    if (HPKE_MSMATCH(st,"0x10")) kem=HPKE_KEM_ID_P256;
-                    if (HPKE_MSMATCH(st,"16")) kem=HPKE_KEM_ID_P256;
-                    if (HPKE_MSMATCH(st,"0x11")) kem=HPKE_KEM_ID_P384;
-                    if (HPKE_MSMATCH(st,"17")) kem=HPKE_KEM_ID_P384;
-                    if (HPKE_MSMATCH(st,"0x12")) kem=HPKE_KEM_ID_P521;
-                    if (HPKE_MSMATCH(st,"18")) kem=HPKE_KEM_ID_P521;
-                    if (HPKE_MSMATCH(st,"0x20")) kem=HPKE_KEM_ID_25519;
-                    if (HPKE_MSMATCH(st,"32")) kem=HPKE_KEM_ID_25519;
-                    if (HPKE_MSMATCH(st,"0x21")) kem=HPKE_KEM_ID_448;
-                    if (HPKE_MSMATCH(st,"33")) kem=HPKE_KEM_ID_448;
-                }
-                if (kem!=0 && kdf==0) {
-                    if (HPKE_MSMATCH(st,HPKE_KDFSTR_256)) kdf=1;
-                    if (HPKE_MSMATCH(st,HPKE_KDFSTR_512)) kdf=2;
-                    if (HPKE_MSMATCH(st,"1")) kdf=1;
-                    if (HPKE_MSMATCH(st,"2")) kdf=2;
-                }
-                if (kem!=0 && kdf!=0 && aead==0) {
-                    if (HPKE_MSMATCH(st,HPKE_AEADSTR_AES128GCM)) aead=1;
-                    if (HPKE_MSMATCH(st,HPKE_AEADSTR_AES256GCM)) aead=2;
-                    if (HPKE_MSMATCH(st,HPKE_AEADSTR_CP)) aead=3;
-                    if (HPKE_MSMATCH(st,"1")) aead=1;
-                    if (HPKE_MSMATCH(st,"2")) aead=2;
-                    if (HPKE_MSMATCH(st,"3")) aead=3;
-                }
-                st=strtok(NULL,",");
+
+        /* See if it contains a mix of our strings and numbers  */
+        char *st=strtok(suitestr,",");
+        if (!st) usage(argv[0],"Bad ciphersuite (1)");
+        while (st!=NULL) {
+            /* check if string is known or number and if so handle appropriately */
+            if (kem==0) {
+                if (HPKE_MSMATCH(st,HPKE_KEMSTR_P256)) kem=HPKE_KEM_ID_P256;
+                if (HPKE_MSMATCH(st,HPKE_KEMSTR_P384)) kem=HPKE_KEM_ID_P384;
+                if (HPKE_MSMATCH(st,HPKE_KEMSTR_P521)) kem=HPKE_KEM_ID_P521;
+                if (HPKE_MSMATCH(st,HPKE_KEMSTR_X25519)) kem=HPKE_KEM_ID_25519;
+                if (HPKE_MSMATCH(st,HPKE_KEMSTR_X448)) kem=HPKE_KEM_ID_448;
+                if (HPKE_MSMATCH(st,"0x10")) kem=HPKE_KEM_ID_P256;
+                if (HPKE_MSMATCH(st,"16")) kem=HPKE_KEM_ID_P256;
+                if (HPKE_MSMATCH(st,"0x11")) kem=HPKE_KEM_ID_P384;
+                if (HPKE_MSMATCH(st,"17")) kem=HPKE_KEM_ID_P384;
+                if (HPKE_MSMATCH(st,"0x12")) kem=HPKE_KEM_ID_P521;
+                if (HPKE_MSMATCH(st,"18")) kem=HPKE_KEM_ID_P521;
+                if (HPKE_MSMATCH(st,"0x20")) kem=HPKE_KEM_ID_25519;
+                if (HPKE_MSMATCH(st,"32")) kem=HPKE_KEM_ID_25519;
+                if (HPKE_MSMATCH(st,"0x21")) kem=HPKE_KEM_ID_448;
+                if (HPKE_MSMATCH(st,"33")) kem=HPKE_KEM_ID_448;
             }
-            if (kem==0||kdf==0||aead==0) usage(argv[0],"Bad ciphersuite");
-        } else {
-            /* check if numbers are ok */
-            kem=(uint16_t)suitestr[0]-'0';
-            if (suitestr[1]!=',') usage(argv[0],"Bad ciphersuite");
-            kdf=(uint16_t)suitestr[2]-'0';
-            if (suitestr[3]!=',') usage(argv[0],"Bad ciphersuite");
-            aead=(uint16_t)suitestr[4]-'0';
+            if (kem!=0 && kdf==0) {
+                if (HPKE_MSMATCH(st,HPKE_KDFSTR_256)) kdf=1;
+                if (HPKE_MSMATCH(st,HPKE_KDFSTR_384)) kdf=2;
+                if (HPKE_MSMATCH(st,HPKE_KDFSTR_512)) kdf=3;
+                if (HPKE_MSMATCH(st,"1")) kdf=1;
+                if (HPKE_MSMATCH(st,"2")) kdf=2;
+                if (HPKE_MSMATCH(st,"3")) kdf=3;
+            }
+            if (kem!=0 && kdf!=0 && aead==0) {
+                if (HPKE_MSMATCH(st,HPKE_AEADSTR_AES128GCM)) aead=1;
+                if (HPKE_MSMATCH(st,HPKE_AEADSTR_AES256GCM)) aead=2;
+                if (HPKE_MSMATCH(st,HPKE_AEADSTR_CP)) aead=3;
+                if (HPKE_MSMATCH(st,"1")) aead=1;
+                if (HPKE_MSMATCH(st,"2")) aead=2;
+                if (HPKE_MSMATCH(st,"3")) aead=3;
+            }
+            st=strtok(NULL,",");
         }
+        if (kem==0||kdf==0||aead==0) usage(argv[0],"Bad ciphersuite (2)");
+
         hpke_suite.kem_id=kem;
         hpke_suite.kdf_id=kdf;
         hpke_suite.aead_id=aead;
@@ -657,7 +657,10 @@ int main(int argc, char **argv)
      * that way)
      * File name for this doesn't need to be parameterised yet.
      */
-    char *tvfname="test-vectors.json";
+    char *def_tvfname="test-vectors.json";
+    if (tvfname==NULL) {
+        tvfname=def_tvfname;
+    }
     int nelems=0;
     hpke_tv_t *tvarr=NULL;
     hpke_tv_t *tv=NULL;

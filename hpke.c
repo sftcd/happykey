@@ -598,27 +598,125 @@ err:
 
 }
 
+#define HPKE_5869_MODE_PURE 0 ///< Do "pure" RFC5869
+#define HPKE_5869_MODE_KEM  1 ///< Abide by HPKE section 4.1
+#define HPKE_6859_MODE_FULL 2 ///< Abide by HPKE section 5.1
+
+#define HPKE_VERLABEL    "HPKE-05 "  ///< The version string label
+#define HPKE_SEC41LABEL  "KEM"       ///< The "suite_id" label for 4.1
+#define HPKE_SEC51LABEL  "HPKE"      ///< The "suite_id" label for 5.1
 
 /*!
  * brief RFC5869 HKDF-Extract
  *
  * @param suite is the ciphersuite 
+ * @param mode5869 - controls labelling specifics
  * @param salt - surprisingly this is the salt;-)
  * @param saltlen - length of above
  * @param zz - the initial key material (IKM)
  * @param zzlen - length of above
+ * @param label - label for separation
+ * @param labellen - length of above
  * @param secret - the result of extraction (allocated inside)
  * @param secretlen - an input only!
  * @return 1 for good otherwise bad
+ *
+ * Mode can be:
+ * - HPKE_5869_MODE_PURE meaning to ignore all the
+ * HPKE-specific labelling and produce an output that's 
+ * RFC5869 compliant (useful for testing and maybe
+ * more)
+ * - HPKE_5869_MODE_KEM meaning to follow section 4.1
+ * where the suite_id is used as:
+ *   concat("KEM", I2OSP(kem_id, 2))
+ * - HPKE_6859_MODE_FULL meaning to follow section 5.1
+ * where the suite_id is used as:
+ *   concat("HPKE",I2OSP(kem_id, 2),
+ *          I2OSP(kdf_id, 2), I2OSP(aead_id, 2))
+ *
+ * Isn't that a bit of a mess!
  */
 static int hpke_extract(
-        hpke_suite_t suite,
+        hpke_suite_t suite, int mode5869,
         const unsigned char *salt, const size_t saltlen,
-        const unsigned char *zz, const size_t zzlen,
+        unsigned char *zz, const size_t zzlen,
+        const unsigned char *label, const size_t labellen,
         unsigned char **secret, const size_t secretlen)
 {
     EVP_PKEY_CTX *pctx=NULL;
+    unsigned char labeled_ikmbuf[HPKE_MAXSIZE];
+    unsigned char *labeled_ikm=labeled_ikmbuf;
+    size_t labeled_ikmlen=0;
     int erv=1;
+    size_t concat_offset=0;
+    /*
+     * Handle oddities of HPKE labels (or not)
+     */
+    switch (mode5869) {
+        case HPKE_5869_MODE_PURE:
+            labeled_ikmlen=zzlen;
+            labeled_ikm=zz;
+            break;
+        case HPKE_5869_MODE_KEM:
+            concat_offset=0;
+            memcpy(labeled_ikm,HPKE_VERLABEL,strlen(HPKE_VERLABEL)); 
+            concat_offset+=strlen(HPKE_VERLABEL);
+            if (concat_offset>=HPKE_MAXSIZE) { erv=__LINE__; goto err; }
+            memcpy(labeled_ikm+concat_offset,HPKE_VERLABEL,strlen(HPKE_SEC41LABEL));
+            concat_offset+=strlen(HPKE_SEC41LABEL);
+            if (concat_offset>=HPKE_MAXSIZE) { erv=__LINE__; goto err; }
+            labeled_ikm[concat_offset]=(suite.kem_id/256)%256;
+            concat_offset+=1;
+            if (concat_offset>=HPKE_MAXSIZE) { erv=__LINE__; goto err; }
+            labeled_ikm[concat_offset]=suite.kem_id%256;
+            concat_offset+=1;
+            if (concat_offset>=HPKE_MAXSIZE) { erv=__LINE__; goto err; }
+            memcpy(labeled_ikm+concat_offset,label,labellen);
+            concat_offset+=labellen;
+            if (concat_offset>=HPKE_MAXSIZE) { erv=__LINE__; goto err; }
+            memcpy(labeled_ikm+concat_offset,zz,zzlen);
+            concat_offset+=zzlen;
+            if (concat_offset>=HPKE_MAXSIZE) { erv=__LINE__; goto err; }
+            labeled_ikmlen=concat_offset;
+            break;
+        case HPKE_6859_MODE_FULL:
+            concat_offset=0;
+            memcpy(labeled_ikm,HPKE_VERLABEL,strlen(HPKE_VERLABEL)); 
+            concat_offset+=strlen(HPKE_VERLABEL);
+            if (concat_offset>=HPKE_MAXSIZE) { erv=__LINE__; goto err; }
+            memcpy(labeled_ikm+concat_offset,HPKE_VERLABEL,strlen(HPKE_SEC51LABEL));
+            concat_offset+=strlen(HPKE_SEC51LABEL);
+            if (concat_offset>=HPKE_MAXSIZE) { erv=__LINE__; goto err; }
+            labeled_ikm[concat_offset]=(suite.kem_id/256)%256;
+            concat_offset+=1;
+            if (concat_offset>=HPKE_MAXSIZE) { erv=__LINE__; goto err; }
+            labeled_ikm[concat_offset]=suite.kem_id%256;
+            concat_offset+=1;
+            if (concat_offset>=HPKE_MAXSIZE) { erv=__LINE__; goto err; }
+            labeled_ikm[concat_offset]=(suite.kdf_id/256)%256;
+            concat_offset+=1;
+            if (concat_offset>=HPKE_MAXSIZE) { erv=__LINE__; goto err; }
+            labeled_ikm[concat_offset]=suite.kdf_id%256;
+            concat_offset+=1;
+            if (concat_offset>=HPKE_MAXSIZE) { erv=__LINE__; goto err; }
+            labeled_ikm[concat_offset]=(suite.aead_id/256)%256;
+            concat_offset+=1;
+            if (concat_offset>=HPKE_MAXSIZE) { erv=__LINE__; goto err; }
+            labeled_ikm[concat_offset]=suite.aead_id%256;
+            concat_offset+=1;
+            if (concat_offset>=HPKE_MAXSIZE) { erv=__LINE__; goto err; }
+            memcpy(labeled_ikm+concat_offset,label,labellen);
+            concat_offset+=labellen;
+            if (concat_offset>=HPKE_MAXSIZE) { erv=__LINE__; goto err; }
+            memcpy(labeled_ikm+concat_offset,zz,zzlen);
+            concat_offset+=zzlen;
+            if (concat_offset>=HPKE_MAXSIZE) { erv=__LINE__; goto err; }
+            labeled_ikmlen=concat_offset;
+            break;
+            break;
+        default:
+            erv=__LINE__; goto err;
+    }
     pctx = EVP_PKEY_CTX_new_id(EVP_PKEY_HKDF, NULL);
     if (!pctx) {
         erv=__LINE__; goto err;
@@ -632,7 +730,7 @@ static int hpke_extract(
     if (EVP_PKEY_CTX_set_hkdf_md(pctx, hpke_kdf_tab[suite.kdf_id].hash_init_func())!=1) {
         erv=__LINE__; goto err;
     }
-    if (EVP_PKEY_CTX_set1_hkdf_key(pctx, zz, zzlen)!=1) {
+    if (EVP_PKEY_CTX_set1_hkdf_key(pctx, labeled_ikm, labeled_ikmlen)!=1) {
         erv=__LINE__; goto err;
     }
     if (EVP_PKEY_CTX_set1_hkdf_salt(pctx, salt, saltlen)!=1) {
@@ -652,6 +750,7 @@ static int hpke_extract(
     EVP_PKEY_CTX_free(pctx); pctx=NULL;
 err:
     if (pctx!=NULL) EVP_PKEY_CTX_free(pctx);
+    memset(labeled_ikmbuf,0,HPKE_MAXSIZE);
     return erv;
 }
 
@@ -792,7 +891,7 @@ static int hpke_test_expand_extract(void)
     unsigned char *calc_okm;
     int rv=1;
     hpke_suite_t suite=HPKE_SUITE_DEFAULT;
-    rv=hpke_extract(suite,salt,saltlen,IKM,IKMlen,&calc_prk,PRKlen);
+    rv=hpke_extract(suite,HPKE_5869_MODE_PURE,salt,saltlen,IKM,IKMlen,"",0,&calc_prk,PRKlen);
     if (rv!=1) {
         printf("rfc5869 check: hpke_extract failed: %d\n",rv);
         printf("rfc5869 check: hpke_extract failed: %d\n",rv);
@@ -1325,7 +1424,7 @@ int hpke_enc(
         IKM_len=psklen;
     }
     secretlen=hpke_kdf_tab[suite.kdf_id].Nh;
-    if (hpke_extract(suite,IKM,IKM_len,zz,zzlen,&secret,secretlen)!=1) {
+    if (hpke_extract(suite,HPKE_5869_MODE_PURE,IKM,IKM_len,zz,zzlen,"",0,&secret,secretlen)!=1) {
         erv=__LINE__; goto err;
     }
     /*
@@ -1654,7 +1753,7 @@ int hpke_dec(
         IKM=psk;
         IKM_len=psklen;
     }
-    if (hpke_extract(suite,IKM,IKM_len,zz,zzlen,&secret,secretlen)!=1) {
+    if (hpke_extract(suite,HPKE_5869_MODE_PURE,IKM,IKM_len,zz,zzlen,"",0,&secret,secretlen)!=1) {
         erv=__LINE__; goto err;
     }
     /*

@@ -7,9 +7,12 @@ draft](https://tools.ietf.org/html/draft-ietf-tls-esni) with my [ESNI-enabled
 OpenSSL](https://github.com/sftcd/openssl) fork.  (As of now, this needs to be
 built against a master/tip version of OpenSSL such as my fork.)
 
-Starting 20200810, I'm coding up draft-05 of HPKE. So far, I've
-only added the new suite IDs so that the local tests work but have
-yet to aim to verify test vectors.
+Starting 20200810, I'm coding up draft-05 of HPKE. 
+- Added the KEM IDs and other suite additions 
+- Changed ``hpke_extract()`` to handle new labelling. Still
+  to put in different labels for calls as per spec though.
+- Local tests (``./alltest.sh``) still work but I have
+  yet to do anything to try interop/verify test vectors. 
 
 On 20200121, I started to integrate this into a guess as to what the next ESNI
 draft (version -06) might involve. That needed a couple of minor changes so I

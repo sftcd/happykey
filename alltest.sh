@@ -103,7 +103,7 @@ do
         fi
 
         # go through the kdfs aeads...
-	    for kdf in 1 2 
+	    for kdf in 1 2 3 
 	    do
 	        for aead in 1 2 3 
 	        do
