@@ -29,7 +29,7 @@ then
 fi
 
 # check hpkemain is built with testvectors
-$BINDIR/hpkemain -hT >/dev/null 2>&1
+$BINDIR/hpkemain -T -h >/dev/null 2>&1
 res=$?
 if [[ "$res" != "0" ]]
 then

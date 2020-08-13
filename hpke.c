@@ -97,6 +97,7 @@ const char *hpke_aead_strtab[]={
 typedef struct {
     uint16_t            kem_id; ///< code point for key encipherment method
     int                 groupid; ///< NID of KEM
+    size_t              Nsecret; ///< size of secrets
     size_t              Nenc; ///< length of encapsulated key
     size_t              Npk; ///< length of public key
     size_t              Npriv; ///< length of raw private key
@@ -108,41 +109,41 @@ typedef struct {
  * Ok we're wasting space here, but not much and it's ok
  */
 hpke_kem_info_t hpke_kem_tab[]={
-    { 0, 0, 0, 0 }, // this is needed to keep indexing correct
-    { 1, 0, 0, 0 }, // this is needed to keep indexing correct
-    { 2, 0, 0, 0 }, // this is needed to keep indexing correct
-    { 3, 0, 0, 0 }, // this is needed to keep indexing correct
-    { 4, 0, 0, 0 }, // this is needed to keep indexing correct
-    { 5, 0, 0, 0 }, // this is needed to keep indexing correct
-    { 6, 0, 0, 0 }, // this is needed to keep indexing correct
-    { 7, 0, 0, 0 }, // this is needed to keep indexing correct
-    { 8, 0, 0, 0 }, // this is needed to keep indexing correct
-    { 9, 0, 0, 0 }, // this is needed to keep indexing correct
-    {10, 0, 0, 0 }, // this is needed to keep indexing correct
-    {11, 0, 0, 0 }, // this is needed to keep indexing correct
-    {12, 0, 0, 0 }, // this is needed to keep indexing correct
-    {13, 0, 0, 0 }, // this is needed to keep indexing correct
-    {14, 0, 0, 0 }, // this is needed to keep indexing correct
-    {15, 0, 0, 0 }, // this is needed to keep indexing correct
-    { HPKE_KEM_ID_P256, NID_X9_62_prime256v1, 65, 65, 32 },
-    { HPKE_KEM_ID_P384, NID_secp384r1, 97, 97, 48 },
-    { HPKE_KEM_ID_P521, NID_secp521r1, 133, 133, 66 },
-    {19, 0, 0, 0 }, // this is needed to keep indexing correct
-    {20, 0, 0, 0 }, // this is needed to keep indexing correct
-    {21, 0, 0, 0 }, // this is needed to keep indexing correct
-    {22, 0, 0, 0 }, // this is needed to keep indexing correct
-    {23, 0, 0, 0 }, // this is needed to keep indexing correct
-    {24, 0, 0, 0 }, // this is needed to keep indexing correct
-    {25, 0, 0, 0 }, // this is needed to keep indexing correct
-    {26, 0, 0, 0 }, // this is needed to keep indexing correct
-    {27, 0, 0, 0 }, // this is needed to keep indexing correct
-    {28, 0, 0, 0 }, // this is needed to keep indexing correct
-    {29, 0, 0, 0 }, // this is needed to keep indexing correct
-    {30, 0, 0, 0 }, // this is needed to keep indexing correct
-    {31, 0, 0, 0 }, // this is needed to keep indexing correct
-    { HPKE_KEM_ID_25519, EVP_PKEY_X25519, 32, 32, 32 },
-    { HPKE_KEM_ID_448, EVP_PKEY_X448, 56, 56, 56 },
-    {34, 0, 0, 0 }, // this is needed to keep indexing correct
+    { 0, 0, 0, 0, 0 }, // this is needed to keep indexing correct
+    { 1, 0, 0, 0, 0 }, // this is needed to keep indexing correct
+    { 2, 0, 0, 0, 0 }, // this is needed to keep indexing correct
+    { 3, 0, 0, 0, 0 }, // this is needed to keep indexing correct
+    { 4, 0, 0, 0, 0 }, // this is needed to keep indexing correct
+    { 5, 0, 0, 0, 0 }, // this is needed to keep indexing correct
+    { 6, 0, 0, 0, 0 }, // this is needed to keep indexing correct
+    { 7, 0, 0, 0, 0 }, // this is needed to keep indexing correct
+    { 8, 0, 0, 0, 0 }, // this is needed to keep indexing correct
+    { 9, 0, 0, 0, 0 }, // this is needed to keep indexing correct
+    {10, 0, 0, 0, 0 }, // this is needed to keep indexing correct
+    {11, 0, 0, 0, 0 }, // this is needed to keep indexing correct
+    {12, 0, 0, 0, 0 }, // this is needed to keep indexing correct
+    {13, 0, 0, 0, 0 }, // this is needed to keep indexing correct
+    {14, 0, 0, 0, 0 }, // this is needed to keep indexing correct
+    {15, 0, 0, 0, 0 }, // this is needed to keep indexing correct
+    { HPKE_KEM_ID_P256, NID_X9_62_prime256v1, 32, 65, 65, 32 },
+    { HPKE_KEM_ID_P384, NID_secp384r1, 48, 97, 97, 48 },
+    { HPKE_KEM_ID_P521, NID_secp521r1, 64, 133, 133, 66 },
+    {19, 0, 0, 0, 0 }, // this is needed to keep indexing correct
+    {20, 0, 0, 0, 0 }, // this is needed to keep indexing correct
+    {21, 0, 0, 0, 0 }, // this is needed to keep indexing correct
+    {22, 0, 0, 0, 0 }, // this is needed to keep indexing correct
+    {23, 0, 0, 0, 0 }, // this is needed to keep indexing correct
+    {24, 0, 0, 0, 0 }, // this is needed to keep indexing correct
+    {25, 0, 0, 0, 0 }, // this is needed to keep indexing correct
+    {26, 0, 0, 0, 0 }, // this is needed to keep indexing correct
+    {27, 0, 0, 0, 0 }, // this is needed to keep indexing correct
+    {28, 0, 0, 0, 0 }, // this is needed to keep indexing correct
+    {29, 0, 0, 0, 0 }, // this is needed to keep indexing correct
+    {30, 0, 0, 0, 0 }, // this is needed to keep indexing correct
+    {31, 0, 0, 0, 0 }, // this is needed to keep indexing correct
+    { HPKE_KEM_ID_25519, EVP_PKEY_X25519, 32, 32, 32, 32 },
+    { HPKE_KEM_ID_448, EVP_PKEY_X448, 64, 56, 56, 56 },
+    {34, 0, 0, 0, 0 }, // this is needed to keep indexing correct
 };
 
 /*
@@ -916,7 +917,7 @@ static int hpke_extract_and_expand(
             eae_prkbuf,eae_prklen,
             "",0,
             context,contextlen,
-            0,
+            hpke_kem_tab[suite.kem_id].Nsecret,
             secret,secretlen);
 	if (rv!=1) { erv=__LINE__; goto err; }
 err:
