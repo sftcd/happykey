@@ -90,8 +90,8 @@ do
             then
                 echo "$mode,$kem sender key gen failed!"
                 overall=1
-                continue
                 failed=$((failed+1))
+                continue
             else
                 passed=$((passed+1))
             fi
@@ -124,7 +124,10 @@ do
 	                echo "$mode,$kem,$kdf,$aead ENCRYPT FAILED!"
                     ores=1
                     overall=1
+                    failed=$((failed+1))
                 else
+                    # this refers to the encrypt above
+                    passed=$((passed+1))
                     # should be good decrypt
                     $VALGRIND $BINDIR/hpkemain -d -p $TMPNAM.$mode.$kem.rpriv $AUTHDPARMS $GOODPSKPARMS \
                         -i $TMPNAM.$mode.$kem.$kdf.$aead.cipher -o $TMPNAM.$mode.$kem.$kdf.$aead.recovered \
@@ -151,11 +154,12 @@ do
                             res=$?
                             if [[ "$res" == 0 || -f $TMPNAM.$mode.$kem.$kdf.$aead.unrecovered ]]
                             then
-                                echo "$mode,$kem,$kdf,$aead DECRYPT WORKED when it shouldn't!\n"
+                                echo "$mode,$kem,$kdf,$aead DECRYPT WORKED when it shouldn't!"
                                 overall=1
                                 ores=1
                                 failed=$((failed+1))
                             else
+                                echo "$mode,$kem,$kdf,$aead DECRYPT failed as planned"
                                 passed=$((passed+1))
                             fi
                         fi

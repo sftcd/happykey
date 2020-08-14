@@ -681,8 +681,8 @@ int main(int argc, char **argv)
          * exactly the same as real command line args - plaintext in particular 
          * needs to be decoded here but MUST NOT in the normal case.
          */
-        if (map_input(tv->pkR,&publen,&pub,1)!=1) usage(argv[0],"bad -P value");
-        if (map_input(tv->skI,&privlen,&priv,1)!=1) usage(argv[0],"bad -p value");
+        if (map_input(tv->pkRm,&publen,&pub,1)!=1) usage(argv[0],"bad -P value");
+        if (map_input(tv->skRm,&privlen,&priv,1)!=1) usage(argv[0],"bad -p value");
         if (tv->encs && map_input(tv->encs[0].aad,&aadlen,&aad,1)!=1) usage(argv[0],"bad -a value");
         if (tv->info && map_input(tv->info,&infolen,&info,1)!=1) usage(argv[0],"bad -I value");
         if (tv->encs && map_input(tv->encs[0].plaintext,&plainlen,&plain,1)!=1) usage(argv[0],"bad -i value");
@@ -690,14 +690,14 @@ int main(int argc, char **argv)
 
         if (hpke_mode==HPKE_MODE_PSK || hpke_mode==HPKE_MODE_PSKAUTH) {
             /*
-             * grab PSK and pskID from tv 
+             * grab PSK and psk_id from tv 
              */
             unsigned char *dec_pskid=NULL;
             size_t dec_pskidlen=0;
-            hpke_ah_decode(strlen(tv->pskID),tv->pskID,&dec_pskidlen,&dec_pskid);
-            pskid=OPENSSL_malloc(strlen(tv->pskID)); /* too much but heh it's ok */
-            memset(pskid,0,strlen(tv->pskID));
-            memcpy(pskid,dec_pskid,strlen(tv->pskID)/2);
+            hpke_ah_decode(strlen(tv->psk_id),tv->psk_id,&dec_pskidlen,&dec_pskid);
+            pskid=OPENSSL_malloc(strlen(tv->psk_id)); /* too much but heh it's ok */
+            memset(pskid,0,strlen(tv->psk_id));
+            memcpy(pskid,dec_pskid,strlen(tv->psk_id)/2);
             OPENSSL_free(dec_pskid);
             hpke_ah_decode(strlen(tv->psk),tv->psk,&psklen,&psk);
         }
@@ -759,6 +759,7 @@ int main(int argc, char **argv)
             if (tv && tv->encs) {
                 unsigned char *bcipher=NULL;
                 size_t bcipherlen=0;
+                int goodres=1;
                 hpke_ah_decode( strlen(tv->encs[0].ciphertext),
                             tv->encs[0].ciphertext,
                             &bcipherlen,
@@ -766,12 +767,17 @@ int main(int argc, char **argv)
                 if (bcipherlen!=cipherlen) {
                     printf("Ciphertext output lengths differ: %lu vs %lu\n",
                             (unsigned long)bcipherlen,(unsigned long)cipherlen);
+                    goodres=0;
                 } else if (memcmp(cipher,bcipher,cipherlen)) {
                     printf("Ciphertext outputs differ, sorry\n");
+                    goodres=0;
                 } else {
                     printf("Ciphertext outputs the same! Yay!\n");
                 }
                 OPENSSL_free(bcipher);
+                if (goodres==0) {
+                    exit(1);
+                }
             } else {
 #endif
                 int wrv=hpkemain_write_ct(out_in,senderpublen,senderpub,cipherlen,cipher);

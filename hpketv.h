@@ -36,6 +36,7 @@
  */
 typedef struct {
     const char *aad; ///< ascii-hex encoded additional authenticated data
+    const char *nonce; ///< aascii-hex encoded nonce
     const char *plaintext; ///< aascii-hex encoded plaintext
     const char *ciphertext; ///< ascii-hex encoded ciphertext
 } hpke_tv_encs_t;
@@ -50,25 +51,27 @@ typedef struct {
  * json-c API.
  */
 typedef struct hpke_tv_s {
+
     uint8_t mode;
-    uint16_t kdfID;
-    uint16_t aeadID;
-    uint16_t kemID;
-    const char *context;
-    const char *skI;
-    const char *pkI;
-    const char *zz;
-    const char *secret;
-    const char *enc;
+    uint16_t kdf_id;
+    uint16_t aead_id;
+    uint16_t kem_id;
     const char *info;
-    const char *pskID;
+    const char *exporter_secret;
+    const char *enc;
+    const char *key_schedule_context;
     const char *nonce;
-    const char *key;
-    const char *pkR;
-    const char *pkE;
-    const char *skR;
-    const char *skE;
+    const char *secret;
+    const char *shared_secret;
+    const char *skEm;
+    const char *skRm;
+    const char *pkEm;
+    const char *pkRm;
+    const char *seedE;
+    const char *seedR;
+    const char *psk_id;
     const char *psk;
+
     int nencs;
     hpke_tv_encs_t *encs;
     void *jobj;  ///< pointer to json-c object into which the char* pointers above point

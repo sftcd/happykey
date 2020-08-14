@@ -165,23 +165,24 @@ int hpke_tv_load(char *fname, int *nelems, hpke_tv_t **array)
         json_object_object_foreach(tmp, key, val) {
 
             grabnum(mode)
-            grabnum(kdfID)
-            grabnum(aeadID)
-            grabnum(kemID)
-            grabstr(context)
-            grabstr(skI)
-            grabstr(pkI)
-            grabstr(zz)
-            grabstr(secret)
-            grabstr(enc)
+            grabnum(kdf_id)
+            grabnum(aead_id)
+            grabnum(kem_id)
+
             grabstr(info)
-            grabstr(pskID)
+            grabstr(exporter_secret)
+            grabstr(enc)
+            grabstr(key_schedule_context)
             grabstr(nonce)
-            grabstr(key)
-            grabstr(pkR)
-            grabstr(pkE)
-            grabstr(skR)
-            grabstr(skE)
+            grabstr(secret)
+            grabstr(shared_secret)
+            grabstr(skEm)
+            grabstr(skRm)
+            grabstr(pkEm)
+            grabstr(pkRm)
+            grabstr(seedE)
+            grabstr(seedR)
+            grabstr(psk_id)
             grabstr(psk)
 
             if (!strcmp(key,"encryptions")) {
@@ -191,6 +192,7 @@ int hpke_tv_load(char *fname, int *nelems, hpke_tv_t **array)
                     json_object *tmp1 = json_object_array_get_idx(val, j);
                     json_object_object_foreach(tmp1, key1, val1) {
                         grabestr(aad)
+                        grabestr(nonce)
                         grabestr(plaintext)
                         grabestr(ciphertext)
                     }
@@ -213,11 +215,11 @@ int hpke_tv_load(char *fname, int *nelems, hpke_tv_t **array)
      * really used. So keep this code for a bit.
      */
     for (i=0;i!=*nelems;i++) {
-        if (thearr[i].kemID==0x01) {
+        if (thearr[i].kem_id==0x01) {
             /* we don't really want uncompressed points */
             /* this is utterly messing about ... */
-            if (thearr[i].pkR) {
-                thearr[i].pkR=u2c_transform(thearr[i].pkR);
+            if (thearr[i].pkRm) {
+                thearr[i].pkRm=u2c_transform(thearr[i].pkRm);
             }
             if (thearr[1].pkI) {
                 thearr[i].pkI=u2c_transform(thearr[i].pkI);
@@ -264,24 +266,27 @@ void hpke_tv_print(int nelems, hpke_tv_t *array)
     if (!array) return;
     for (int i=0;i!=nelems;i++) {
         printf("Test Vector Element %d of %d\n",i+1,nelems);
-        printf("\tmode: %d, kem: %d, kdf: %d, aead: %d\n",a->mode,a->kemID,a->kdfID,a->aeadID);
-        PRINTIT(pkR);
-        PRINTIT(skR)
-        PRINTIT(pkE)
-        PRINTIT(skE)
-        PRINTIT(zz)
-        PRINTIT(enc)
+        printf("\tmode: %d, kem: %d, kdf: %d, aead: %d\n",a->mode,a->kem_id,a->kdf_id,a->aead_id);
+
+
         PRINTIT(info)
-        PRINTIT(pskID)
-        PRINTIT(psk)
-        PRINTIT(pkI)
-        PRINTIT(skI)
-        PRINTIT(context);
-        PRINTIT(secret)
+        PRINTIT(exporter_secret)
+        PRINTIT(enc)
+        PRINTIT(key_schedule_context)
         PRINTIT(nonce)
-        PRINTIT(key)
+        PRINTIT(secret)
+        PRINTIT(shared_secret)
+        PRINTIT(skEm)
+        PRINTIT(skRm)
+        PRINTIT(pkEm)
+        PRINTIT(pkRm)
+        PRINTIT(seedE)
+        PRINTIT(seedR)
+        PRINTIT(psk_id)
+        PRINTIT(psk)
         if (a->encs) {
             printf("\taad: %s\n",a->encs[0].aad);
+            printf("\tplaintext: %s\n",a->encs[0].nonce);
             printf("\tplaintext: %s\n",a->encs[0].plaintext);
             printf("\tciphertext: %s\n",a->encs[0].ciphertext);
         }
@@ -300,14 +305,14 @@ void hpke_tv_print(int nelems, hpke_tv_t *array)
  * @return 1 for match zero otherwise
  *
  * For now, this just matches the first <mode>,default-suite
- * test vecctor.
+ * test vector.
  */
 static int hpke_tv_match(unsigned int mode, hpke_suite_t suite,hpke_tv_t *a)
 {
     if (a && a->mode==mode &&
-        a->kdfID==suite.kdf_id && 
-        a->kemID==suite.kem_id && 
-        a->aeadID==suite.aead_id ) return(1);
+        a->kdf_id==suite.kdf_id && 
+        a->kem_id==suite.kem_id && 
+        a->aead_id==suite.aead_id ) return(1);
     return(0);
 }
 

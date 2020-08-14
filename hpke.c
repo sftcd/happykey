@@ -44,7 +44,7 @@
  * Define this if you want loads printing of intermediate
  * cryptographic values
  */
-#undef SUPERVERBOSE
+#define SUPERVERBOSE
 
 #if defined(SUPERVERBOSE) || defined(TESTVECTORS)
 unsigned char *pbuf; ///< global var for debug printing
@@ -148,14 +148,24 @@ hpke_kem_info_t hpke_kem_tab[]={
 
 /*
  * @brief table of KEM strings
+ *
+ * Note: This also need blanks
  */
 const char *hpke_kem_strtab[]={
-    NULL,
+    NULL,NULL,NULL,NULL,
+    NULL,NULL,NULL,NULL,
+    NULL,NULL,NULL,NULL,
+    NULL,NULL,NULL,NULL,
     HPKE_KEMSTR_P256,
     HPKE_KEMSTR_P384,
     HPKE_KEMSTR_P521,
+    NULL,
+    NULL,NULL,NULL,NULL,
+    NULL,NULL,NULL,NULL,
+    NULL,NULL,NULL,NULL,
     HPKE_KEMSTR_X25519,
-    HPKE_KEMSTR_X448};
+    HPKE_KEMSTR_X448,
+    NULL};
 
 /*!
  * @brief info about a KDF
@@ -601,7 +611,7 @@ err:
 
 #define HPKE_5869_MODE_PURE 0 ///< Do "pure" RFC5869
 #define HPKE_5869_MODE_KEM  1 ///< Abide by HPKE section 4.1
-#define HPKE_6859_MODE_FULL 2 ///< Abide by HPKE section 5.1
+#define HPKE_5869_MODE_FULL 2 ///< Abide by HPKE section 5.1
 
 #define HPKE_VERLABEL    "HPKE-05 "  ///< The version string label
 #define HPKE_SEC41LABEL  "KEM"       ///< The "suite_id" label for 4.1
@@ -631,7 +641,7 @@ err:
  * - HPKE_5869_MODE_KEM meaning to follow section 4.1
  * where the suite_id is used as:
  *   concat("KEM", I2OSP(kem_id, 2))
- * - HPKE_6859_MODE_FULL meaning to follow section 5.1
+ * - HPKE_5869_MODE_FULL meaning to follow section 5.1
  * where the suite_id is used as:
  *   concat("HPKE",I2OSP(kem_id, 2),
  *          I2OSP(kdf_id, 2), I2OSP(aead_id, 2))
@@ -682,7 +692,7 @@ static int hpke_extract(
             if (concat_offset>=HPKE_MAXSIZE) { erv=__LINE__; goto err; }
             labeled_ikmlen=concat_offset;
             break;
-        case HPKE_6859_MODE_FULL:
+        case HPKE_5869_MODE_FULL:
             concat_offset=0;
             memcpy(labeled_ikm,HPKE_VERLABEL,strlen(HPKE_VERLABEL)); 
             concat_offset+=strlen(HPKE_VERLABEL);
@@ -816,7 +826,7 @@ static int hpke_expand(hpke_suite_t suite, int mode5869,
             if (concat_offset>=HPKE_MAXSIZE) { erv=__LINE__; goto err; }
             break;
 
-        case HPKE_6859_MODE_FULL:
+        case HPKE_5869_MODE_FULL:
             lip[0]=(L/256)%256;
             lip[1]=L%256;
             concat_offset=2;
@@ -1361,7 +1371,7 @@ int hpke_enc(
      * The plan:
      * 0. Initialise peer's key from string
      * 1. generate sender's key pair
-     * 2. run DH KEM to get zz
+     * 2. run DH KEM to get dh
      * 3. create context buffer
      * 4. extracts and expands as needed
      * 5. call the AEAD 
@@ -1375,8 +1385,8 @@ int hpke_enc(
     EVP_PKEY *pkR=NULL;
     EVP_PKEY *pkE=NULL;
     EVP_PKEY *skI=NULL;
-    size_t  zzlen=0;
-    unsigned char *zz=NULL;
+    size_t  dhlen=0;
+    unsigned char *dh=NULL;
     size_t  enclen=0;
     unsigned char *enc=NULL;
     size_t  contextlen=0;
@@ -1401,7 +1411,7 @@ int hpke_enc(
         erv=__LINE__; goto err;
     }
 
-    /* step 1. generate sender's key pair */
+    /* step 1. generate sender's key pair: skE, pkE */
     pctx = EVP_PKEY_CTX_new(pkR, NULL);
     if (pctx == NULL) {
         erv=__LINE__; goto err;
@@ -1415,16 +1425,16 @@ int hpke_enc(
          * Read DH private from tv, then use that instead of 
          * a newly generated key pair
          */
-        if (hpke_kem_id_check(ltv->kemID)!=1) return(__LINE__);
+        if (hpke_kem_id_check(ltv->kem_id)!=1) return(__LINE__);
         unsigned char *bin_skE=NULL;
         size_t bin_skElen=0;
-        if (1!=hpke_ah_decode(strlen(ltv->skE),ltv->skE,&bin_skElen,&bin_skE)) { 
+        if (1!=hpke_ah_decode(strlen(ltv->skEm),ltv->skEm,&bin_skElen,&bin_skE)) { 
             erv=__LINE__; goto err; 
         }
-        if (hpke_kem_id_nist_curve(ltv->kemID)==1) {
-            pkE = hpke_EVP_PKEY_new_raw_nist_private_key(hpke_kem_tab[ltv->kemID].groupid,bin_skE,bin_skElen);
+        if (hpke_kem_id_nist_curve(ltv->kem_id)==1) {
+            pkE = hpke_EVP_PKEY_new_raw_nist_private_key(hpke_kem_tab[ltv->kem_id].groupid,bin_skE,bin_skElen);
         } else {
-            pkE = EVP_PKEY_new_raw_private_key(hpke_kem_tab[ltv->kemID].groupid,NULL,bin_skE,bin_skElen);
+            pkE = EVP_PKEY_new_raw_private_key(hpke_kem_tab[ltv->kem_id].groupid,NULL,bin_skE,bin_skElen);
         }
         if (!pkE) { erv=__LINE__; goto err; }
         OPENSSL_free(bin_skE);
@@ -1436,13 +1446,13 @@ int hpke_enc(
     }
     EVP_PKEY_CTX_free(pctx); pctx=NULL;
 
-    /* step 2 run DH KEM to get zz */
-    erv=hpke_do_kem(pkE,pkR,&zz,&zzlen);
+    /* step 2 run DH KEM to get dh */
+    erv=hpke_do_kem(pkE,pkR,&dh,&dhlen);
     if (erv!=1) {
         goto err;
     }
 
-    /* get 2nd half of zz if using an auth mode */
+    /* get 2nd half of dh if using an auth mode */
     if (mode==HPKE_MODE_AUTH||mode==HPKE_MODE_PSKAUTH) {
         if (hpke_kem_tab[suite.kem_id].Npriv==privlen) {
             if (hpke_kem_id_nist_curve(suite.kem_id)==1) {
@@ -1467,24 +1477,24 @@ int hpke_enc(
             }
         }
 
-        /* step 2.5 run DH KEM again to get 2nd half of zz */
-        unsigned char *zz2=NULL;
-        size_t zzlen2=0;
-        erv=hpke_do_kem(skI,pkR,&zz2,&zzlen2);
+        /* step 2.5 run DH KEM again to get 2nd half of dh */
+        unsigned char *dh2=NULL;
+        size_t dhlen2=0;
+        erv=hpke_do_kem(skI,pkR,&dh2,&dhlen2);
         if (erv!=1) {
             goto err;
         }
-        unsigned char *zzboth=OPENSSL_malloc(zzlen+zzlen2);
-        if (!zzboth) {
-            OPENSSL_free(zz2);
+        unsigned char *dhboth=OPENSSL_malloc(dhlen+dhlen2);
+        if (!dhboth) {
+            OPENSSL_free(dh2);
             erv=__LINE__; goto err;
         }
-        memcpy(zzboth,zz,zzlen);
-        memcpy(zzboth+zzlen,zz2,zzlen2);
-        OPENSSL_free(zz2);
-        OPENSSL_free(zz);
-        zz=zzboth;
-        zzlen=zzlen+zzlen2;
+        memcpy(dhboth,dh,dhlen);
+        memcpy(dhboth+dhlen,dh2,dhlen2);
+        OPENSSL_free(dh2);
+        OPENSSL_free(dh);
+        dh=dhboth;
+        dhlen=dhlen+dhlen2;
 
         /* set the public part of skI to be included in context */
         pkI_buflen=EVP_PKEY_get1_tls_encodedpoint(skI,&pkI_buf); 
@@ -1508,8 +1518,9 @@ int hpke_enc(
 #ifdef TESTVECTORS
     hpke_test_expand_extract();
 #endif
+#ifdef DRAFT_02
     /*
-     * secret = Extract(psk, zz)
+     * secret = Extract(psk, dh)
      * unless otherwise specified psk is 32 octets of zero
      */
     size_t IKM_len=hpke_kdf_tab[suite.kdf_id].Nh;
@@ -1521,7 +1532,8 @@ int hpke_enc(
         IKM=psk;
         IKM_len=psklen;
     }
-    if (hpke_extract(suite,HPKE_5869_MODE_PURE,IKM,IKM_len,zz,zzlen,"",0,secret,&secretlen)!=1) {
+    
+    if (hpke_extract(suite,HPKE_5869_MODE_FULL,IKM,IKM_len,dh,dhlen,"",0,secret,&secretlen)!=1) {
         erv=__LINE__; goto err;
     }
     if (secretlen!=hpke_kdf_tab[suite.kdf_id].Nh) {
@@ -1537,6 +1549,22 @@ int hpke_enc(
     if (keylen!=hpke_aead_tab[suite.aead_id].Nk) {
         erv=__LINE__; goto err;
     }
+#endif
+#define DRAFT_05
+
+#ifdef DRAFT_05
+    /*
+     * ExtractAndExpand
+     */
+    keylen=hpke_kdf_tab[suite.kdf_id].Nh;
+    if (keylen>SHA512_DIGEST_LENGTH) {
+        erv=__LINE__; goto err;
+    }
+    if (hpke_extract_and_expand(suite,HPKE_5869_MODE_FULL,dh,dhlen,context,contextlen,key,&keylen)!=1) {
+        erv=__LINE__; goto err;
+    }
+#endif
+
     /*
      * nonce = Expand(secret, concat("hpke nonce", context), Nn)
     */
@@ -1591,7 +1619,7 @@ int hpke_enc(
         if (mode==HPKE_MODE_AUTH || mode==HPKE_MODE_PSKAUTH) {
             pblen = EVP_PKEY_get1_tls_encodedpoint(skI,&pbuf); hpke_pbuf(stdout,"\tpkI",pbuf,pblen); if (pblen) OPENSSL_free(pbuf);
         }
-        hpke_pbuf(stdout,"\tzz",zz,zzlen);
+        hpke_pbuf(stdout,"\tdh",dh,dhlen);
         hpke_pbuf(stdout,"\tenc",enc,enclen);
         hpke_pbuf(stdout,"\tinfo",info,infolen);
         hpke_pbuf(stdout,"\tcontext",context,contextlen);
@@ -1643,7 +1671,7 @@ err:
     } else { 
         fprintf(stdout,"\tskI is NULL\n"); 
     }
-    hpke_pbuf(stdout,"\tzz",zz,zzlen);
+    hpke_pbuf(stdout,"\tdh",dh,dhlen);
     hpke_pbuf(stdout,"\tcontext",context,contextlen);
     hpke_pbuf(stdout,"\tsecret",secret,secretlen);
     hpke_pbuf(stdout,"\tenc",enc,enclen);
@@ -1668,7 +1696,7 @@ err:
     if (skI!=NULL) EVP_PKEY_free(skI);
     if (pkI_buf!=NULL) OPENSSL_free(pkI_buf);
     if (pctx!=NULL) EVP_PKEY_CTX_free(pctx);
-    if (zz!=NULL) OPENSSL_free(zz);
+    if (dh!=NULL) OPENSSL_free(dh);
     if (enc!=NULL) OPENSSL_free(enc);
     if (context!=NULL) OPENSSL_free(context);
     return erv;
@@ -1725,7 +1753,7 @@ int hpke_dec(
      * The plan:
      * 0. Initialise peer's key from string
      * 1. load decryptors private key
-     * 2. run DH KEM to get zz
+     * 2. run DH KEM to get dh
      * 3. create context buffer
      * 4. extracts and expands as needed
      * 5. call the AEAD 
@@ -1737,8 +1765,8 @@ int hpke_dec(
     EVP_PKEY *skR=NULL;
     EVP_PKEY *pkE=NULL;
     EVP_PKEY *pkI=NULL;
-    size_t  zzlen=0;
-    unsigned char *zz=NULL;
+    size_t  dhlen=0;
+    unsigned char *dh=NULL;
     size_t  contextlen=0;
     unsigned char *context=NULL;
     size_t  secretlen=HPKE_MAXSIZE;
@@ -1787,8 +1815,8 @@ int hpke_dec(
         skR=evppriv;
     }
 
-    /* step 2 run DH KEM to get zz */
-    erv=hpke_do_kem(skR,pkE,&zz,&zzlen);
+    /* step 2 run DH KEM to get dh */
+    erv=hpke_do_kem(skR,pkE,&dh,&dhlen);
     if (erv!=1) {
         goto err;
     }
@@ -1801,7 +1829,7 @@ int hpke_dec(
 
     if (mode==HPKE_MODE_AUTH||mode==HPKE_MODE_PSKAUTH) {
 
-        /* step 2.5 run DH KEM again to get 2nd half of zz */
+        /* step 2.5 run DH KEM again to get 2nd half of dh */
         if (hpke_kem_id_nist_curve(suite.kem_id)==1) {
             pkI = hpke_EVP_PKEY_new_raw_nist_public_key(hpke_kem_tab[suite.kem_id].groupid,pub,publen);
         } else {
@@ -1810,23 +1838,23 @@ int hpke_dec(
         if (pkI == NULL) {
             erv=__LINE__; goto err;
         }
-        unsigned char *zz2=NULL;
-        size_t zzlen2=0;
-        erv=hpke_do_kem(skR,pkI,&zz2,&zzlen2);
+        unsigned char *dh2=NULL;
+        size_t dhlen2=0;
+        erv=hpke_do_kem(skR,pkI,&dh2,&dhlen2);
         if (erv!=1) {
             goto err;
         }
-        unsigned char *zzboth=OPENSSL_malloc(zzlen+zzlen2);
-        if (!zzboth) {
-            OPENSSL_free(zz2);
+        unsigned char *dhboth=OPENSSL_malloc(dhlen+dhlen2);
+        if (!dhboth) {
+            OPENSSL_free(dh2);
             erv=__LINE__; goto err;
         }
-        memcpy(zzboth,zz,zzlen);
-        memcpy(zzboth+zzlen,zz2,zzlen2);
-        OPENSSL_free(zz2);
-        OPENSSL_free(zz);
-        zz=zzboth;
-        zzlen=zzlen+zzlen2;
+        memcpy(dhboth,dh,dhlen);
+        memcpy(dhboth+dhlen,dh2,dhlen2);
+        OPENSSL_free(dh2);
+        OPENSSL_free(dh);
+        dh=dhboth;
+        dhlen=dhlen+dhlen2;
 
         /* feed public into context */
         otherpub=pub;
@@ -1842,8 +1870,9 @@ int hpke_dec(
             &context,&contextlen);
 
     /* step 4. extracts and expands as needed */
+#ifdef DRAFT_02
     /*
-     * secret = Extract(psk, zz)
+     * secret = Extract(psk, dh)
      * in my case psk is 32 octets of zero
      */
     size_t IKM_len=hpke_kdf_tab[suite.kdf_id].Nh;
@@ -1855,7 +1884,7 @@ int hpke_dec(
         IKM=psk;
         IKM_len=psklen;
     }
-    if (hpke_extract(suite,HPKE_5869_MODE_PURE,IKM,IKM_len,zz,zzlen,"",0,secret,&secretlen)!=1) {
+    if (hpke_extract(suite,HPKE_5869_MODE_FULL,IKM,IKM_len,dh,dhlen,"",0,secret,&secretlen)!=1) {
         erv=__LINE__; goto err;
     }
     if (secretlen!=hpke_kdf_tab[suite.kdf_id].Nh) {
@@ -1871,6 +1900,21 @@ int hpke_dec(
     if (keylen!=hpke_aead_tab[suite.aead_id].Nk) {
         erv=__LINE__; goto err;
     }
+#endif
+
+#ifdef DRAFT_05
+    /*
+     * ExtractAndExpand
+     */
+    keylen=hpke_kdf_tab[suite.kdf_id].Nh;
+    if (keylen>SHA512_DIGEST_LENGTH) {
+        erv=__LINE__; goto err;
+    }
+    if (hpke_extract_and_expand(suite,HPKE_5869_MODE_FULL,dh,dhlen,context,contextlen,key,&keylen)!=1) {
+        erv=__LINE__; goto err;
+    }
+#endif
+
     /*
      * nonce = Expand(secret, concat("hpke nonce", context), Nn)
     */
@@ -1936,7 +1980,7 @@ err:
         fprintf(stdout,"\tskI is NULL\n"); 
     }
  
-    hpke_pbuf(stdout,"\tzz",zz,zzlen);
+    hpke_pbuf(stdout,"\tdh",dh,dhlen);
     hpke_pbuf(stdout,"\tcontext",context,contextlen);
     hpke_pbuf(stdout,"\tsecret",secret,secretlen);
     hpke_pbuf(stdout,"\tenc",enc,enclen);
@@ -1958,7 +2002,7 @@ err:
     if (pkE!=NULL) EVP_PKEY_free(pkE);
     if (pkI!=NULL) EVP_PKEY_free(pkI);
     if (pctx!=NULL) EVP_PKEY_CTX_free(pctx);
-    if (zz!=NULL) OPENSSL_free(zz);
+    if (dh!=NULL) OPENSSL_free(dh);
     if (context!=NULL) OPENSSL_free(context);
     if (mypub!=NULL) OPENSSL_free(mypub);
     return erv;
