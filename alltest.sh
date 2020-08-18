@@ -159,7 +159,7 @@ do
                                 ores=1
                                 failed=$((failed+1))
                             else
-                                echo "$mode,$kem,$kdf,$aead DECRYPT failed as planned"
+                                #echo "$mode,$kem,$kdf,$aead DECRYPT failed as planned"
                                 passed=$((passed+1))
                             fi
                         fi

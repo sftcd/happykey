@@ -286,7 +286,7 @@ void hpke_tv_print(int nelems, hpke_tv_t *array)
         PRINTIT(psk)
         if (a->encs) {
             printf("\taad: %s\n",a->encs[0].aad);
-            printf("\tplaintext: %s\n",a->encs[0].nonce);
+            printf("\tnonce: %s\n",a->encs[0].nonce);
             printf("\tplaintext: %s\n",a->encs[0].plaintext);
             printf("\tciphertext: %s\n",a->encs[0].ciphertext);
         }
@@ -341,11 +341,13 @@ int hpke_tv_pick(unsigned int mode, hpke_suite_t suite, int nelems, hpke_tv_t *a
     memset(resarr,0,nelems*sizeof(hpke_tv_t*));
     int mind=0;
     int gotmatch=0;
+    int lastmatch=-1;
     int i=0;
     for (i=0;i!=nelems;i++) {
         if (hpke_tv_match(mode,suite,a)) {
             resarr[mind++]=a;
-            gotmatch=i;
+            gotmatch=1;
+            lastmatch=i;
         }
         a++;
     }
@@ -353,6 +355,9 @@ int hpke_tv_pick(unsigned int mode, hpke_suite_t suite, int nelems, hpke_tv_t *a
         free(resarr);
         return(0);
     }
+    /*
+     * We expect exactly one match but just in case...
+     */
     if (mind==1) {
         *tv=resarr[0];
         free(resarr);
@@ -360,7 +365,7 @@ int hpke_tv_pick(unsigned int mode, hpke_suite_t suite, int nelems, hpke_tv_t *a
     }
     *tv=resarr[0];
     free(resarr);
-    printf("Got %d matches, last at %d\n",mind,gotmatch);
+    printf("Got %d matches, last at %d, taking 1st\n",mind,lastmatch);
     return(1);
 }
 

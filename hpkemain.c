@@ -764,7 +764,10 @@ int main(int argc, char **argv)
                             tv->encs[0].ciphertext,
                             &bcipherlen,
                             &bcipher);
-                if (bcipherlen!=cipherlen) {
+                if ((cipherlen==0 || cipherlen==HPKE_MAXSIZE) || cipher==NULL) { 
+                    printf("Re-generated ciphertext is NULL sorry. \n");
+                    goodres=0;
+                } else if (bcipherlen!=cipherlen) {
                     printf("Ciphertext output lengths differ: %lu vs %lu\n",
                             (unsigned long)bcipherlen,(unsigned long)cipherlen);
                     goodres=0;
