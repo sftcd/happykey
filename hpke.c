@@ -1445,6 +1445,10 @@ int hpke_enc(
     unsigned char psk_hash[HPKE_MAXSIZE];
     size_t  noncelen=HPKE_MAXSIZE;
     unsigned char nonce[HPKE_MAXSIZE];
+    size_t  keylen=HPKE_MAXSIZE;
+    unsigned char key[HPKE_MAXSIZE];
+    size_t  exporterlen=HPKE_MAXSIZE;
+    unsigned char exporter[HPKE_MAXSIZE];
     size_t pkI_buflen=0;
     unsigned char *pkI_buf=NULL;
     BIO *bfp=NULL;
@@ -1604,11 +1608,40 @@ int hpke_enc(
 
     noncelen=hpke_aead_tab[suite.aead_id].Nn;
     if (hpke_expand(suite,HPKE_5869_MODE_FULL,
-                    psk_hash,psk_hashlen,
-                    "nonce",strlen("nonce"),
                     secret,secretlen,
-                    noncelen,
-                    nonce,&noncelen)!=1) {
+                    "nonce",strlen("nonce"),
+                    ks_context,ks_contextlen,
+                    noncelen,nonce,&noncelen)!=1) {
+        erv=__LINE__; goto err;
+    }
+    if (noncelen!=12) {
+        erv=__LINE__; goto err;
+    }
+
+    keylen=hpke_aead_tab[suite.aead_id].Nk;
+    if (hpke_expand(suite,HPKE_5869_MODE_FULL,
+                    secret,secretlen,
+                    "key",strlen("key"),
+                    ks_context,ks_contextlen,
+                    keylen,key,&keylen)!=1) {
+        erv=__LINE__; goto err;
+    }
+
+    exporterlen=hpke_kdf_tab[suite.kdf_id].Nh;
+    if (hpke_expand(suite,HPKE_5869_MODE_FULL,
+                    secret,secretlen,
+                    "exp",strlen("exp"),
+                    ks_context,ks_contextlen,
+                    exporterlen,exporter,&exporterlen)!=1) {
+        erv=__LINE__; goto err;
+    }
+
+    noncelen=hpke_aead_tab[suite.aead_id].Nn;
+    if (hpke_expand(suite,HPKE_5869_MODE_FULL,
+                    secret,secretlen,
+                    "nonce",strlen("nonce"),
+                    ks_context,ks_contextlen,
+                    noncelen,nonce,&noncelen)!=1) {
         erv=__LINE__; goto err;
     }
     if (noncelen!=12) {
@@ -1620,7 +1653,7 @@ int hpke_enc(
     unsigned char lcipher[HPKE_MAXSIZE];
     int arv=hpke_aead_enc(
                 suite,
-                secret,secretlen,
+                key,keylen,
                 nonce,noncelen,
                 aad,aadlen,
                 clear,clearlen,
@@ -1683,6 +1716,8 @@ err:
     hpke_pbuf(stdout,"\tinfo",info,infolen);
     hpke_pbuf(stdout,"\taad",aad,aadlen);
     hpke_pbuf(stdout,"\tnonce",nonce,noncelen);
+    hpke_pbuf(stdout,"\tkey",key,keylen);
+    hpke_pbuf(stdout,"\texporter",exporter,exporterlen);
     hpke_pbuf(stdout,"\tplaintext",clear,clearlen);
     hpke_pbuf(stdout,"\tciphertext",cipher,*cipherlen);
     if (mode==HPKE_MODE_PSK || mode==HPKE_MODE_PSKAUTH) {

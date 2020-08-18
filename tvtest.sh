@@ -37,6 +37,11 @@ then
     exit 2
 fi
 
+goodcnt=0
+badcnt=0
+notvcnt=0
+verbose="no"
+
 for mode in base psk auth pskauth
 do
 	for kem in 0x10 0x11 0x12 0x20 0x21
@@ -45,15 +50,32 @@ do
 	    do
 	        for aead in 1 2 3 
 	        do
-	            $BINDIR/hpkemain -T -m $mode -c $kem,$kdf,$aead >/dev/null 
+	            $BINDIR/hpkemain -T -m $mode -c $kem,$kdf,$aead >/dev/null 2>&1 
 	            res=$?
 	            if [[ "$res" == "0" ]]
 	            then
-	                echo "$mode,$kem,$kdf,$aead is good"
+                    if [[ "$verbose" == "yes" ]]
+                    then
+	                    echo "$mode,$kem,$kdf,$aead is good"
+                    fi
+                    goodcnt=$((goodcnt+1))
+                elif [[ "$res" == "2" ]]
+                then
+                    if [[ "$verbose" == "yes" ]]
+                    then
+	                    echo "No test vector for: $mode,$kem,$kdf,$aead"
+                    fi
+                    notvcnt=$((notvcnt+1))
 	            else
-	                echo "$mode,$kem,$kdf,$aead is BAD!"
+                    if [[ "$verbose" == "yes" ]]
+                    then
+	                    echo "$mode,$kem,$kdf,$aead is BAD!"
+                    fi
+                    badcnt=$((badcnt+1))
 	            fi
 	        done
 	    done
 	done
 done
+
+echo "Good: $goodcnt, Bad: $badcnt, No test vector: $notvcnt"
