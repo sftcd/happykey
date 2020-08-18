@@ -49,7 +49,7 @@
  * Define this if you want loads printing of intermediate
  * cryptographic values
  */
-#undef SUPERVERBOSE
+#define SUPERVERBOSE
 
 #if defined(SUPERVERBOSE) || defined(TESTVECTORS)
 unsigned char *pbuf; ///< global var for debug printing
@@ -541,7 +541,7 @@ static int hpke_aead_enc(
     unsigned char *ciphertext=NULL;
     size_t taglen=hpke_aead_tab[suite.aead_id].taglen;
     unsigned char tag[taglen];
-    if (taglen+plainlen>*cipherlen) {
+    if ((taglen+plainlen)>*cipherlen) {
         erv=__LINE__; goto err;
     }
     /*
@@ -1410,7 +1410,7 @@ int hpke_enc(
     if ((mode==HPKE_MODE_PSK || mode==HPKE_MODE_PSKAUTH) && (!psk || psklen==0 || !pskid)) return(__LINE__);
 
     int erv=1; /* Our error return value - 1 is success */
-#ifdef TESTVECTORS
+#if defined(SUPERVERBOSE) || defined(TESTVECTORS)
     hpke_tv_t *ltv=(hpke_tv_t*)tv;
     printf("Encrypting:\n");
 #endif
@@ -1449,8 +1449,8 @@ int hpke_enc(
     unsigned char key[HPKE_MAXSIZE];
     size_t  exporterlen=HPKE_MAXSIZE;
     unsigned char exporter[HPKE_MAXSIZE];
-    size_t pkI_buflen=0;
-    unsigned char *pkI_buf=NULL;
+    size_t  mypublen=0;
+    unsigned char *mypub=NULL;
     BIO *bfp=NULL;
 
     /* step 0. Initialise peer's key from string */
@@ -1504,6 +1504,14 @@ int hpke_enc(
         erv=__LINE__; goto err;
     }
     
+
+#if defined(SUPERVERBOSE) || defined(TESTVECTORS)
+    size_t revkemlen=0;
+    unsigned char *revkem;
+    erv=hpke_do_kem(suite,pkE,publen,pub,pkR,enclen,enc,&revkem,&revkemlen);
+    hpke_pbuf(stdout,"\trevkem",revkem,revkemlen);
+#endif
+
     erv=hpke_do_kem(suite,pkE,enclen,enc,pkR,publen,pub,&shared_secret,&shared_secretlen);
     if (erv!=1) {
         goto err;
@@ -1533,11 +1541,15 @@ int hpke_enc(
                 erv=__LINE__; goto err;
             }
         }
+        mypublen=EVP_PKEY_get1_tls_encodedpoint(skI,&mypub);
+        if (mypub==NULL || mypublen == 0) {
+            erv=__LINE__; goto err;
+        }
 
         /* step 2.5 run DH KEM again to get 2nd half of dh */
         unsigned char *shared_secret2=NULL;
         size_t shared_secretlen2=0;
-        erv=hpke_do_kem(suite,skI,privlen,priv,pkR,publen,pub,&shared_secret2,&shared_secretlen2);
+        erv=hpke_do_kem(suite,skI,mypublen,mypub,pkR,publen,pub,&shared_secret2,&shared_secretlen2);
         if (erv!=1) {
             goto err;
         }
@@ -1553,8 +1565,6 @@ int hpke_enc(
         shared_secret=shared_secretboth;
         shared_secretlen=shared_secretlen+shared_secretlen2;
 
-        /* set the public part of skI to be included in context */
-        pkI_buflen=EVP_PKEY_get1_tls_encodedpoint(skI,&pkI_buf); 
     } 
 
     /* step 3. create context buffer */
@@ -1583,6 +1593,7 @@ int hpke_enc(
 #ifdef TESTVECTORS
     hpke_test_expand_extract();
 #endif
+
     /*
      * Extract secret and Expand variously...
      */
@@ -1605,7 +1616,6 @@ int hpke_enc(
                     secret,&secretlen)!=1) {
         erv=__LINE__; goto err;
     }
-
     noncelen=hpke_aead_tab[suite.aead_id].Nn;
     if (hpke_expand(suite,HPKE_5869_MODE_FULL,
                     secret,secretlen,
@@ -1617,7 +1627,6 @@ int hpke_enc(
     if (noncelen!=12) {
         erv=__LINE__; goto err;
     }
-
     keylen=hpke_aead_tab[suite.aead_id].Nk;
     if (hpke_expand(suite,HPKE_5869_MODE_FULL,
                     secret,secretlen,
@@ -1626,7 +1635,6 @@ int hpke_enc(
                     keylen,key,&keylen)!=1) {
         erv=__LINE__; goto err;
     }
-
     exporterlen=hpke_kdf_tab[suite.kdf_id].Nh;
     if (hpke_expand(suite,HPKE_5869_MODE_FULL,
                     secret,secretlen,
@@ -1635,7 +1643,6 @@ int hpke_enc(
                     exporterlen,exporter,&exporterlen)!=1) {
         erv=__LINE__; goto err;
     }
-
     noncelen=hpke_aead_tab[suite.aead_id].Nn;
     if (hpke_expand(suite,HPKE_5869_MODE_FULL,
                     secret,secretlen,
@@ -1679,9 +1686,6 @@ err:
 
 #if defined(SUPERVERBOSE) || defined(TESTVECTORS)
 
-#ifdef TESTVECTORS
-    if (ltv) {
-#endif
     printf("\tmode: %s (%d), kem: %s (%d), kdf: %s (%d), aead: %s (%d)\n",
                 hpke_mode_strtab[mode],mode,
                 hpke_kem_strtab[suite.kem_id],suite.kem_id,
@@ -1724,16 +1728,12 @@ err:
         fprintf(stdout,"\tpskid: %s\n",pskid);
         hpke_pbuf(stdout,"\tpsk",psk,psklen);
     }
-#ifdef TESTVECTORS
-    }
-#endif
 #endif
 
     if (bfp!=NULL) BIO_free_all(bfp);
     if (pkR!=NULL) EVP_PKEY_free(pkR);
     if (pkE!=NULL) EVP_PKEY_free(pkE);
     if (skI!=NULL) EVP_PKEY_free(skI);
-    if (pkI_buf!=NULL) OPENSSL_free(pkI_buf);
     if (pctx!=NULL) EVP_PKEY_CTX_free(pctx);
     if (shared_secret!=NULL) OPENSSL_free(shared_secret);
     if (enc!=NULL) OPENSSL_free(enc);
@@ -1809,15 +1809,23 @@ int hpke_dec(
     unsigned char ks_context[HPKE_MAXSIZE];
     size_t  secretlen=HPKE_MAXSIZE;
     unsigned char secret[HPKE_MAXSIZE];
-    size_t  keylen=HPKE_MAXSIZE;
-    unsigned char key[HPKE_MAXSIZE];
     size_t  noncelen=HPKE_MAXSIZE;
     unsigned char nonce[HPKE_MAXSIZE];
+    size_t  psk_hashlen=HPKE_MAXSIZE;
+    unsigned char psk_hash[HPKE_MAXSIZE];
+    size_t  keylen=HPKE_MAXSIZE;
+    unsigned char key[HPKE_MAXSIZE];
+    size_t  exporterlen=HPKE_MAXSIZE;
+    unsigned char exporter[HPKE_MAXSIZE];
     size_t  mypublen=0;
     unsigned char *mypub=NULL;
     size_t  otherpublen=0;
     unsigned char *otherpub=NULL;
     BIO *bfp=NULL;
+
+#if defined(SUPERVERBOSE) || defined(TESTVECTORS)
+    printf("Decrypting:\n");
+#endif
 
     /* step 0. Initialise peer's key from string */
     if (hpke_kem_id_nist_curve(suite.kem_id)==1) {
@@ -1858,7 +1866,17 @@ int hpke_dec(
     if (mypub==NULL || mypublen == 0) {
         erv=__LINE__; goto err;
     }
-    erv=hpke_do_kem(suite,skR,mypublen,mypub,pkE,enclen,enc,&shared_secret,&shared_secretlen);
+    /*
+     * The enclen,enc and mypublen,mypub inputs below are "backwards" i.e.
+     * enc goes with pkE and mypub goes with skR - but inputting them that
+     * way gives us the correct kem_context without having to add another
+     * parameter to signal if encrypting or decrypting (though I might do
+     * that later as this is hacky).
+     * The upshot is that you supply the parameters in a different order
+     * when encrypting and decrypting.
+     * The same hack is done for the call for auth modes below.
+     */
+    erv=hpke_do_kem(suite,skR,enclen,enc,pkE,mypublen,mypub,&shared_secret,&shared_secretlen);
     if (erv!=1) {
         goto err;
     }
@@ -1878,7 +1896,7 @@ int hpke_dec(
         }
         unsigned char *shared_secret2=NULL;
         size_t shared_secretlen2=0;
-        erv=hpke_do_kem(suite,skR,mypublen,mypub,pkI,publen,pub,&shared_secret2,&shared_secretlen2);
+        erv=hpke_do_kem(suite,skR,publen,pub,pkI,mypublen,mypub,&shared_secret2,&shared_secretlen2);
         if (erv!=1) {
             goto err;
         }
@@ -1921,21 +1939,60 @@ int hpke_dec(
 
     /* step 4. extracts and expands as needed */
     /*
-     * ExtractAndExpand
+     * Extract secret and Expand variously...
      */
-    keylen=hpke_kdf_tab[suite.kdf_id].Nh;
-    if (keylen>SHA512_DIGEST_LENGTH) {
+    erv=hpke_extract(suite,HPKE_5869_MODE_FULL,"",0,
+                    psk,psklen,
+                    "psk_hash",strlen("psk_hash"),
+                    psk_hash,&psk_hashlen);
+#if defined(SUPERVERBOSE) || defined(TESTVECTORS)
+    hpke_pbuf(stdout,"\tpsk_hash",psk_hash,psk_hashlen);
+#endif
+    if (erv!=1) goto err;
+    secretlen=hpke_kdf_tab[suite.kdf_id].Nh;
+    if (secretlen>SHA512_DIGEST_LENGTH) {
         erv=__LINE__; goto err;
     }
-    if (hpke_extract_and_expand(suite,HPKE_5869_MODE_FULL,shared_secret,shared_secretlen,ks_context,ks_contextlen,key,&keylen)!=1) {
+    if (hpke_extract(suite,HPKE_5869_MODE_FULL,
+                    psk_hash,psk_hashlen,
+                    "secret",strlen("secret"),
+                    shared_secret,shared_secretlen,
+                    secret,&secretlen)!=1) {
         erv=__LINE__; goto err;
     }
-
-    /*
-     * nonce = Expand(secret, concat(secret,"nonce", ks_context), Nn)
-    */
-    noncelen=12;
-    if (hpke_expand(suite,HPKE_5869_MODE_FULL,secret,secretlen,"hpke nonce",10,ks_context,ks_contextlen,noncelen,nonce,&noncelen)!=1) {
+    noncelen=hpke_aead_tab[suite.aead_id].Nn;
+    if (hpke_expand(suite,HPKE_5869_MODE_FULL,
+                    secret,secretlen,
+                    "nonce",strlen("nonce"),
+                    ks_context,ks_contextlen,
+                    noncelen,nonce,&noncelen)!=1) {
+        erv=__LINE__; goto err;
+    }
+    if (noncelen!=12) {
+        erv=__LINE__; goto err;
+    }
+    keylen=hpke_aead_tab[suite.aead_id].Nk;
+    if (hpke_expand(suite,HPKE_5869_MODE_FULL,
+                    secret,secretlen,
+                    "key",strlen("key"),
+                    ks_context,ks_contextlen,
+                    keylen,key,&keylen)!=1) {
+        erv=__LINE__; goto err;
+    }
+    exporterlen=hpke_kdf_tab[suite.kdf_id].Nh;
+    if (hpke_expand(suite,HPKE_5869_MODE_FULL,
+                    secret,secretlen,
+                    "exp",strlen("exp"),
+                    ks_context,ks_contextlen,
+                    exporterlen,exporter,&exporterlen)!=1) {
+        erv=__LINE__; goto err;
+    }
+    noncelen=hpke_aead_tab[suite.aead_id].Nn;
+    if (hpke_expand(suite,HPKE_5869_MODE_FULL,
+                    secret,secretlen,
+                    "nonce",strlen("nonce"),
+                    ks_context,ks_contextlen,
+                    noncelen,nonce,&noncelen)!=1) {
         erv=__LINE__; goto err;
     }
     if (noncelen!=12) {
@@ -1966,8 +2023,7 @@ int hpke_dec(
 
 err:
 
-#ifdef SUPERVERBOSE
-    printf("Decrypting:\n");
+#if defined(SUPERVERBOSE) || defined(TESTVECTORS)
     printf("\tmode: %s (%d), kem: %s (%d), kdf: %s (%d), aead: %s (%d)\n",
                 hpke_mode_strtab[mode],mode,
                 hpke_kem_strtab[suite.kem_id],suite.kem_id,

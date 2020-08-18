@@ -34,10 +34,19 @@ fi
 SCRATCH=$BINDIR/scratch
 mkdir -p $SCRATCH
 
+DICTFILE="/usr/share/dict/words"
+
 if [ ! -f $SCRATCH/plain ]
 then
-    echo "Fetching new plaintext from https://jell.ie/news/ ..."
-    curl https://jell.ie/news/ >$SCRATCH/plain
+    # echo "Fetching new plaintext from https://jell.ie/news/ ..."
+    # curl https://jell.ie/news/ >$SCRATCH/plain
+    # use the first 1024 bytes of the dictionary
+    if [ ! -f $DICTFILE ]
+    then
+        echo "Can't read $DICTFILE make some other plaintext - exiting"
+        exit 88
+    fi
+    head -10 $DICTFILE >$SCRATCH/plain
 fi
 
 TMPNAM=`mktemp $SCRATCH/tmpXXXX`
@@ -45,6 +54,12 @@ cp $SCRATCH/plain $TMPNAM.plain
 
 $VALGRIND $BINDIR/hpkemain -k -p $TMPNAM.priv -P $TMPNAM.pub $*
 $VALGRIND $BINDIR/hpkemain -e -P $TMPNAM.pub -i $TMPNAM.plain -o $TMPNAM.cipher  $*
+res=$?
+if [[ "$res" != "0" ]]
+then
+    echo "Oops - encrypting failed! - exiting"
+    exit 1
+fi
 
 # Next line is handy when debugging with gdb
 # echo "RUnning: $BINDIR/hpkemain -d -p $TMPNAM.priv -i $TMPNAM.cipher"

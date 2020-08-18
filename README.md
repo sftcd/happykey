@@ -8,13 +8,10 @@ OpenSSL](https://github.com/sftcd/openssl) fork.  (As of now, this needs to be
 built against a master/tip version of OpenSSL such as my fork.)
 
 - Started coding up draft-05 of HPKE on 20200810
-- Added the KEM IDs and other suite additions 
-- Changed ``hpke_extract()`` to handle new labelling. Still
-  to put in different labels for calls as per spec though.
-- Got my set of first test vectors validating, but only
-  6 of 'em so far. (See ``tvtest.sh`` output.) 
-- Local tests (``./alltest.sh``) currently broken, but will
-  fix those back next. 
+- Got my first set of test vectors validating, but only
+  6 of 'em so far. (See ``tvtest.sh`` output - 90 tests
+  fail and 86 don't seem to match a test vector.) 
+- All 480 local tests (``./alltest.sh``) are back working.
 
 On 20200121, I started to integrate this into a guess as to what the next ESNI
 draft (version -06) might involve. That needed a couple of minor changes so I

@@ -122,6 +122,10 @@ do
                 then
                     # encrypt failed!
 	                echo "$mode,$kem,$kdf,$aead ENCRYPT FAILED!"
+                    echo "What failed was: "
+                    echo "$BINDIR/hpkemain -e -P $TMPNAM.$mode.$kem.rpub $AUTHEPARMS $GOODPSKPARMS \
+                    -i $TMPNAM.plain -o $TMPNAM.$mode.$kem.$kdf.$aead.cipher \
+                    -m $mode -c $kem,$kdf,$aead"
                     ores=1
                     overall=1
                     failed=$((failed+1))
@@ -137,6 +141,10 @@ do
                     then
                         # decrypt failed!
                         echo "$mode,$kem,$kdf,$aead DECRYPT FAILED when it shouldn't!"
+                        echo "What failed was: "
+                        echo "$BINDIR/hpkemain -d -p $TMPNAM.$mode.$kem.rpriv $AUTHDPARMS $GOODPSKPARMS \
+                        -i $TMPNAM.$mode.$kem.$kdf.$aead.cipher -o $TMPNAM.$mode.$kem.$kdf.$aead.recovered \
+                        -m $mode -c $kem,$kdf,$aead"
                         overall=1
                         ores=1
                         failed=$((failed+1))
@@ -185,7 +193,7 @@ do
 done
 if [[ "$overall" == "0" ]]
 then
-    echo "All done. All good."
+    echo "All done. All good. ($passed tests)"
 else
     echo "Some problems - passed: $passed but failed: $failed "
 fi
