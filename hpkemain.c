@@ -586,16 +586,14 @@ int main(int argc, char **argv)
                 if (HPKE_MSMATCH(st,"32")) kem=HPKE_KEM_ID_25519;
                 if (HPKE_MSMATCH(st,"0x21")) kem=HPKE_KEM_ID_448;
                 if (HPKE_MSMATCH(st,"33")) kem=HPKE_KEM_ID_448;
-            }
-            if (kem!=0 && kdf==0) {
+            } else if (kem!=0 && kdf==0) {
                 if (HPKE_MSMATCH(st,HPKE_KDFSTR_256)) kdf=1;
                 if (HPKE_MSMATCH(st,HPKE_KDFSTR_384)) kdf=2;
                 if (HPKE_MSMATCH(st,HPKE_KDFSTR_512)) kdf=3;
                 if (HPKE_MSMATCH(st,"1")) kdf=1;
                 if (HPKE_MSMATCH(st,"2")) kdf=2;
                 if (HPKE_MSMATCH(st,"3")) kdf=3;
-            }
-            if (kem!=0 && kdf!=0 && aead==0) {
+            } else if (kem!=0 && kdf!=0 && aead==0) {
                 if (HPKE_MSMATCH(st,HPKE_AEADSTR_AES128GCM)) aead=1;
                 if (HPKE_MSMATCH(st,HPKE_AEADSTR_AES256GCM)) aead=2;
                 if (HPKE_MSMATCH(st,HPKE_AEADSTR_CP)) aead=3;

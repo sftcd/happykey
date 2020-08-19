@@ -362,46 +362,6 @@ static int hpke_suite_check(hpke_suite_t suite)
     return(1);
 }
 
-/*!
- * @brief return the length of the context for this suite
- * @param suite is the ciphersuite to use
- * @return the length (in octets) of the context 
- */
-static size_t figure_contextlen(hpke_suite_t suite)
-{
-    /*
-     * From the I-D:
-     *  struct {
-     *  // Mode and algorithms
-     *  uint8 mode;
-     *  uint16 kem_id;
-     *  uint16 kdf_id;
-     *  uint16 aead_id;
-     *
-     *  // Public inputs to this key exchange
-     *  opaque enc[Nenc];
-     *  opaque pkR[Npk];
-     *  opaque pkI[Npk];
-     *
-     *  // Cryptographic hash of application-supplied pskID
-     *  opaque pskID_hash[Nh];
-     *
-     *  // Cryptographic hash of application-supplied info
-     *  opaque info_hash[Nh];
-     * } HPKEContext;
-     *
-     * Note that the lengths in hpke_kem_tab are not the same
-     * as in the I-D - the test vectors and this code use
-     * uncompressed form NIST curve values, so that's 65 for
-     * p256 and not 33 or 32.
-     */
-    size_t ans=
-        7+hpke_kem_tab[suite.kem_id].Nenc+
-        2*hpke_kem_tab[suite.kem_id].Npk+
-        2*hpke_kdf_tab[suite.kdf_id].Nh;
-    return(ans);
-}
-
 /*
  * There's an odd accidental coding style feature here:
  * For all the externally visible functions in hpke.h, when
@@ -1131,92 +1091,6 @@ err:
     return erv;
 }
 
-/*!
- * @brief make it easier to do repetitive code
- */
-#define CHECK_HPKE_CTX if ((cp-*context)>*contextlen) { erv=__LINE__; goto err; }
-
-/*
- * @brief say if mode is authenticated or not
- */
-#define ISAUTHMODE(xxmode) (xxmode==HPKE_MODE_AUTH || xxmode==HPKE_MODE_PSKAUTH)
-
-/*
- * @brief say if mode has a PRK or not
- */
-#define ISPSKMODE(xxmode) (xxmode==HPKE_MODE_PSK || xxmode==HPKE_MODE_PSKAUTH)
-
-/*!
- * @brief Create context for input to extract/expand
- *
- * @param mode is the HPKE mode
- * @param suite is the ciphersuite to use
- * @param enc is the sender public key
- * @param enclen is the length of the sender public key
- * @param pub is the encoded recipient public key
- * @param publen is the length of the recipient public key
- * @param pkI_hash is the hash of the sender's authentication key (or NULL)
- * @param pkI_hashlen is the length of the pkI_hash
- * @param pskid is a PSK ID string (can be NULL)
- * @param info is buffer of info to bind
- * @param infolen is the length of the buffer of info
- * @param context is a buffer for the resulting context
- * @param contextlen is the size of the buffer and octets-used on exit
- * @return 1 for good, not 1 otherwise
- */
-static int hpke_make_context(
-            int mode, hpke_suite_t suite,
-            const unsigned char *enc, const size_t enclen,
-            const unsigned char *pub, const size_t publen,
-            const unsigned char *pkI_hash, const size_t pkI_hashlen,
-            const char *pskid,
-            const unsigned char *info, const size_t infolen,
-            unsigned char **context, size_t *contextlen) 
-{
-    int erv=1;
-    *contextlen=figure_contextlen(suite);
-    /* allocate space incl. some o/h just in case */
-    *context=OPENSSL_malloc(*contextlen+1024);
-    if (*context==NULL) {
-        erv=__LINE__; goto err;
-    }
-    memset(*context,0,*contextlen);
-    unsigned char *cp=*context;
-    *cp++=mode; CHECK_HPKE_CTX;
-    *cp++=(suite.kem_id&0xff00)>>8; *cp++=(suite.kem_id&0xff);  CHECK_HPKE_CTX;
-    *cp++=(suite.kdf_id&0xff00)>>8; *cp++=(suite.kdf_id&0xff);  CHECK_HPKE_CTX;
-    *cp++=(suite.aead_id&0xff00)>>8; *cp++=(suite.aead_id&0xff); 
-    memcpy(cp,enc,enclen); cp+=enclen; CHECK_HPKE_CTX
-    memcpy(cp,pub,publen); cp+=publen; CHECK_HPKE_CTX;
-
-    if (!ISAUTHMODE(mode) || pkI_hash==NULL) {
-        memset(cp,0,hpke_kem_tab[suite.kem_id].Npk); cp+= hpke_kem_tab[suite.kem_id].Npk; CHECK_HPKE_CTX;
-    } else {
-        memcpy(cp,pkI_hash,pkI_hashlen); cp+=pkI_hashlen; CHECK_HPKE_CTX;
-    }
-    EVP_MD_CTX *mdctx = EVP_MD_CTX_new();
-    unsigned int md_len;
-    const EVP_MD *md=hpke_kdf_tab[suite.kdf_id].hash_init_func();
-    EVP_DigestInit_ex(mdctx, md, NULL);
-    if (!ISPSKMODE(mode) || pskid==NULL) {
-        EVP_DigestUpdate(mdctx, NULL, 0);
-    } else {
-        EVP_DigestUpdate(mdctx, pskid, strlen(pskid));
-    }
-    EVP_DigestFinal_ex(mdctx, cp, &md_len);cp+=md_len; CHECK_HPKE_CTX;
-    EVP_DigestInit_ex(mdctx, md, NULL);
-    if (info==NULL) {
-        EVP_DigestUpdate(mdctx, NULL, 0);
-    } else {
-        EVP_DigestUpdate(mdctx, info, infolen);
-    }
-    EVP_DigestFinal_ex(mdctx, cp, &md_len);cp+=md_len; CHECK_HPKE_CTX;
-    EVP_MD_CTX_free(mdctx);
-
-err:
-    return erv;
-}
-
 
 /*!
  * @brief check mode is in-range and supported
@@ -1504,14 +1378,6 @@ int hpke_enc(
         erv=__LINE__; goto err;
     }
     
-
-#if defined(SUPERVERBOSE) || defined(TESTVECTORS)
-    size_t revkemlen=0;
-    unsigned char *revkem;
-    erv=hpke_do_kem(suite,pkE,publen,pub,pkR,enclen,enc,&revkem,&revkemlen);
-    hpke_pbuf(stdout,"\trevkem",revkem,revkemlen);
-#endif
-
     erv=hpke_do_kem(suite,pkE,enclen,enc,pkR,publen,pub,&shared_secret,&shared_secretlen);
     if (erv!=1) {
         goto err;
