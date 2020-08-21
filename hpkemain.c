@@ -625,7 +625,7 @@ int main(int argc, char **argv)
         if (doing_enc && !pub_in) usage(argv[0],"No recipient public key (\"-P\") provided"); 
         if (pub_in && map_input(pub_in,&publen,&pub,1)!=1) usage(argv[0],"bad -P value");
 
-        if (!doing_enc && !priv_in) usage(argv[0],"No recipient private key (\"-p\") provided"); 
+        if (!doing_enc && !priv_in) usage(argv[0],"No sender private key (\"-p\") provided"); 
         if (priv_in && map_input(priv_in,&privlen,&priv,1)!=1) usage(argv[0],"bad -p value");
 
         /* think again about why doing_enc is below... */
@@ -680,15 +680,16 @@ int main(int argc, char **argv)
          * needs to be decoded here but MUST NOT in the normal case.
          */
         if (map_input(tv->pkRm,&publen,&pub,1)!=1) usage(argv[0],"bad -P value");
-        if (map_input(tv->skRm,&privlen,&priv,1)!=1) usage(argv[0],"bad -p value");
+        if (hpke_mode==HPKE_MODE_AUTH || hpke_mode==HPKE_MODE_PSKAUTH) {
+            if (map_input(tv->skSm,&privlen,&priv,1)!=1) usage(argv[0],"bad -p value");
+        }
         if (tv->encs && map_input(tv->encs[0].aad,&aadlen,&aad,1)!=1) usage(argv[0],"bad -a value");
         if (tv->info && map_input(tv->info,&infolen,&info,1)!=1) usage(argv[0],"bad -I value");
         if (tv->encs && map_input(tv->encs[0].plaintext,&plainlen,&plain,1)!=1) usage(argv[0],"bad -i value");
 
-
         if (hpke_mode==HPKE_MODE_PSK || hpke_mode==HPKE_MODE_PSKAUTH) {
             /*
-             * grab PSK and psk_id from tv 
+             * grab from tv 
              */
             unsigned char *dec_pskid=NULL;
             size_t dec_pskidlen=0;

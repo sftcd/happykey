@@ -65,10 +65,13 @@ typedef struct hpke_tv_s {
     const char *shared_secret;
     const char *skEm;
     const char *skRm;
+    const char *skSm;
     const char *pkEm;
     const char *pkRm;
+    const char *pkSm;
     const char *seedE;
     const char *seedR;
+    const char *seedS;
     const char *psk_id;
     const char *psk;
 
