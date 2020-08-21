@@ -49,7 +49,7 @@
  * Define this if you want loads printing of intermediate
  * cryptographic values
  */
-#define SUPERVERBOSE
+#undef SUPERVERBOSE
 
 #if defined(SUPERVERBOSE) || defined(TESTVECTORS)
 unsigned char *pbuf; ///< global var for debug printing
@@ -102,6 +102,7 @@ const char *hpke_aead_strtab[]={
 typedef struct {
     uint16_t            kem_id; ///< code point for key encipherment method
     int                 groupid; ///< NID of KEM
+    const EVP_MD*       (*hash_init_func)(void); ///< the hash alg we're using for the HKDF
     size_t              Nsecret; ///< size of secrets
     size_t              Nenc; ///< length of encapsulated key
     size_t              Npk; ///< length of public key
@@ -114,41 +115,41 @@ typedef struct {
  * Ok we're wasting space here, but not much and it's ok
  */
 hpke_kem_info_t hpke_kem_tab[]={
-    { 0, 0, 0, 0, 0 }, // this is needed to keep indexing correct
-    { 1, 0, 0, 0, 0 }, // this is needed to keep indexing correct
-    { 2, 0, 0, 0, 0 }, // this is needed to keep indexing correct
-    { 3, 0, 0, 0, 0 }, // this is needed to keep indexing correct
-    { 4, 0, 0, 0, 0 }, // this is needed to keep indexing correct
-    { 5, 0, 0, 0, 0 }, // this is needed to keep indexing correct
-    { 6, 0, 0, 0, 0 }, // this is needed to keep indexing correct
-    { 7, 0, 0, 0, 0 }, // this is needed to keep indexing correct
-    { 8, 0, 0, 0, 0 }, // this is needed to keep indexing correct
-    { 9, 0, 0, 0, 0 }, // this is needed to keep indexing correct
-    {10, 0, 0, 0, 0 }, // this is needed to keep indexing correct
-    {11, 0, 0, 0, 0 }, // this is needed to keep indexing correct
-    {12, 0, 0, 0, 0 }, // this is needed to keep indexing correct
-    {13, 0, 0, 0, 0 }, // this is needed to keep indexing correct
-    {14, 0, 0, 0, 0 }, // this is needed to keep indexing correct
-    {15, 0, 0, 0, 0 }, // this is needed to keep indexing correct
-    { HPKE_KEM_ID_P256, NID_X9_62_prime256v1, 32, 65, 65, 32 },
-    { HPKE_KEM_ID_P384, NID_secp384r1, 48, 97, 97, 48 },
-    { HPKE_KEM_ID_P521, NID_secp521r1, 64, 133, 133, 66 },
-    {19, 0, 0, 0, 0 }, // this is needed to keep indexing correct
-    {20, 0, 0, 0, 0 }, // this is needed to keep indexing correct
-    {21, 0, 0, 0, 0 }, // this is needed to keep indexing correct
-    {22, 0, 0, 0, 0 }, // this is needed to keep indexing correct
-    {23, 0, 0, 0, 0 }, // this is needed to keep indexing correct
-    {24, 0, 0, 0, 0 }, // this is needed to keep indexing correct
-    {25, 0, 0, 0, 0 }, // this is needed to keep indexing correct
-    {26, 0, 0, 0, 0 }, // this is needed to keep indexing correct
-    {27, 0, 0, 0, 0 }, // this is needed to keep indexing correct
-    {28, 0, 0, 0, 0 }, // this is needed to keep indexing correct
-    {29, 0, 0, 0, 0 }, // this is needed to keep indexing correct
-    {30, 0, 0, 0, 0 }, // this is needed to keep indexing correct
-    {31, 0, 0, 0, 0 }, // this is needed to keep indexing correct
-    { HPKE_KEM_ID_25519, EVP_PKEY_X25519, 32, 32, 32, 32 },
-    { HPKE_KEM_ID_448, EVP_PKEY_X448, 64, 56, 56, 56 },
-    {34, 0, 0, 0, 0 }, // this is needed to keep indexing correct
+    { 0, 0, NULL, 0, 0, 0 }, // this is needed to keep indexing correct
+    { 1, 0, NULL, 0, 0, 0 }, // this is needed to keep indexing correct
+    { 2, 0, NULL, 0, 0, 0 }, // this is needed to keep indexing correct
+    { 3, 0, NULL, 0, 0, 0 }, // this is needed to keep indexing correct
+    { 4, 0, NULL, 0, 0, 0 }, // this is needed to keep indexing correct
+    { 5, 0, NULL, 0, 0, 0 }, // this is needed to keep indexing correct
+    { 6, 0, NULL, 0, 0, 0 }, // this is needed to keep indexing correct
+    { 7, 0, NULL, 0, 0, 0 }, // this is needed to keep indexing correct
+    { 8, 0, NULL, 0, 0, 0 }, // this is needed to keep indexing correct
+    { 9, 0, NULL, 0, 0, 0 }, // this is needed to keep indexing correct
+    {10, 0, NULL, 0, 0, 0 }, // this is needed to keep indexing correct
+    {11, 0, NULL, 0, 0, 0 }, // this is needed to keep indexing correct
+    {12, 0, NULL, 0, 0, 0 }, // this is needed to keep indexing correct
+    {13, 0, NULL, 0, 0, 0 }, // this is needed to keep indexing correct
+    {14, 0, NULL, 0, 0, 0 }, // this is needed to keep indexing correct
+    {15, 0, NULL, 0, 0, 0 }, // this is needed to keep indexing correct
+    { HPKE_KEM_ID_P256, NID_X9_62_prime256v1, EVP_sha256, 32, 65, 65, 32 },
+    { HPKE_KEM_ID_P384, NID_secp384r1, EVP_sha384, 48, 97, 97, 48 },
+    { HPKE_KEM_ID_P521, NID_secp521r1, EVP_sha512, 64, 133, 133, 66 },
+    {19, 0, NULL, 0, 0, 0 }, // this is needed to keep indexing correct
+    {20, 0, NULL, 0, 0, 0 }, // this is needed to keep indexing correct
+    {21, 0, NULL, 0, 0, 0 }, // this is needed to keep indexing correct
+    {22, 0, NULL, 0, 0, 0 }, // this is needed to keep indexing correct
+    {23, 0, NULL, 0, 0, 0 }, // this is needed to keep indexing correct
+    {24, 0, NULL, 0, 0, 0 }, // this is needed to keep indexing correct
+    {25, 0, NULL, 0, 0, 0 }, // this is needed to keep indexing correct
+    {26, 0, NULL, 0, 0, 0 }, // this is needed to keep indexing correct
+    {27, 0, NULL, 0, 0, 0 }, // this is needed to keep indexing correct
+    {28, 0, NULL, 0, 0, 0 }, // this is needed to keep indexing correct
+    {29, 0, NULL, 0, 0, 0 }, // this is needed to keep indexing correct
+    {30, 0, NULL, 0, 0, 0 }, // this is needed to keep indexing correct
+    {31, 0, NULL, 0, 0, 0 }, // this is needed to keep indexing correct
+    { HPKE_KEM_ID_25519, EVP_PKEY_X25519, EVP_sha256, 32, 32, 32, 32 },
+    { HPKE_KEM_ID_448, EVP_PKEY_X448, EVP_sha512, 64, 56, 56, 56 },
+    {34, 0, NULL, 0, 0, 0 }, // this is needed to keep indexing correct
 };
 
 /*
@@ -347,6 +348,53 @@ static int hpke_kem_id_nist_curve(uint16_t kem_id)
     if (hpke_kem_id_check(kem_id)!=1) return(__LINE__);
     if (kem_id >=0x10 && kem_id <0x20) return(1);
     return(0);
+}
+
+/*!
+ * @brief hpke wrapper to import NIST curve public key as easily as x25519/x448
+ * @param curve is the curve NID
+ * @param buf is the binary buffer with the (uncompressed) public value
+ * @param buflen is the length of the private key buffer
+ * @return a working EVP_PKEY * or NULL
+ */
+static EVP_PKEY* hpke_EVP_PKEY_new_raw_nist_public_key(
+        int curve,
+        unsigned char *buf,
+        size_t buflen) 
+{
+    int erv=1;
+    EVP_PKEY *ret=NULL;
+    // following s3_lib.c:ssl_generate_param_group
+    EVP_PKEY_CTX *cctx=EVP_PKEY_CTX_new_id(EVP_PKEY_EC,NULL);
+    if (cctx==NULL) {
+        erv=__LINE__; goto err;
+    }
+    if (EVP_PKEY_paramgen_init(cctx) <= 0) {
+        EVP_PKEY_CTX_free(cctx);
+        erv=__LINE__; goto err;
+    }
+    if (EVP_PKEY_CTX_set_ec_paramgen_curve_nid(cctx, curve) <= 0) {
+        EVP_PKEY_CTX_free(cctx);
+        erv=__LINE__; goto err;
+    }
+    if (EVP_PKEY_paramgen(cctx, &ret) <= 0) {
+        EVP_PKEY_CTX_free(cctx);
+        erv=__LINE__; goto err;
+    }
+    // For some reason this returns zero for p256 but works!
+    EVP_PKEY_set1_tls_encodedpoint(ret,buf,buflen);
+    //if (!EVP_PKEY_set1_tls_encodedpoint(pkR,pub,publen)) {
+        //erv=__LINE__; goto err;
+    //}
+err:
+#ifdef SUPERVERBOSE
+    pblen = EVP_PKEY_get1_tls_encodedpoint(ret,&pbuf); 
+    hpke_pbuf(stdout,"EARLY public",pbuf,pblen); 
+    if (pblen) OPENSSL_free(pbuf);
+#endif
+    if (cctx) EVP_PKEY_CTX_free(cctx);
+    if (erv==1) return(ret);
+    else return NULL;
 }
 
 /*!
@@ -711,8 +759,14 @@ static int hpke_extract(
     if (EVP_PKEY_CTX_hkdf_mode(pctx, EVP_PKEY_HKDEF_MODE_EXTRACT_ONLY)!=1) {
         erv=__LINE__; goto err;
     }
-    if (EVP_PKEY_CTX_set_hkdf_md(pctx, hpke_kdf_tab[suite.kdf_id].hash_init_func())!=1) {
-        erv=__LINE__; goto err;
+    if (mode5869==HPKE_5869_MODE_KEM) {
+        if (EVP_PKEY_CTX_set_hkdf_md(pctx, hpke_kem_tab[suite.kem_id].hash_init_func())!=1) {
+            erv=__LINE__; goto err;
+        }
+    } else {
+        if (EVP_PKEY_CTX_set_hkdf_md(pctx, hpke_kdf_tab[suite.kdf_id].hash_init_func())!=1) {
+            erv=__LINE__; goto err;
+        }
     }
     if (EVP_PKEY_CTX_set1_hkdf_key(pctx, labeled_ikm, labeled_ikmlen)!=1) {
         erv=__LINE__; goto err;
@@ -848,8 +902,14 @@ static int hpke_expand(hpke_suite_t suite, int mode5869,
     if (EVP_PKEY_CTX_hkdf_mode(pctx, EVP_PKEY_HKDEF_MODE_EXPAND_ONLY)!=1) {
         erv=__LINE__; goto err;
     }
-    if (EVP_PKEY_CTX_set_hkdf_md(pctx, hpke_kdf_tab[suite.kdf_id].hash_init_func())!=1) {
-        erv=__LINE__; goto err;
+    if (mode5869==HPKE_5869_MODE_KEM) {
+        if (EVP_PKEY_CTX_set_hkdf_md(pctx, hpke_kem_tab[suite.kem_id].hash_init_func())!=1) {
+            erv=__LINE__; goto err;
+        }
+    } else {
+        if (EVP_PKEY_CTX_set_hkdf_md(pctx, hpke_kdf_tab[suite.kdf_id].hash_init_func())!=1) {
+            erv=__LINE__; goto err;
+        }
     }
     if (EVP_PKEY_CTX_set1_hkdf_key(pctx, prk, prklen)!=1) {
         erv=__LINE__; goto err;
@@ -892,11 +952,20 @@ static int hpke_extract_and_expand(
 	unsigned char eae_prkbuf[HPKE_MAXSIZE];
 	size_t eae_prklen=HPKE_MAXSIZE;
     size_t lsecretlen=hpke_kem_tab[suite.kem_id].Nsecret;
+#if defined(SUPERVERBOSE) || defined(TESTVECTORS)
+    hpke_pbuf(stdout,"\teae_ssinput",shared_secret,shared_secretlen);
+    hpke_pbuf(stdout,"\teae_context",context,contextlen);
+    printf("\tNsecret: %lu\n",lsecretlen); 
+#endif
+
 	erv=hpke_extract(suite,mode5869,
             "",0,HPKE_EAE_PRK_LABEL,strlen(HPKE_EAE_PRK_LABEL),
 			shared_secret,shared_secretlen,
 			eae_prkbuf,&eae_prklen);
 	if (erv!=1) { goto err; }
+#if defined(SUPERVERBOSE) || defined(TESTVECTORS)
+    hpke_pbuf(stdout,"\teae_prk",eae_prkbuf,eae_prklen);
+#endif
     erv=hpke_expand(suite,mode5869,
             eae_prkbuf,eae_prklen,
             HPKE_SS_LABEL,strlen(HPKE_SS_LABEL),
@@ -905,6 +974,9 @@ static int hpke_extract_and_expand(
             secret,&lsecretlen);
 	if (erv!=1) { goto err; }
     *secretlen=lsecretlen;
+#if defined(SUPERVERBOSE) || defined(TESTVECTORS)
+    hpke_pbuf(stdout,"\tsecret",secret,*secretlen);
+#endif
 err:
 	memset(eae_prkbuf,0,HPKE_MAXSIZE);
 	return(erv);
@@ -1073,10 +1145,12 @@ static int hpke_do_kem(
     }
     memcpy(kem_context,key1enc,key1enclen);
     memcpy(kem_context+key1enclen,key2enc,key2enclen);
+
 #if defined(SUPERVERBOSE) || defined(TESTVECTORS)
     hpke_pbuf(stdout,"\tkem_context",kem_context,kem_contextlen);
     hpke_pbuf(stdout,"\tzz",zz,zzlen);
 #endif
+
     erv=hpke_extract_and_expand(suite,HPKE_5869_MODE_KEM,zz,zzlen,kem_context,kem_contextlen,lss,&lsslen);
     if (erv!=1) { goto err; }
     *ss=OPENSSL_malloc(lsslen);
@@ -1136,54 +1210,6 @@ static int hpke_psk_check(
 }
 
 /*!
- * @brief hpke wrapper to import NIST curve public key as easily as x25519/x448
- * @param curve is the curve NID
- * @param buf is the binary buffer with the (uncompressed) public value
- * @param buflen is the length of the private key buffer
- * @return a working EVP_PKEY * or NULL
- */
-static EVP_PKEY* hpke_EVP_PKEY_new_raw_nist_public_key(
-        int curve,
-        unsigned char *buf,
-        size_t buflen) 
-{
-    int erv=1;
-    EVP_PKEY *ret=NULL;
-    // following s3_lib.c:ssl_generate_param_group
-    EVP_PKEY_CTX *cctx=EVP_PKEY_CTX_new_id(EVP_PKEY_EC,NULL);
-    if (cctx==NULL) {
-        erv=__LINE__; goto err;
-    }
-    if (EVP_PKEY_paramgen_init(cctx) <= 0) {
-        EVP_PKEY_CTX_free(cctx);
-        erv=__LINE__; goto err;
-    }
-    if (EVP_PKEY_CTX_set_ec_paramgen_curve_nid(cctx, curve) <= 0) {
-        EVP_PKEY_CTX_free(cctx);
-        erv=__LINE__; goto err;
-    }
-    if (EVP_PKEY_paramgen(cctx, &ret) <= 0) {
-        EVP_PKEY_CTX_free(cctx);
-        erv=__LINE__; goto err;
-    }
-    // For some reason this returns zero for p256 but works!
-    EVP_PKEY_set1_tls_encodedpoint(ret,buf,buflen);
-    //if (!EVP_PKEY_set1_tls_encodedpoint(pkR,pub,publen)) {
-        //erv=__LINE__; goto err;
-    //}
- 
-err:
-#ifdef SUPERVERBOSE
-    pblen = EVP_PKEY_get1_tls_encodedpoint(ret,&pbuf); 
-    hpke_pbuf(stdout,"EARLY public",pbuf,pblen); 
-    if (pblen) OPENSSL_free(pbuf);
-#endif
-    if (cctx) EVP_PKEY_CTX_free(cctx);
-    if (erv==1) return(ret);
-    else return NULL;
-}
-
-/*!
  * @brief hpke wrapper to import NIST curve private key as easily as x25519/x448
  * @param curve is the curve NID
  * @param buf is the binary buffer with the private value
@@ -1221,7 +1247,6 @@ static EVP_PKEY* hpke_EVP_PKEY_new_raw_nist_private_key(
     if (1!=EVP_PKEY_assign_EC_KEY(ret, ec_key)) {
         erv=__LINE__; goto err; 
     }
-
 err:
 #ifdef SUPERVERBOSE
     pblen = EVP_PKEY_get1_tls_encodedpoint(ret,&pbuf); 
@@ -1230,7 +1255,6 @@ err:
     pblen=EC_KEY_priv2buf(ec_key,&pbuf);
     hpke_pbuf(stdout,"EARLY private",pbuf,pblen); 
 #endif
-
     if (pub_key) EC_POINT_free(pub_key);
     if (erv==1) return(ret);
     else return NULL;

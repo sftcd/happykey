@@ -8,10 +8,12 @@ OpenSSL](https://github.com/sftcd/openssl) fork.  (As of now, this needs to be
 built against a master/tip version of OpenSSL such as my fork.)
 
 - Started coding up draft-05 of HPKE on 20200810
-- Got my first set of test vectors validating, but only
-  6 of 'em so far. (See ``tvtest.sh`` output - 90 tests
-  fail and 86 don't seem to match a test vector.) 
-- All 480 local tests (``./alltest.sh``) are back working.
+- Got more test vectors validating, after the x-coord
+  fix to the spec and when I fixed the KDF being used
+  with the KEM. See ``tvtest.sh`` output - 24 tests pass, 
+  72 fail as of now (all the auth/psk/pskauth ones) and 84
+  don't match a test vector. 
+- All 480 local tests (``./alltest.sh``) are working.
 
 On 20200121, I started to integrate this into a guess as to what the next ESNI
 draft (version -06) might involve. That needed a couple of minor changes so I
