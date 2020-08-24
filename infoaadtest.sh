@@ -53,22 +53,35 @@ cp $SCRATCH/plain $TMPNAM.plain
 # new key pair
 $VALGRIND $BINDIR/hpkemain -k -p $TMPNAM.priv -P $TMPNAM.pub $*
 
-# encrypt
-$VALGRIND $BINDIR/hpkemain -e -P $TMPNAM.pub -i $TMPNAM.plain -o $TMPNAM.cipher -I $GOODINFO -a $GOODAAD $*
-
 # check decryption fails as expected
 echo "Good aad: $GOODAAD info $GOODINFO"
-for mode in base psk auth pskauth
+for mode in base psk 
 do
+
+    # if a psk mode then generate both a PSK and PSKID
+    if [[ "$mode" == "psk" || "$mode" == "pskauth" ]]
+    then
+        PSKPARMS="-s $RADNDOM$RANDOM -n $RANDOM$RANDOM"
+    else
+        PSKPARMS=" "
+    fi
+
+    # encrypt
+    $VALGRIND $BINDIR/hpkemain -e -m $mode -P $TMPNAM.pub -i $TMPNAM.plain -o $TMPNAM.cipher -I $GOODINFO -a $GOODAAD $PSKPARMS $*
+    res=$?
+    if [[ "$res" != "0" ]]
+    then
+        echo "Exiting - failure to encrypt"
+    fi
 	for aad in $GOODAAD $BADAAD
 	do
 	    for info in $GOODINFO $BADINFO
 	    do
 	        if [[ "$VALGRIND" == "" ]]
 	        then
-	            $BINDIR/hpkemain -d -m $mode -p $TMPNAM.priv -i $TMPNAM.cipher -o $TMPNAM.recovered -I $info -a $aad $* 2>/dev/null
+	            $BINDIR/hpkemain -d -m $mode -p $TMPNAM.priv -i $TMPNAM.cipher -o $TMPNAM.recovered -I $info -a $aad $PSKPARMS $* 2>/dev/null
 	        else
-	            $VALGRIND $BINDIR/hpkemain -d -m $mode -p $TMPNAM.priv -i $TMPNAM.cipher -o $TMPNAM.recovered -I $info -a $aad  $*
+	            $VALGRIND $BINDIR/hpkemain -d -m $mode -p $TMPNAM.priv -i $TMPNAM.cipher -o $TMPNAM.recovered -I $info -a $aad $PSKPARMS  $*
 	        fi
 	        res=$?
 	        if [[ "$res" == "0" ]]
@@ -77,7 +90,12 @@ do
 	        else
 	            strres="error"
 	        fi
-	        echo "$mode $aad $info results in $res/$strres"
+            if [[ "$aad" == "$GOODAAD" && "$info" == "$GOODINFO" ]]
+            then
+	            echo "Expected good: $mode $aad $info results in $res/$strres"
+            else
+	            echo "Expected error: $mode $aad $info results in $res/$strres"
+            fi
 	    done
 	done
 done
