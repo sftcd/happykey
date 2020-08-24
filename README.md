@@ -14,7 +14,7 @@ the X-coordinate DH fix, and verifies all the most recently posted
 High level notes:
 
 - All 480 local tests (``./alltest.sh``) are working - yes, you get to
-  380 combinations with the variations allowed. That's too many IMO.
+  480 test combinations with the variations allowed. That's too many IMO.
 - For test vectors, see ``tvtest.sh`` output - 96 tests pass, 
   and 84 don't match a test vector. 
 - The default ciphersuite is x25519/hkdf-sha256,hkdf-sha256,aes128gcm. 
@@ -68,8 +68,6 @@ If you do build this, ``hpkemain`` is the test tool, so start with
                 Usage: ./hpkemain -d -p private [-P public] [-a aad] [-I info]
                         [-i input] [-o output]
                         [-m mode] [-c suite] [-s psk] [-n pskid]
-            This version is built with TESTVECTORS
-                Usage: ./hpkemain -T [-m mode] [-c suite]
             Options:
                 -a additional authenticated data file name or actual value
                 -c specify ciphersuite
@@ -85,7 +83,6 @@ If you do build this, ``hpkemain`` is the test tool, so start with
                 -n PSK id string
                 -o output file name (output to stdout if not specified) 
                 -s psk file name or base64 or ascii-hex encoded value
-                -T run a testvector for mode/suite
                 -v verbose output
 
             Notes:
@@ -95,9 +92,9 @@ If you do build this, ``hpkemain`` is the test tool, so start with
               be supplied
             - For auth or pskauth modes, provide both public and private keys
             - Ciphersuites are specified using a comma-separated list of numbers
-              e.g. "-c 2,1,3" or a comma-separated list of strings from:
-                  KEMs: p256, x25519, p521 or x448
-                  KDFs: hkdf-sha256 or hkdf-sha512
+              e.g. "-c 0x20,1,3" or a comma-separated list of strings from:
+                  KEMs: p256, p384, p521, x25519 or x448
+                  KDFs: hkdf-sha256, hkdf-sha384 or hkdf-sha512
                   AEADs: aes128gcm, aes256gcm or chachapoly1305
               For example "-c x25519,hkdf-sha256,aes128gcm" (the default)
 
