@@ -133,7 +133,7 @@ script [env](./env), looks like this:
             IcUIJv4YCX57Uh/cH+KQCMCErLFQtXQgsk68lsCubUCzAVtEH7X1/eqhsij7ly0M9Mozp+r+7tp7s1hoFHtdI52G9frDnDjQ3OG+P0bpMJ7ovA==
             -----END CIPHERTEXT-----
 
-## Test scripts`
+## Test scripts
 
 The [tvtest.sh](tvtest.sh) script tests all combinations of mode/cipheruite
 against test vectors.
@@ -149,14 +149,14 @@ files end up in ``$HOME/code/happykey/scratch`` with random looking names. (A
 
 The [roundtrip.sh](roundtrip.sh) script fetches some plaintext, generates a key
 pair, encrypts a file to that public key, then tries to decrypt that.  You can
-add extra comnand line parameters (e.g. "-c 1,1,1") and those'll be passed on
+add extra comnand line parameters (e.g. "-c 0x20,1,1") and those'll be passed on
 to the key generation and encrypt/decrypt calls.
 
 The [infoaadtest.sh](infoaadtest.sh) script does the same as
 [roundtrip.sh](roundtrip.sh) but provides (random) AAD and Info inputs to
 encryption and checks that decryption works or fails as appropriate when
 good/bad values are provided. That's only done for base and psk modes for now.
-As before, you can add extra comnand line parameters (e.g. "-c 1,1,1") and
+As before, you can add extra comnand line parameters (e.g. "-c 0x20,1,1") and
 those'll be passed on to the key generation and encrypt/decrypt calls.
 
 ## Key generation
