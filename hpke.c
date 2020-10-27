@@ -43,7 +43,11 @@
 /*
  * Temp thing only
  */
+#if !defined(DRAFT_06)
 #define DRAFT_05
+#else
+#undef DRAFT_05
+#endif
 
 /*
  * Define this if you want loads printing of intermediate
@@ -613,7 +617,14 @@ err:
 #define HPKE_5869_MODE_KEM  1 ///< Abide by HPKE section 4.1
 #define HPKE_5869_MODE_FULL 2 ///< Abide by HPKE section 5.1
 
+#ifdef DRAFT_06
+#define HPKE_VERLABEL    "HPKE-06"  ///< The version string label
+#endif
+
+#ifdef DRAFT_05
 #define HPKE_VERLABEL    "HPKE-05 "  ///< The version string label
+#endif
+
 #define HPKE_SEC41LABEL  "KEM"       ///< The "suite_id" label for 4.1
 #define HPKE_SEC51LABEL  "HPKE"      ///< The "suite_id" label for 5.1
 #define HPKE_EAE_PRK_LABEL "eae_prk"  ///< The label within ExtractAndExpand
@@ -621,6 +632,18 @@ err:
 #define HPKE_PSKIDHASH_LABEL "psk_id_hash" ///< A label within key_schedule_context
 #define HPKE_INFOHASH_LABEL "info_hash" ///< A label within key_schedule_context
 #define HPKE_SS_LABEL "shared_secret" ///< Yet another label
+
+#ifdef DRAFT_05
+#define HPKE_NONCE_LABEL "nonce" ///< guess?
+#endif
+#ifdef DRAFT_06
+#define HPKE_NONCE_LABEL "base_nonce" ///< guess?
+#endif
+
+#define HPKE_EXP_LABEL "exp" ///< guess again?
+#define HPKE_KEY_LABEL "key" ///< guess again?
+#define HPKE_PSK_HASH_LABEL "psk_hash" ///< guess again?
+#define HPKE_SECRET_LABEL "secret" ///< guess again?
 
 /*!
  * brief RFC5869 HKDF-Extract
@@ -1037,7 +1060,9 @@ static int hpke_test_expand_extract(void)
     unsigned char calc_okm[HPKE_MAXSIZE];
     int rv=1;
     hpke_suite_t suite=HPKE_SUITE_DEFAULT;
-    rv=hpke_extract(suite,HPKE_5869_MODE_PURE,salt,saltlen,"",0,IKM,IKMlen,calc_prk,&PRKlen);
+    rv=hpke_extract(suite,HPKE_5869_MODE_PURE,salt,saltlen,
+            (const unsigned char*)"",0,
+            IKM,IKMlen,calc_prk,&PRKlen);
     if (rv!=1) {
         printf("rfc5869 check: hpke_extract failed: %d\n",rv);
         printf("rfc5869 check: hpke_extract failed: %d\n",rv);
@@ -1055,7 +1080,9 @@ static int hpke_test_expand_extract(void)
         printf("rfc5869 check: hpke_extract gave wrong answer!\n");
     }
     OKMlen=42;
-    rv=hpke_expand(suite,HPKE_5869_MODE_PURE,PRK,PRKlen,"",0,info,infolen,OKMlen,calc_okm,&OKMlen);
+    rv=hpke_expand(suite,HPKE_5869_MODE_PURE,PRK,PRKlen,
+            (unsigned char*)"",0,
+            info,infolen,OKMlen,calc_okm,&OKMlen);
     if (rv!=1) {
         printf("rfc5869 check: hpke_expand failed: %d\n",rv);
         printf("rfc5869 check: hpke_expand failed: %d\n",rv);
@@ -1513,9 +1540,11 @@ int hpke_enc(
     /*
      * Extract secret and Expand variously...
      */
+
+#ifdef DRAFT_05
     erv=hpke_extract(suite,HPKE_5869_MODE_FULL,
                     (const unsigned char*)"",0,
-                    (const unsigned char*)"psk_hash",strlen("psk_hash"),
+                    (const unsigned char*)HPKE_PSK_HASH_LABEL,strlen(HPKE_PSK_HASH_LABEL),
                     psk,psklen,
                     psk_hash,&psk_hashlen);
 #if defined(SUPERVERBOSE) || defined(TESTVECTORS)
@@ -1528,15 +1557,40 @@ int hpke_enc(
     }
     if (hpke_extract(suite,HPKE_5869_MODE_FULL,
                     psk_hash,psk_hashlen,
-                    (const unsigned char*)"secret",strlen("secret"),
+                    (const unsigned char*)HPKE_SECRET_LABEL,strlen(HPKE_SECRET_LABEL),
                     shared_secret,shared_secretlen,
                     secret,&secretlen)!=1) {
         erv=__LINE__; goto err;
     }
+#endif
+
+#ifdef DRAFT_06
+    erv=hpke_extract(suite,HPKE_5869_MODE_FULL,
+                    (const unsigned char*)"",0,
+                    (const unsigned char*)HPKE_PSK_HASH_LABEL,strlen(HPKE_PSK_HASH_LABEL),
+                    psk,psklen,
+                    psk_hash,&psk_hashlen);
+#if defined(SUPERVERBOSE) || defined(TESTVECTORS)
+    hpke_pbuf(stdout,"\tpsk_hash",psk_hash,psk_hashlen);
+#endif
+    if (erv!=1) goto err;
+    secretlen=hpke_kdf_tab[suite.kdf_id].Nh;
+    if (secretlen>SHA512_DIGEST_LENGTH) {
+        erv=__LINE__; goto err;
+    }
+    if (hpke_extract(suite,HPKE_5869_MODE_FULL,
+                    shared_secret,shared_secretlen,
+                    (const unsigned char*)HPKE_SECRET_LABEL,strlen(HPKE_SECRET_LABEL),
+                    psk,psklen,
+                    secret,&secretlen)!=1) {
+        erv=__LINE__; goto err;
+    }
+#endif
+
     noncelen=hpke_aead_tab[suite.aead_id].Nn;
     if (hpke_expand(suite,HPKE_5869_MODE_FULL,
                     secret,secretlen,
-                    (unsigned char*)"nonce",strlen("nonce"),
+                    (unsigned char*)HPKE_NONCE_LABEL,strlen(HPKE_NONCE_LABEL),
                     ks_context,ks_contextlen,
                     noncelen,nonce,&noncelen)!=1) {
         erv=__LINE__; goto err;
@@ -1547,7 +1601,7 @@ int hpke_enc(
     keylen=hpke_aead_tab[suite.aead_id].Nk;
     if (hpke_expand(suite,HPKE_5869_MODE_FULL,
                     secret,secretlen,
-                    (unsigned char*)"key",strlen("key"),
+                    (unsigned char*)HPKE_KEY_LABEL,strlen(HPKE_KEY_LABEL),
                     ks_context,ks_contextlen,
                     keylen,key,&keylen)!=1) {
         erv=__LINE__; goto err;
@@ -1555,7 +1609,7 @@ int hpke_enc(
     exporterlen=hpke_kdf_tab[suite.kdf_id].Nh;
     if (hpke_expand(suite,HPKE_5869_MODE_FULL,
                     secret,secretlen,
-                    (unsigned char*)"exp",strlen("exp"),
+                    (unsigned char*)HPKE_EXP_LABEL,strlen(HPKE_EXP_LABEL),
                     ks_context,ks_contextlen,
                     exporterlen,exporter,&exporterlen)!=1) {
         erv=__LINE__; goto err;
@@ -1563,7 +1617,7 @@ int hpke_enc(
     noncelen=hpke_aead_tab[suite.aead_id].Nn;
     if (hpke_expand(suite,HPKE_5869_MODE_FULL,
                     secret,secretlen,
-                    (unsigned char*)"nonce",strlen("nonce"),
+                    (unsigned char*)HPKE_NONCE_LABEL,strlen(HPKE_NONCE_LABEL),
                     ks_context,ks_contextlen,
                     noncelen,nonce,&noncelen)!=1) {
         erv=__LINE__; goto err;
@@ -1824,9 +1878,11 @@ int hpke_dec(
     /*
      * Extract secret and Expand variously...
      */
+
+#ifdef DRAFT_05
     erv=hpke_extract(suite,HPKE_5869_MODE_FULL,
                     (const unsigned char*)"",0,
-                    (const unsigned char*)"psk_hash",strlen("psk_hash"),
+                    (const unsigned char*)HPKE_PSK_HASH_LABEL,strlen(HPKE_PSK_HASH_LABEL),
                     psk,psklen,
                     psk_hash,&psk_hashlen);
 #if defined(SUPERVERBOSE) || defined(TESTVECTORS)
@@ -1839,15 +1895,41 @@ int hpke_dec(
     }
     if (hpke_extract(suite,HPKE_5869_MODE_FULL,
                     (const unsigned char*)psk_hash,psk_hashlen,
-                    (const unsigned char*)"secret",strlen("secret"),
+                    (const unsigned char*)HPKE_SECRET_LABEL,strlen(HPKE_SECRET_LABEL),
                     shared_secret,shared_secretlen,
                     secret,&secretlen)!=1) {
         erv=__LINE__; goto err;
     }
+#endif
+
+
+#ifdef DRAFT_06
+    erv=hpke_extract(suite,HPKE_5869_MODE_FULL,
+                    (const unsigned char*)"",0,
+                    (const unsigned char*)HPKE_PSK_HASH_LABEL,strlen(HPKE_PSK_HASH_LABEL),
+                    psk,psklen,
+                    psk_hash,&psk_hashlen);
+#if defined(SUPERVERBOSE) || defined(TESTVECTORS)
+    hpke_pbuf(stdout,"\tpsk_hash",psk_hash,psk_hashlen);
+#endif
+    if (erv!=1) goto err;
+    secretlen=hpke_kdf_tab[suite.kdf_id].Nh;
+    if (secretlen>SHA512_DIGEST_LENGTH) {
+        erv=__LINE__; goto err;
+    }
+    if (hpke_extract(suite,HPKE_5869_MODE_FULL,
+                    shared_secret,shared_secretlen,
+                    (const unsigned char*)HPKE_SECRET_LABEL,strlen(HPKE_SECRET_LABEL),
+                    psk,psklen,
+                    secret,&secretlen)!=1) {
+        erv=__LINE__; goto err;
+    }
+#endif
+
     noncelen=hpke_aead_tab[suite.aead_id].Nn;
     if (hpke_expand(suite,HPKE_5869_MODE_FULL,
                     secret,secretlen,
-                    (unsigned char*)"nonce",strlen("nonce"),
+                    (unsigned char*)HPKE_NONCE_LABEL,strlen(HPKE_NONCE_LABEL),
                     ks_context,ks_contextlen,
                     noncelen,nonce,&noncelen)!=1) {
         erv=__LINE__; goto err;
@@ -1858,7 +1940,7 @@ int hpke_dec(
     keylen=hpke_aead_tab[suite.aead_id].Nk;
     if (hpke_expand(suite,HPKE_5869_MODE_FULL,
                     secret,secretlen,
-                    (unsigned char*)"key",strlen("key"),
+                    (unsigned char*)HPKE_KEY_LABEL,strlen(HPKE_KEY_LABEL),
                     ks_context,ks_contextlen,
                     keylen,key,&keylen)!=1) {
         erv=__LINE__; goto err;
@@ -1866,7 +1948,7 @@ int hpke_dec(
     exporterlen=hpke_kdf_tab[suite.kdf_id].Nh;
     if (hpke_expand(suite,HPKE_5869_MODE_FULL,
                     secret,secretlen,
-                    (unsigned char*)"exp",strlen("exp"),
+                    (unsigned char*)HPKE_EXP_LABEL,strlen(HPKE_EXP_LABEL),
                     ks_context,ks_contextlen,
                     exporterlen,exporter,&exporterlen)!=1) {
         erv=__LINE__; goto err;
@@ -1874,7 +1956,7 @@ int hpke_dec(
     noncelen=hpke_aead_tab[suite.aead_id].Nn;
     if (hpke_expand(suite,HPKE_5869_MODE_FULL,
                     secret,secretlen,
-                    (unsigned char*)"nonce",strlen("nonce"),
+                    (unsigned char*)HPKE_NONCE_LABEL,strlen(HPKE_NONCE_LABEL),
                     ks_context,ks_contextlen,
                     noncelen,nonce,&noncelen)!=1) {
         erv=__LINE__; goto err;

@@ -41,6 +41,7 @@ fi
 function usage()
 {
     echo "$0 [-hvV] - test HPKE test vectors"
+    echo "  -t <file> to use the given test vector file"
     echo "  -h means print this"
     echo "  -v means be verbose"
     echo "  -V means run with valgrind"
@@ -50,8 +51,18 @@ function usage()
 verbose="no"
 VG="no"
 
+# We're gonna guess which draft, based on the content of 
+# the Makefile. (Yes, that's iccky, but shouldn't be needed
+# for long I hope;-)
+mline=`grep DRAFT_06 Makefile | grep CFLAGS`
+TVFILE="test-vectors-05.json"
+if [[ "${mline:0:1}" == "C" ]]
+then
+    TVFILE="test-vectors-06.json"
+fi
+
 # options may be followed by one colon to indicate they have a required argument
-if ! options=$(/usr/bin/getopt -s bash -o hvV -l help,verbose,valgrind -- "$@")
+if ! options=$(/usr/bin/getopt -s bash -o ht:vV -l help,testvectors:,verbose,valgrind -- "$@")
 then
     # something went wrong, getopt will put out an error message for us
     exit 1
@@ -62,6 +73,7 @@ while [ $# -gt 0 ]
 do
     case "$1" in
         -h|--help) usage;;
+        -t|--testvectors) TVFILE=$2; shift ;;
         -v|--verbose) verbose="yes" ;;
         -V|--valgrind) VG="yes" ;;
         (--) shift; break;;
@@ -88,9 +100,9 @@ do
                 if [[ "$VG" == "yes" ]]
                 then
                     VALGRIND="valgrind --leak-check=full --show-leak-kinds=all"
-	                $VALGRIND $BINDIR/hpkemain -T -m $mode -c $kem,$kdf,$aead 
+	                $VALGRIND $BINDIR/hpkemain -T$TVFILE -m $mode -c $kem,$kdf,$aead 
                 else 
-	                $BINDIR/hpkemain -T -m $mode -c $kem,$kdf,$aead >/dev/null 2>&1
+	                $BINDIR/hpkemain -T$TVFILE -m $mode -c $kem,$kdf,$aead >/dev/null 2>&1
                 fi
 	            res=$?
 	            if [[ "$res" == "0" ]]

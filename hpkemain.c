@@ -50,7 +50,7 @@ static void usage(char *prog,char *errmsg)
     fprintf(stderr,"\t\t\t[-m mode] [-c suite] [-s psk] [-n pskid]\n");
 #ifdef TESTVECTORS
     fprintf(stderr,"This version is built with TESTVECTORS\n");
-    fprintf(stderr,"\tUsage: %s -T [-m mode] [-c suite]\n",prog);
+    fprintf(stderr,"\tUsage: %s -T <optional-tvfile> [-m mode] [-c suite]\n",prog);
 #endif
     fprintf(stderr,"Options:\n");
     fprintf(stderr,"\t-a additional authenticated data file name or actual value\n");
@@ -69,7 +69,7 @@ static void usage(char *prog,char *errmsg)
     fprintf(stderr,"\t-o output file name (output to stdout if not specified) \n");
     fprintf(stderr,"\t-s psk file name or base64 or ascii-hex encoded value\n");
 #ifdef TESTVECTORS
-    fprintf(stderr,"\t-T run a testvector for mode/suite\n");
+    fprintf(stderr,"\t-T <optional-tvfile> run a testvector for mode/suite\n");
 #endif
     fprintf(stderr,"\t-v verbose output\n");
     fprintf(stderr,"\n");
@@ -658,6 +658,9 @@ int main(int argc, char **argv)
     char *def_tvfname="test-vectors.json";
     if (tvfname==NULL) {
         tvfname=def_tvfname;
+    } 
+    if (verbose) {
+        printf("Test vector file: %s\n",tvfname);
     }
     int nelems=0;
     hpke_tv_t *tvarr=NULL;

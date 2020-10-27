@@ -7,9 +7,18 @@ draft](https://tools.ietf.org/html/draft-ietf-tls-esni) with my [ESNI-enabled
 OpenSSL](https://github.com/sftcd/openssl) fork.  This needs to be
 built against a master/tip version of OpenSSL such as my fork.
 
-The current (20200824) status is that the implements HPKE draft-05, with
-the X-coordinate DH fix, and verifies all the most recently posted 
-[test vectors](https://github.com/cfrg/draft-irtf-cfrg-hpke/blob/master/test-vectors.json).
+The current (20201027) status is that the implements HPKE draft-06 as
+the default. It also supports 
+HPKE draft-05 with
+the X-coordinate DH fix. 
+This code verifies the most recently posted 
+[test vectors](https://github.com/cfrg/draft-irtf-cfrg-hpke/blob/master/test-vectors.json)
+for draft-06. (Or the older ones for draft-05.) 
+
+As we also (currently, hopefully briefly) need to keep draft-05 code too, because
+that's apparently what the latest ESNI/ECH draft requires (sheesh!),
+I've kept both. See the [Makefile](Makefile) for how to define
+the right things (hint: ``-DDRAFT_06`` is one way:-).
 
 High level notes:
 
@@ -194,7 +203,8 @@ values as those when encrypting with the given keys.
 To enable test vector checking, compile with ``TESTVECTORS`` #define'd.
 There's a line to uncomment in the [Makefile](Makefile) that does that.
 To do the test vector comparison I use the published 
-[test-vectors](test-vectors.json) from 
+[test-vectors-06](test-vectors-06.json) or [test-vectors-05](test-vectors-05.json),
+as appropriate, from 
 [the CFRG repo](https://github.com/cfrg/draft-irtf-cfrg-hpke).  I use the 
 [json-c](https://github.com/json-c/json-c) library to decode
 the JSON file into an array of type``hpke_tv_t`` that I defined.

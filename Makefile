@@ -18,7 +18,13 @@ INCL=../openssl/include
 # the next line:
 # testvectors=-D TESTVECTORS -I ../json-c
 
-CFLAGS=-g ${testvectors} -DHAPPYKEY
+# include DRAFT_06 if you want that - ECH (for now)
+# requires DRAFT_05 (which is the current default 
+# if nothing is passed here)
+CFLAGS=-g ${testvectors} -DHAPPYKEY -DDRAFT_06
+#
+# For DRAFT_05 just omit it
+# CFLAGS=-g ${testvectors} -DHAPPYKEY 
 CC=gcc
 
 all: hpkemain
