@@ -7,19 +7,6 @@ draft](https://tools.ietf.org/html/draft-ietf-tls-esni) with my [ESNI-enabled
 OpenSSL](https://github.com/sftcd/openssl) fork.  This needs to be
 built against a master/tip version of OpenSSL such as my fork.
 
-The current (20201027) status is that the implements HPKE draft-06 as
-the default. It also supports 
-HPKE draft-05 with
-the X-coordinate DH fix. 
-This code verifies the most recently posted 
-[test vectors](https://github.com/cfrg/draft-irtf-cfrg-hpke/blob/master/test-vectors.json)
-for draft-06. (Or the older ones for draft-05.) 
-
-As we also (currently, hopefully briefly) need to keep draft-05 code too, because
-that's apparently what the latest ESNI/ECH draft requires (sheesh!),
-I've kept both. See the [Makefile](Makefile) for how to define
-the right things (hint: ``-DDRAFT_06`` is one way:-).
-
 High level notes:
 
 - All 480 local tests (``./alltest.sh``) are working - yes, you get to
@@ -31,6 +18,21 @@ High level notes:
 - Exporters are not supported.
 - There is a limit of 40KB on the buffers supported, including plain 
   and ciphertexts.
+
+## Recent Changes
+
+- 20201204: Made an internal api external (``hpke_suite_check()``) to allow a
+  client to check if the suite presented e.g. from an ECHConfig is supported
+locally.
+
+- 20201027: this implements HPKE draft-06 as the default. It also supports HPKE
+  draft-05 with the X-coordinate DH fix.  This code verifies the most recently
+posted [test vectors](https://github.com/cfrg/draft-irtf-cfrg-hpke/blob/master/test-vectors.json)
+for draft-06. (Or the older ones for draft-05.) 
+As we also (currently, hopefully briefly) need to keep draft-05 code too, because
+that's apparently what the latest ESNI/ECH draft requires (sheesh!),
+I've kept both. See the [Makefile](Makefile) for how to define
+the right things (hint: ``-DDRAFT_06`` is one way:-).
 
 ## Build 
 
