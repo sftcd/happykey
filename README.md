@@ -21,6 +21,9 @@ High level notes:
 
 ## Recent Changes
 
+- 20201216: Updated for draft-07, only changes made is the new
+labels, and disable support for draft-05 - still haven't added exporter stuff.
+
 - 20201204: Made an internal api external (``hpke_suite_check()``) to allow a
   client to check if the suite presented e.g. from an ECHConfig is supported
 locally.
@@ -205,7 +208,7 @@ values as those when encrypting with the given keys.
 To enable test vector checking, compile with ``TESTVECTORS`` #define'd.
 There's a line to uncomment in the [Makefile](Makefile) that does that.
 To do the test vector comparison I use the published 
-[test-vectors-06](test-vectors-06.json) or [test-vectors-05](test-vectors-05.json),
+[test-vectors-07](test-vectors-07.json) or [test-vectors-06](test-vectors-06.json),
 as appropriate, from 
 [the CFRG repo](https://github.com/cfrg/draft-irtf-cfrg-hpke).  I use the 
 [json-c](https://github.com/json-c/json-c) library to decode

@@ -16,12 +16,12 @@ INCL=../openssl/include
 # There are test vectors for this - see comments in hpketv.h.
 # If you want to compile in test vector checks then uncomment 
 # the next line:
-# testvectors=-D TESTVECTORS -I ../json-c
+#testvectors=-D TESTVECTORS -I ../json-c
 
-# include DRAFT_06 if you want that - ECH (for now)
-# requires DRAFT_05 (which is the current default 
+# include DRAFT_06 or DRAFT_07 you want that - ECH (in esni-09)
+# requires DRAFT_07 (which is the current default 
 # if nothing is passed here)
-CFLAGS=-g ${testvectors} -DHAPPYKEY -DDRAFT_06
+CFLAGS=-g ${testvectors} -DHAPPYKEY -DDRAFT_07
 #
 # For DRAFT_05 just omit it
 # CFLAGS=-g ${testvectors} -DHAPPYKEY 

@@ -54,11 +54,11 @@ VG="no"
 # We're gonna guess which draft, based on the content of 
 # the Makefile. (Yes, that's iccky, but shouldn't be needed
 # for long I hope;-)
-mline=`grep DRAFT_06 Makefile | grep CFLAGS`
-TVFILE="test-vectors-05.json"
+mline=`grep DRAFT_07 Makefile | grep CFLAGS`
+TVFILE="test-vectors-06.json"
 if [[ "${mline:0:1}" == "C" ]]
 then
-    TVFILE="test-vectors-06.json"
+    TVFILE="test-vectors-07.json"
 fi
 
 # options may be followed by one colon to indicate they have a required argument
