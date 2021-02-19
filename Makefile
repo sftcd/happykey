@@ -13,6 +13,21 @@
 OSSL=../openssl
 INCL=../openssl/include
 
+# NSS 
+NSSL=../dist/Debug/lib
+NINCL=  -I../nss/lib \
+		-I../nss/lib/nss \
+		-I../nss/lib/ssl \
+		-I../nss/lib/pk11wrap \
+		-I../nss/lib/freebl \
+		-I../nss/lib/freebl/ecl \
+		-I../nss/lib/util \
+		-I../nss/lib/cryptohi \
+		-I../nss/lib/certdb \
+		-I../nss/lib/pkcs7 \
+		-I../nss/lib/smime \
+		-I../dist/Debug/include/nspr
+
 # There are test vectors for this - see comments in hpketv.h.
 # If you want to compile in test vector checks then uncomment 
 # the next line:
@@ -27,7 +42,22 @@ CFLAGS=-g ${testvectors} -DHAPPYKEY -DDRAFT_07
 # CFLAGS=-g ${testvectors} -DHAPPYKEY 
 CC=gcc
 
-all: hpkemain
+all: hpkemain neod
+
+# This is a round-trip test with NSS encrypting and my code decrypting
+# (no parameters for now)
+
+neod: neod.o hpke.o neod_nss.o
+	${CC} ${CFLAGS} -g -o $@ neod.o hpke.o neod_nss.o -L ${OSSL} -lssl -lcrypto -L ${NSSL} -lnss3 -lnspr4
+
+neod.o: neod.c
+	${CC} ${CFLAGS} -g -I ${INCL} -c $<
+
+neod_nss.o: neod_nss.c
+	${CC} -g ${CFLAGS} ${NINCL} -c $<
+
+neodtest: neod
+	- LD_LIBRARY_PATH=${OSSL}:${NSSL} ./neod
 
 # do a test run
 test: hpkemain
@@ -61,5 +91,6 @@ docclean:
 
 clean:
 	- rm -f hpkemain.o hpke.o hpketv.o hpkemain 
+	- rm -f neod.o neod_nss.o 
 	- rm -rf scratch/*
 
