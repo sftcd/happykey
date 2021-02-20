@@ -826,6 +826,14 @@ static int hpke_expand(hpke_suite_t suite, int mode5869,
     size_t concat_offset=0;
 
     /*
+     * Sanity check - we better not ask for my output than we have
+     * space for
+     */
+    if (L > *outlen) {
+        erv=__LINE__; goto err;
+    }
+
+    /*
      * Handle oddities of HPKE labels (or not)
      */
     switch (mode5869) {
@@ -924,7 +932,7 @@ static int hpke_expand(hpke_suite_t suite, int mode5869,
     if (EVP_PKEY_CTX_add1_hkdf_info(pctx, libuf, concat_offset)!=1) {
         erv=__LINE__; goto err;
     }
-    size_t loutlen=*outlen; /* just in case it changes */
+    size_t loutlen=L; /* just in case it changes */
     if (EVP_PKEY_derive(pctx, out, &loutlen)!=1) {
         erv=__LINE__; goto err;
     }
