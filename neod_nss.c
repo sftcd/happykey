@@ -64,7 +64,7 @@ int nss_enc(
     HpkeContext *cx = NULL;
     SECItem aad_item = {siBuffer, aad, aadlen};
     SECKEYPublicKey *pkR = NULL;
-    SECItem hpkeInfo = { siBuffer, NULL, 0 };
+    SECItem hpkeInfo = { siBuffer, info, infolen };
     SECStatus rv;
     SECItem chPt = { siBuffer, clear, clearlen};
     SECItem *chCt = NULL;

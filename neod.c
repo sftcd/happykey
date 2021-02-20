@@ -34,6 +34,7 @@
  */
 #include "hpke.h"
 
+#define MEMCHAR 0xfa
 
 /*
  * Our Happykey wrapper for NSS stuff
@@ -94,7 +95,9 @@ int main(int argc, char **argv)
     int hpke_mode=HPKE_MODE_BASE;
     hpke_suite_t hpke_suite = HPKE_SUITE_DEFAULT;
     size_t publen=HPKE_MAXSIZE; unsigned char pub[HPKE_MAXSIZE];
+    memset(pub,MEMCHAR,publen);
     size_t privlen=HPKE_MAXSIZE; unsigned char priv[HPKE_MAXSIZE];
+    memset(priv,MEMCHAR,privlen);
     int rv=hpke_kg(
         hpke_mode, hpke_suite,
         &publen, pub,
@@ -121,13 +124,17 @@ int main(int argc, char **argv)
      * Initial values
      */
 #define INFO (char*) "The Info"
-    infolen=strlen(INFO)+1; memcpy(info,INFO,strlen(INFO+1)); neod_pbuf("info",info,infolen);
+    memset(info,MEMCHAR,infolen);
+    infolen=strlen(INFO); memcpy(info,INFO,strlen(INFO)); neod_pbuf("info",info,infolen);
 
 #define AAD (char*) "aad aad aad lots and lots of aad"
-    aadlen=strlen(AAD)+1; memcpy(aad,AAD,strlen(AAD+1)); neod_pbuf("aad",aad,aadlen);
+    memset(aad,MEMCHAR,aadlen);
+    aadlen=strlen(AAD); memcpy(aad,AAD,strlen(AAD)); neod_pbuf("aad",aad,aadlen);
 
 #define MESSAGE (char*)"we need another trip to the bottle bank"
-    clearlen=strlen(MESSAGE)+1; memcpy(clear,MESSAGE,strlen(MESSAGE+1)); neod_pbuf("clear",clear,clearlen);
+    memset(clear,MEMCHAR,clearlen);
+    clearlen=strlen(MESSAGE); memcpy(clear,MESSAGE,strlen(MESSAGE)); neod_pbuf("clear",clear,clearlen);
+    memset(cipher,MEMCHAR,cipherlen);
 
     /*
      * Call NSS encrypt
@@ -138,6 +145,7 @@ int main(int argc, char **argv)
         0, NULL,
         clearlen, clear,
         aadlen, aad,
+        // 0, NULL, // infolen, info,
         infolen, info,
         &senderpublen, senderpub,
         &cipherlen, cipher
@@ -159,12 +167,14 @@ int main(int argc, char **argv)
             senderpublen, senderpub,
             cipherlen, cipher,
             aadlen,aad,
-            infolen,info,
+            // 0, NULL, // infolen, info,
+            infolen, info,
             &clearlen, clear); 
     if (rv!=1) {
         printf("Error decrypting (%d) - exiting\n",rv);
         exit(rv);
     }
+    neod_pbuf("recovered clear",clear,clearlen);
 
     return 1;
 }

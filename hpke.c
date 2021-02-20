@@ -1613,17 +1613,6 @@ int hpke_enc(
                     exporterlen,exporter,&exporterlen)!=1) {
         erv=__LINE__; goto err;
     }
-    noncelen=hpke_aead_tab[suite.aead_id].Nn;
-    if (hpke_expand(suite,HPKE_5869_MODE_FULL,
-                    secret,secretlen,
-                    (unsigned char*)HPKE_NONCE_LABEL,strlen(HPKE_NONCE_LABEL),
-                    ks_context,ks_contextlen,
-                    noncelen,nonce,&noncelen)!=1) {
-        erv=__LINE__; goto err;
-    }
-    if (noncelen!=12) {
-        erv=__LINE__; goto err;
-    }
 
     /* step 5. call the AEAD */
     size_t lcipherlen=HPKE_MAXSIZE;
@@ -2120,8 +2109,16 @@ int hpke_kg(
     if (lprivlen > *privlen) {
         erv=__LINE__; goto err;
     }
-    *privlen=lprivlen;
     memcpy(priv,lpriv,lprivlen);
+    /*
+     * We're actually outputting a PEM encoding so should (if we can)
+     * add a NUL byte
+     */
+    if (lprivlen < *privlen) {
+        priv[lprivlen]=0x00;
+    }
+
+    *privlen=lprivlen;
 
 err:
 
