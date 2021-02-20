@@ -1,5 +1,6 @@
 .gitignore
 *.o
 hpkemain
+neod
 doxy/
 scratch/
