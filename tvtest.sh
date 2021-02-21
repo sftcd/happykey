@@ -51,15 +51,17 @@ function usage()
 verbose="no"
 VG="no"
 
-# We're gonna guess which draft, based on the content of 
+# We're used to guess which draft, based on the content of 
 # the Makefile. (Yes, that's iccky, but shouldn't be needed
 # for long I hope;-)
-mline=`grep DRAFT_07 Makefile | grep CFLAGS`
-TVFILE="test-vectors-06.json"
-if [[ "${mline:0:1}" == "C" ]]
-then
-    TVFILE="test-vectors-07.json"
-fi
+# mline=`grep DRAFT_07 Makefile | grep CFLAGS`
+# TVFILE="test-vectors-06.json"
+# if [[ "${mline:0:1}" == "C" ]]
+# then
+    # TVFILE="test-vectors-07.json"
+# fi
+
+TVFILE="test-vectors-07.json"
 
 # options may be followed by one colon to indicate they have a required argument
 if ! options=$(/usr/bin/getopt -s bash -o ht:vV -l help,testvectors:,verbose,valgrind -- "$@")

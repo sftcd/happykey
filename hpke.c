@@ -41,21 +41,6 @@
 #endif
 
 /*
- * Temp thing only
- */
-#if !defined(DRAFT_07)
-#define DRAFT_06
-#else
-#undef DRAFT_06
-#endif
-//We may as well forget draft 05 now
-//#if !defined(DRAFT_06)
-//#define DRAFT_05
-//#else
-//#undef DRAFT_05
-//#endif
-
-/*
  * Define this if you want loads printing of intermediate
  * cryptographic values
  */
@@ -292,7 +277,7 @@ static int hpke_pbuf(FILE *fout, char *msg,unsigned char *buf,size_t blen)
     if (!msg) {
         fprintf(fout,"NULL msg:");
     } else {
-        fprintf(fout,"%s: ",msg);
+        fprintf(fout,"%s (%lu): ",msg,blen);
     }
     if (!buf) {
         fprintf(fout,"buf is NULL, so probably something wrong\n");
@@ -610,18 +595,7 @@ err:
 #define HPKE_5869_MODE_KEM  1 ///< Abide by HPKE section 4.1
 #define HPKE_5869_MODE_FULL 2 ///< Abide by HPKE section 5.1
 
-#ifdef DRAFT_07
 #define HPKE_VERLABEL    "HPKE-07"  ///< The version string label
-#endif
-
-#ifdef DRAFT_06
-#define HPKE_VERLABEL    "HPKE-06"  ///< The version string label
-#endif
-
-#ifdef DRAFT_05
-#define HPKE_VERLABEL    "HPKE-05 "  ///< The version string label
-#endif
-
 #define HPKE_SEC41LABEL  "KEM"       ///< The "suite_id" label for 4.1
 #define HPKE_SEC51LABEL  "HPKE"      ///< The "suite_id" label for 5.1
 #define HPKE_EAE_PRK_LABEL "eae_prk"  ///< The label within ExtractAndExpand
@@ -629,14 +603,7 @@ err:
 #define HPKE_PSKIDHASH_LABEL "psk_id_hash" ///< A label within key_schedule_context
 #define HPKE_INFOHASH_LABEL "info_hash" ///< A label within key_schedule_context
 #define HPKE_SS_LABEL "shared_secret" ///< Yet another label
-
-#if defined(DRAFT_06) || defined(DRAFT_07)
 #define HPKE_NONCE_LABEL "base_nonce" ///< guess?
-#endif
-#ifdef DRAFT_05
-#define HPKE_NONCE_LABEL "nonce" ///< guess?
-#endif
-
 #define HPKE_EXP_LABEL "exp" ///< guess again?
 #define HPKE_KEY_LABEL "key" ///< guess again?
 #define HPKE_PSK_HASH_LABEL "psk_hash" ///< guess again?
@@ -672,11 +639,11 @@ err:
  *
  * Isn't that a bit of a mess!
  */
-static int hpke_extract(
-        hpke_suite_t suite, int mode5869,
+int hpke_extract(
+        const hpke_suite_t suite, const int mode5869,
         const unsigned char *salt, const size_t saltlen,
-        const unsigned char *label, const size_t labellen,
-        unsigned char *ikm, const size_t ikmlen,
+        const char *label, const size_t labellen,
+        const unsigned char *ikm, const size_t ikmlen,
         unsigned char *secret, size_t *secretlen)
 {
     EVP_PKEY_CTX *pctx=NULL;
@@ -692,7 +659,7 @@ static int hpke_extract(
     switch (mode5869) {
         case HPKE_5869_MODE_PURE:
             labeled_ikmlen=ikmlen;
-            labeled_ikm=ikm;
+            labeled_ikm=(unsigned char*)ikm;
             break;
 
         case HPKE_5869_MODE_KEM:
@@ -812,11 +779,11 @@ err:
  * @param outlen - buf size on input
  * @return 1 for good otherwise bad
  */
-static int hpke_expand(hpke_suite_t suite, int mode5869, 
-                unsigned char *prk, size_t prklen,
-                unsigned char *label, size_t labellen,
-                unsigned char *info, size_t infolen,
-                uint32_t L,
+int hpke_expand(const hpke_suite_t suite, const int mode5869, 
+                const unsigned char *prk, const size_t prklen,
+                const char *label, const size_t labellen,
+                const unsigned char *info, const size_t infolen,
+                const uint32_t L,
                 unsigned char *out, size_t *outlen)
 {
     EVP_PKEY_CTX *pctx=NULL;
@@ -825,14 +792,9 @@ static int hpke_expand(hpke_suite_t suite, int mode5869,
     unsigned char *lip=libuf;
     size_t concat_offset=0;
 
-    /*
-     * Sanity check - we better not ask for my output than we have
-     * space for
-     */
-    if (L > *outlen) {
+    if (L>*outlen) {
         erv=__LINE__; goto err;
     }
-
     /*
      * Handle oddities of HPKE labels (or not)
      */
@@ -932,7 +894,7 @@ static int hpke_expand(hpke_suite_t suite, int mode5869,
     if (EVP_PKEY_CTX_add1_hkdf_info(pctx, libuf, concat_offset)!=1) {
         erv=__LINE__; goto err;
     }
-    size_t loutlen=L; /* just in case it changes */
+    size_t loutlen=L;
     if (EVP_PKEY_derive(pctx, out, &loutlen)!=1) {
         erv=__LINE__; goto err;
     }
@@ -975,7 +937,7 @@ static int hpke_extract_and_expand(
 
 	erv=hpke_extract(suite,mode5869,
             (const unsigned char*)"",0,
-            (const unsigned char*)HPKE_EAE_PRK_LABEL,strlen(HPKE_EAE_PRK_LABEL),
+            HPKE_EAE_PRK_LABEL,strlen(HPKE_EAE_PRK_LABEL),
 			shared_secret,shared_secretlen,
 			eae_prkbuf,&eae_prklen);
 	if (erv!=1) { goto err; }
@@ -984,7 +946,7 @@ static int hpke_extract_and_expand(
 #endif
     erv=hpke_expand(suite,mode5869,
             eae_prkbuf,eae_prklen,
-            (unsigned char*)HPKE_SS_LABEL,strlen(HPKE_SS_LABEL),
+            HPKE_SS_LABEL,strlen(HPKE_SS_LABEL),
             context,contextlen,
             lsecretlen,
             secret,&lsecretlen);
@@ -1066,7 +1028,7 @@ static int hpke_test_expand_extract(void)
     int rv=1;
     hpke_suite_t suite=HPKE_SUITE_DEFAULT;
     rv=hpke_extract(suite,HPKE_5869_MODE_PURE,salt,saltlen,
-            (const unsigned char*)"",0,
+            "",0,
             IKM,IKMlen,calc_prk,&PRKlen);
     if (rv!=1) {
         printf("rfc5869 check: hpke_extract failed: %d\n",rv);
@@ -1337,7 +1299,7 @@ err:
 }
 
 /*!
- * @brief HPKE single-shot encryption function
+ * @brief Internal HPKE single-shot encryption function
  * @param mode is the HPKE mode
  * @param suite is the ciphersuite to use
  * @param pskid is the pskid string fpr a PSK mode (can be NULL)
@@ -1353,13 +1315,16 @@ err:
  * @param aad is the encoded additional data (can be NULL)
  * @param infolen is the lenght of the info data (can be zero)
  * @param info is the encoded info data (can be NULL)
+ * @param extsenderpublen is the length of the input buffer with the sender's public key 
+ * @param extsenderpub is the input buffer for sender public key
+ * @param extsenderpriv has the handle for the sender private key
  * @param senderpublen is the length of the input buffer for the sender's public key (length used on output)
  * @param senderpub is the input buffer for ciphertext
  * @param cipherlen is the length of the input buffer for ciphertext (length used on output)
  * @param cipher is the input buffer for ciphertext
  * @return 1 for good (OpenSSL style), not-1 for error
  */
-int hpke_enc(
+static int hpke_enc_int(
         unsigned int mode, hpke_suite_t suite,
         char *pskid, size_t psklen, unsigned char *psk,
         size_t publen, unsigned char *pub,
@@ -1367,19 +1332,37 @@ int hpke_enc(
         size_t clearlen, unsigned char *clear,
         size_t aadlen, unsigned char *aad,
         size_t infolen, unsigned char *info,
+        size_t extsenderpublen, unsigned char *extsenderpub, 
+        EVP_PKEY *extsenderpriv, size_t rawsenderprivlen,  unsigned char *rawsenderpriv,
         size_t *senderpublen, unsigned char *senderpub,
         size_t *cipherlen, unsigned char *cipher
 #ifdef TESTVECTORS
         , void *tv
 #endif
         )
+
 {
     int crv=1;
     if ((crv=hpke_mode_check(mode))!=1) return(crv);
     if ((crv=hpke_psk_check(mode,pskid,psklen,psk))!=1) return(crv);
     if ((crv=hpke_suite_check(suite))!=1) return(crv);
 
-    if (!pub || !clear || !senderpublen || !senderpub || !cipherlen  || !cipher) return(__LINE__);
+    /*
+     * Depending on who called us, we may want to generated this key pair
+     * or we may have had it handed to us via extsender* inputs
+     */
+    int evpcaller=0;
+    int rawcaller=0;
+    if (extsenderpublen>0 && extsenderpub!=NULL && extsenderpriv!=NULL) {
+        evpcaller=1;
+    } 
+    if (extsenderpublen>0 && extsenderpub!=NULL && extsenderpriv==NULL && rawsenderprivlen>0 && rawsenderpriv!=NULL) {
+        rawcaller=1;
+    } 
+
+    if (!evpcaller && !rawcaller && (!pub || !clear || !senderpublen || !senderpub || !cipherlen  || !cipher)) return(__LINE__);
+    if (evpcaller && (!pub || !clear || !extsenderpublen || !extsenderpub || !extsenderpriv || !cipherlen  || !cipher)) return(__LINE__);
+    if (rawcaller && (!pub || !clear || !extsenderpublen || !extsenderpub || !rawsenderpriv || !cipherlen  || !cipher)) return(__LINE__);
     if ((mode==HPKE_MODE_AUTH || mode==HPKE_MODE_PSKAUTH) && (!priv || privlen==0)) return(__LINE__);
     if ((mode==HPKE_MODE_PSK || mode==HPKE_MODE_PSKAUTH) && (!psk || psklen==0 || !pskid)) return(__LINE__);
 
@@ -1439,40 +1422,96 @@ int hpke_enc(
         erv=__LINE__; goto err;
     }
 
-    /* step 1. generate sender's key pair: skE, pkE */
-    pctx = EVP_PKEY_CTX_new(pkR, NULL);
-    if (pctx == NULL) {
-        erv=__LINE__; goto err;
-    }
-    if (EVP_PKEY_keygen_init(pctx) <= 0) {
-        erv=__LINE__; goto err;
-    }
-#ifdef TESTVECTORS
-    if (ltv) {
-        /*
-         * Read encap DH private from tv, then use that instead of 
-         * a newly generated key pair
-         */
-        if (hpke_kem_id_check(ltv->kem_id)!=1) return(__LINE__);
-        unsigned char *bin_skE=NULL;
-        size_t bin_skElen=0;
-        if (1!=hpke_ah_decode(strlen(ltv->skEm),ltv->skEm,&bin_skElen,&bin_skE)) { 
-            erv=__LINE__; goto err; 
-        }
-        if (hpke_kem_id_nist_curve(ltv->kem_id)==1) {
-            pkE = hpke_EVP_PKEY_new_raw_nist_private_key(hpke_kem_tab[ltv->kem_id].groupid,bin_skE,bin_skElen);
-        } else {
-            pkE = EVP_PKEY_new_raw_private_key(hpke_kem_tab[ltv->kem_id].groupid,NULL,bin_skE,bin_skElen);
-        }
-        if (!pkE) { erv=__LINE__; goto err; }
-        OPENSSL_free(bin_skE);
+    /* step 1. generate or import sender's key pair: skE, pkE */
 
-    } else  
+    if (!evpcaller && !rawcaller) {
+        pctx = EVP_PKEY_CTX_new(pkR, NULL);
+        if (pctx == NULL) {
+            erv=__LINE__; goto err;
+        }
+        if (EVP_PKEY_keygen_init(pctx) <= 0) {
+            erv=__LINE__; goto err;
+        }
+#ifdef TESTVECTORS
+        if (ltv) {
+            /*
+            * Read encap DH private from tv, then use that instead of 
+            * a newly generated key pair
+            */
+            if (hpke_kem_id_check(ltv->kem_id)!=1) return(__LINE__);
+            unsigned char *bin_skE=NULL;
+            size_t bin_skElen=0;
+
+            if (1!=hpke_ah_decode(strlen(ltv->skEm),ltv->skEm,&bin_skElen,&bin_skE)) { 
+                erv=__LINE__; goto err; 
+            }
+            if (hpke_kem_id_nist_curve(ltv->kem_id)==1) {
+                pkE = hpke_EVP_PKEY_new_raw_nist_private_key(hpke_kem_tab[ltv->kem_id].groupid,bin_skE,bin_skElen);
+            } else {
+                pkE = EVP_PKEY_new_raw_private_key(hpke_kem_tab[ltv->kem_id].groupid,NULL,bin_skE,bin_skElen);
+            }
+            if (!pkE) { erv=__LINE__; goto err; }
+            OPENSSL_free(bin_skE);
+
+        } else  
 #endif
-    if (EVP_PKEY_keygen(pctx, &pkE) <= 0) {
-        erv=__LINE__; goto err;
+        if (EVP_PKEY_keygen(pctx, &pkE) <= 0) {
+            erv=__LINE__; goto err;
+        }
+        EVP_PKEY_CTX_free(pctx); pctx=NULL;
+    } else if (evpcaller) {
+
+        pkE=extsenderpriv;
+        if (EVP_PKEY_set1_tls_encodedpoint(pkE,extsenderpub,extsenderpublen)!=1) {
+            erv=__LINE__; goto err;
+        }
+        pkE=extsenderpriv;
+
+#if 0
+        /*
+         * Double check we're a good key pair
+         */
+        unsigned char *checkpub=NULL;
+        size_t checkpublen=EVP_PKEY_get1_tls_encodedpoint(pkE,&checkpub);
+        if (checkpublen!=extsenderpublen ||
+                memcmp(checkpub,extsenderpub,checkpublen)) {
+            erv=__LINE__; goto err;
+        }
+        OPENSSL_free(checkpub);
+#endif
+
+    } else if (rawcaller) {
+
+        if (hpke_kem_tab[suite.kem_id].Npriv==rawsenderprivlen) {
+            if (hpke_kem_id_nist_curve(suite.kem_id)==1) {
+                pkE = hpke_EVP_PKEY_new_raw_nist_private_key(hpke_kem_tab[suite.kem_id].groupid,rawsenderpriv,rawsenderprivlen);
+            } else {
+                pkE=EVP_PKEY_new_raw_private_key(hpke_kem_tab[suite.kem_id].groupid,NULL,rawsenderpriv,rawsenderprivlen);
+            }
+        }
+        if (!pkE) {
+            /* check PEM decode - that might work :-) */
+            bfp=BIO_new(BIO_s_mem());
+            if (!bfp) {
+                erv=__LINE__; goto err;
+            }
+            BIO_write(bfp,rawsenderpriv,rawsenderprivlen);
+            if (!PEM_read_bio_PrivateKey(bfp,&pkE,NULL,NULL)) {
+                erv=__LINE__; goto err;
+            }
+            if (bfp!=NULL) {
+                BIO_free_all(bfp); bfp=NULL;
+            }
+        }
+
+        if (!pkE) { erv=__LINE__; goto err; }
+#if 0
+        if (EVP_PKEY_set1_tls_encodedpoint(pkE,extsenderpub,extsenderpublen)!=1) {
+            erv=__LINE__; goto err;
+        }
+#endif
+
     }
-    EVP_PKEY_CTX_free(pctx); pctx=NULL;
 
     /* step 2 run DH KEM to get dh */
     enclen = EVP_PKEY_get1_tls_encodedpoint(pkE,&enc);
@@ -1525,14 +1564,14 @@ int hpke_enc(
     size_t pskidlen=(psk==NULL?0:strlen(pskid));
     erv=hpke_extract(suite,HPKE_5869_MODE_FULL,
                     (const unsigned char*)"",0,
-                    (const unsigned char*)HPKE_PSKIDHASH_LABEL,strlen(HPKE_PSKIDHASH_LABEL),
+                    HPKE_PSKIDHASH_LABEL,strlen(HPKE_PSKIDHASH_LABEL),
                     (unsigned char*)pskid,pskidlen,
                     ks_context+1,&halflen);
     if (erv!=1) goto err;
     ks_contextlen-=halflen;
     erv=hpke_extract(suite,HPKE_5869_MODE_FULL,
                     (const unsigned char*)"",0,
-                    (const unsigned char*)HPKE_INFOHASH_LABEL,strlen(HPKE_INFOHASH_LABEL),
+                    HPKE_INFOHASH_LABEL,strlen(HPKE_INFOHASH_LABEL),
                     (unsigned char*)info,infolen,
                     ks_context+1+halflen,&ks_contextlen);
     if (erv!=1) goto err;
@@ -1547,34 +1586,9 @@ int hpke_enc(
     /*
      * Extract secret and Expand variously...
      */
-
-#ifdef DRAFT_05
     erv=hpke_extract(suite,HPKE_5869_MODE_FULL,
                     (const unsigned char*)"",0,
-                    (const unsigned char*)HPKE_PSK_HASH_LABEL,strlen(HPKE_PSK_HASH_LABEL),
-                    psk,psklen,
-                    psk_hash,&psk_hashlen);
-#if defined(SUPERVERBOSE) || defined(TESTVECTORS)
-    hpke_pbuf(stdout,"\tpsk_hash",psk_hash,psk_hashlen);
-#endif
-    if (erv!=1) goto err;
-    secretlen=hpke_kdf_tab[suite.kdf_id].Nh;
-    if (secretlen>SHA512_DIGEST_LENGTH) {
-        erv=__LINE__; goto err;
-    }
-    if (hpke_extract(suite,HPKE_5869_MODE_FULL,
-                    psk_hash,psk_hashlen,
-                    (const unsigned char*)HPKE_SECRET_LABEL,strlen(HPKE_SECRET_LABEL),
-                    shared_secret,shared_secretlen,
-                    secret,&secretlen)!=1) {
-        erv=__LINE__; goto err;
-    }
-#endif
-
-#if defined(DRAFT_06) || defined(DRAFT_07)
-    erv=hpke_extract(suite,HPKE_5869_MODE_FULL,
-                    (const unsigned char*)"",0,
-                    (const unsigned char*)HPKE_PSK_HASH_LABEL,strlen(HPKE_PSK_HASH_LABEL),
+                    HPKE_PSK_HASH_LABEL,strlen(HPKE_PSK_HASH_LABEL),
                     psk,psklen,
                     psk_hash,&psk_hashlen);
 #if defined(SUPERVERBOSE) || defined(TESTVECTORS)
@@ -1587,17 +1601,16 @@ int hpke_enc(
     }
     if (hpke_extract(suite,HPKE_5869_MODE_FULL,
                     shared_secret,shared_secretlen,
-                    (const unsigned char*)HPKE_SECRET_LABEL,strlen(HPKE_SECRET_LABEL),
+                    HPKE_SECRET_LABEL,strlen(HPKE_SECRET_LABEL),
                     psk,psklen,
                     secret,&secretlen)!=1) {
         erv=__LINE__; goto err;
     }
-#endif
 
     noncelen=hpke_aead_tab[suite.aead_id].Nn;
     if (hpke_expand(suite,HPKE_5869_MODE_FULL,
                     secret,secretlen,
-                    (unsigned char*)HPKE_NONCE_LABEL,strlen(HPKE_NONCE_LABEL),
+                    HPKE_NONCE_LABEL,strlen(HPKE_NONCE_LABEL),
                     ks_context,ks_contextlen,
                     noncelen,nonce,&noncelen)!=1) {
         erv=__LINE__; goto err;
@@ -1608,7 +1621,7 @@ int hpke_enc(
     keylen=hpke_aead_tab[suite.aead_id].Nk;
     if (hpke_expand(suite,HPKE_5869_MODE_FULL,
                     secret,secretlen,
-                    (unsigned char*)HPKE_KEY_LABEL,strlen(HPKE_KEY_LABEL),
+                    HPKE_KEY_LABEL,strlen(HPKE_KEY_LABEL),
                     ks_context,ks_contextlen,
                     keylen,key,&keylen)!=1) {
         erv=__LINE__; goto err;
@@ -1616,7 +1629,7 @@ int hpke_enc(
     exporterlen=hpke_kdf_tab[suite.kdf_id].Nh;
     if (hpke_expand(suite,HPKE_5869_MODE_FULL,
                     secret,secretlen,
-                    (unsigned char*)HPKE_EXP_LABEL,strlen(HPKE_EXP_LABEL),
+                    HPKE_EXP_LABEL,strlen(HPKE_EXP_LABEL),
                     ks_context,ks_contextlen,
                     exporterlen,exporter,&exporterlen)!=1) {
         erv=__LINE__; goto err;
@@ -1643,11 +1656,13 @@ int hpke_enc(
      */
     memcpy(cipher,lcipher,lcipherlen);
     *cipherlen=lcipherlen;
-    if (enclen>*senderpublen) {
-        erv=__LINE__; goto err;
+    if (!evpcaller && !rawcaller) {
+        if (enclen>*senderpublen) {
+            erv=__LINE__; goto err;
+        }
+        memcpy(senderpub,enc,enclen);
+        *senderpublen=enclen;
     }
-    memcpy(senderpub,enc,enclen);
-    *senderpublen=enclen;
 
 err:
 
@@ -1699,12 +1714,180 @@ err:
 
     if (bfp!=NULL) BIO_free_all(bfp);
     if (pkR!=NULL) EVP_PKEY_free(pkR);
-    if (pkE!=NULL) EVP_PKEY_free(pkE);
+    if (!evpcaller && pkE!=NULL) EVP_PKEY_free(pkE);
     if (skI!=NULL) EVP_PKEY_free(skI);
     if (pctx!=NULL) EVP_PKEY_CTX_free(pctx);
     if (shared_secret!=NULL) OPENSSL_free(shared_secret);
     if (enc!=NULL) OPENSSL_free(enc);
     return erv;
+}
+
+/*!
+ * @brief HPKE single-shot encryption function
+ * @param mode is the HPKE mode
+ * @param suite is the ciphersuite to use
+ * @param pskid is the pskid string fpr a PSK mode (can be NULL)
+ * @param psklen is the psk length
+ * @param psk is the psk 
+ * @param publen is the length of the recipient public key
+ * @param pub is the encoded recipient public key
+ * @param privlen is the length of the private (authentication) key
+ * @param priv is the encoded private (authentication) key
+ * @param clearlen is the length of the cleartext
+ * @param clear is the encoded cleartext
+ * @param aadlen is the lenght of the additional data (can be zero)
+ * @param aad is the encoded additional data (can be NULL)
+ * @param infolen is the lenght of the info data (can be zero)
+ * @param info is the encoded info data (can be NULL)
+ * @param senderpublen is the length of the input buffer for the sender's public key (length used on output)
+ * @param senderpub is the input buffer for ciphertext
+ * @param cipherlen is the length of the input buffer for ciphertext (length used on output)
+ * @param cipher is the input buffer for ciphertext
+ * @return 1 for good (OpenSSL style), not-1 for error
+ */
+int hpke_enc(
+        unsigned int mode, hpke_suite_t suite,
+        char *pskid, size_t psklen, unsigned char *psk,
+        size_t publen, unsigned char *pub,
+        size_t privlen, unsigned char *priv,
+        size_t clearlen, unsigned char *clear,
+        size_t aadlen, unsigned char *aad,
+        size_t infolen, unsigned char *info,
+        size_t *senderpublen, unsigned char *senderpub,
+        size_t *cipherlen, unsigned char *cipher
+#ifdef TESTVECTORS
+        , void *tv
+#endif
+        )
+{
+    return hpke_enc_int(mode,suite,
+            pskid,psklen,psk,
+            publen,pub,
+            privlen,priv,
+            clearlen,clear,
+            aadlen,aad,
+            infolen,info,
+            0,NULL, 
+            NULL,0,NULL,
+            senderpublen,senderpub,
+            cipherlen,cipher
+#ifdef TESTVECTORS
+            , tv
+#endif
+           );
+}
+
+/*!
+ * @brief Internal HPKE single-shot encryption function
+ * @param mode is the HPKE mode
+ * @param suite is the ciphersuite to use
+ * @param pskid is the pskid string fpr a PSK mode (can be NULL)
+ * @param psklen is the psk length
+ * @param psk is the psk 
+ * @param publen is the length of the recipient public key
+ * @param pub is the encoded recipient public key
+ * @param privlen is the length of the private (authentication) key
+ * @param priv is the encoded private (authentication) key
+ * @param clearlen is the length of the cleartext
+ * @param clear is the encoded cleartext
+ * @param aadlen is the lenght of the additional data (can be zero)
+ * @param aad is the encoded additional data (can be NULL)
+ * @param infolen is the lenght of the info data (can be zero)
+ * @param info is the encoded info data (can be NULL)
+ * @param senderpublen is the length of the input buffer with the sender's public key 
+ * @param senderpub is the input buffer for sender public key
+ * @param senderpriv has the handle for the sender private key
+ * @param cipherlen is the length of the input buffer for ciphertext (length used on output)
+ * @param cipher is the input buffer for ciphertext
+ * @return 1 for good (OpenSSL style), not-1 for error
+ */
+int hpke_enc_evp(
+        unsigned int mode, hpke_suite_t suite,
+        char *pskid, size_t psklen, unsigned char *psk,
+        size_t publen, unsigned char *pub,
+        size_t privlen, unsigned char *priv,
+        size_t clearlen, unsigned char *clear,
+        size_t aadlen, unsigned char *aad,
+        size_t infolen, unsigned char *info,
+        size_t extsenderpublen, unsigned char *extsenderpub, EVP_PKEY *extsenderpriv,
+        size_t *cipherlen, unsigned char *cipher
+#ifdef TESTVECTORS
+        , void *tv
+#endif
+        )
+{
+    return hpke_enc_int(mode,suite,
+            pskid,psklen,psk,
+            publen,pub,
+            privlen,priv,
+            clearlen,clear,
+            aadlen,aad,
+            infolen,info,
+            extsenderpublen,extsenderpub, 
+            extsenderpriv, 0, NULL,
+            0,NULL,
+            cipherlen,cipher
+#ifdef TESTVECTORS
+            , tv
+#endif
+           );
+}
+
+/*!
+ * @brief Internal HPKE single-shot encryption function
+ * @param mode is the HPKE mode
+ * @param suite is the ciphersuite to use
+ * @param pskid is the pskid string fpr a PSK mode (can be NULL)
+ * @param psklen is the psk length
+ * @param psk is the psk 
+ * @param publen is the length of the recipient public key
+ * @param pub is the encoded recipient public key
+ * @param privlen is the length of the private (authentication) key
+ * @param priv is the encoded private (authentication) key
+ * @param clearlen is the length of the cleartext
+ * @param clear is the encoded cleartext
+ * @param aadlen is the lenght of the additional data (can be zero)
+ * @param aad is the encoded additional data (can be NULL)
+ * @param infolen is the lenght of the info data (can be zero)
+ * @param info is the encoded info data (can be NULL)
+ * @param senderpublen is the length of the input buffer with the sender's public key 
+ * @param senderpub is the input buffer for sender public key
+ * @param senderpriv has the handle for the sender private key
+ * @param cipherlen is the length of the input buffer for ciphertext (length used on output)
+ * @param cipher is the input buffer for ciphertext
+ * @return 1 for good (OpenSSL style), not-1 for error
+ */
+int hpke_enc_raw(
+        unsigned int mode, hpke_suite_t suite,
+        char *pskid, size_t psklen, unsigned char *psk,
+        size_t publen, unsigned char *pub,
+        size_t privlen, unsigned char *priv,
+        size_t clearlen, unsigned char *clear,
+        size_t aadlen, unsigned char *aad,
+        size_t infolen, unsigned char *info,
+        size_t extsenderpublen, unsigned char *extsenderpub, 
+        size_t rawsenderprivlen,  unsigned char *rawsenderpriv,
+        size_t *cipherlen, unsigned char *cipher
+#ifdef TESTVECTORS
+        , void *tv
+#endif
+        )
+{
+    return hpke_enc_int(mode,suite,
+            pskid,psklen,psk,
+            publen,pub,
+            privlen,priv,
+            clearlen,clear,
+            aadlen,aad,
+            infolen,info,
+            extsenderpublen,extsenderpub, 
+            NULL, rawsenderprivlen, rawsenderpriv,
+            0,NULL,
+            cipherlen,cipher
+#ifdef TESTVECTORS
+            , tv
+#endif
+           );
 }
 
 /*!
@@ -1814,6 +1997,7 @@ int hpke_dec(
 
     /* step 1. load decryptors private key */
     if (!evppriv) {
+
         if (hpke_kem_tab[suite.kem_id].Npriv==privlen) {
             if (hpke_kem_id_nist_curve(suite.kem_id)==1) {
                 skR = hpke_EVP_PKEY_new_raw_nist_private_key(hpke_kem_tab[suite.kem_id].groupid,priv,privlen);
@@ -1832,6 +2016,7 @@ int hpke_dec(
                 erv=__LINE__; goto err;
             }
         }
+
     } else {
         skR=evppriv;
     }
@@ -1857,52 +2042,32 @@ int hpke_dec(
     size_t pskidlen=(psk==NULL?0:strlen(pskid));
     erv=hpke_extract(suite,HPKE_5869_MODE_FULL,
                     (const unsigned char*)"",0,
-                    (const unsigned char*)HPKE_PSKIDHASH_LABEL,strlen(HPKE_PSKIDHASH_LABEL),
+                    HPKE_PSKIDHASH_LABEL,strlen(HPKE_PSKIDHASH_LABEL),
                     (unsigned char*)pskid,pskidlen,
                     ks_context+1,&halflen);
     if (erv!=1) goto err;
+#ifdef SUPERVERBOSE
+    hpke_pbuf(stdout,"\tpskidhash",ks_context+1,halflen);
+#endif
     ks_contextlen-=halflen;
     erv=hpke_extract(suite,HPKE_5869_MODE_FULL,
                     (const unsigned char*)"",0,
-                    (const unsigned char*)HPKE_INFOHASH_LABEL,strlen(HPKE_INFOHASH_LABEL),
+                    HPKE_INFOHASH_LABEL,strlen(HPKE_INFOHASH_LABEL),
                     info,infolen,
                     ks_context+1+halflen,&ks_contextlen);
     if (erv!=1) goto err;
+#ifdef SUPERVERBOSE
+    hpke_pbuf(stdout,"\tinfohash",ks_context+1+halflen,ks_contextlen);
+#endif
     ks_contextlen+=1+halflen;
 
     /* step 4. extracts and expands as needed */
     /*
      * Extract secret and Expand variously...
      */
-
-#ifdef DRAFT_05
     erv=hpke_extract(suite,HPKE_5869_MODE_FULL,
                     (const unsigned char*)"",0,
-                    (const unsigned char*)HPKE_PSK_HASH_LABEL,strlen(HPKE_PSK_HASH_LABEL),
-                    psk,psklen,
-                    psk_hash,&psk_hashlen);
-#if defined(SUPERVERBOSE) || defined(TESTVECTORS)
-    hpke_pbuf(stdout,"\tpsk_hash",psk_hash,psk_hashlen);
-#endif
-    if (erv!=1) goto err;
-    secretlen=hpke_kdf_tab[suite.kdf_id].Nh;
-    if (secretlen>SHA512_DIGEST_LENGTH) {
-        erv=__LINE__; goto err;
-    }
-    if (hpke_extract(suite,HPKE_5869_MODE_FULL,
-                    (const unsigned char*)psk_hash,psk_hashlen,
-                    (const unsigned char*)HPKE_SECRET_LABEL,strlen(HPKE_SECRET_LABEL),
-                    shared_secret,shared_secretlen,
-                    secret,&secretlen)!=1) {
-        erv=__LINE__; goto err;
-    }
-#endif
-
-
-#if defined(DRAFT_06) || defined(DRAFT_07)
-    erv=hpke_extract(suite,HPKE_5869_MODE_FULL,
-                    (const unsigned char*)"",0,
-                    (const unsigned char*)HPKE_PSK_HASH_LABEL,strlen(HPKE_PSK_HASH_LABEL),
+                    HPKE_PSK_HASH_LABEL,strlen(HPKE_PSK_HASH_LABEL),
                     psk,psklen,
                     psk_hash,&psk_hashlen);
 #if defined(SUPERVERBOSE) || defined(TESTVECTORS)
@@ -1915,17 +2080,16 @@ int hpke_dec(
     }
     if (hpke_extract(suite,HPKE_5869_MODE_FULL,
                     shared_secret,shared_secretlen,
-                    (const unsigned char*)HPKE_SECRET_LABEL,strlen(HPKE_SECRET_LABEL),
+                    HPKE_SECRET_LABEL,strlen(HPKE_SECRET_LABEL),
                     psk,psklen,
                     secret,&secretlen)!=1) {
         erv=__LINE__; goto err;
     }
-#endif
 
     noncelen=hpke_aead_tab[suite.aead_id].Nn;
     if (hpke_expand(suite,HPKE_5869_MODE_FULL,
                     secret,secretlen,
-                    (unsigned char*)HPKE_NONCE_LABEL,strlen(HPKE_NONCE_LABEL),
+                    HPKE_NONCE_LABEL,strlen(HPKE_NONCE_LABEL),
                     ks_context,ks_contextlen,
                     noncelen,nonce,&noncelen)!=1) {
         erv=__LINE__; goto err;
@@ -1936,7 +2100,7 @@ int hpke_dec(
     keylen=hpke_aead_tab[suite.aead_id].Nk;
     if (hpke_expand(suite,HPKE_5869_MODE_FULL,
                     secret,secretlen,
-                    (unsigned char*)HPKE_KEY_LABEL,strlen(HPKE_KEY_LABEL),
+                    HPKE_KEY_LABEL,strlen(HPKE_KEY_LABEL),
                     ks_context,ks_contextlen,
                     keylen,key,&keylen)!=1) {
         erv=__LINE__; goto err;
@@ -1944,7 +2108,7 @@ int hpke_dec(
     exporterlen=hpke_kdf_tab[suite.kdf_id].Nh;
     if (hpke_expand(suite,HPKE_5869_MODE_FULL,
                     secret,secretlen,
-                    (unsigned char*)HPKE_EXP_LABEL,strlen(HPKE_EXP_LABEL),
+                    HPKE_EXP_LABEL,strlen(HPKE_EXP_LABEL),
                     ks_context,ks_contextlen,
                     exporterlen,exporter,&exporterlen)!=1) {
         erv=__LINE__; goto err;
@@ -1952,7 +2116,7 @@ int hpke_dec(
     noncelen=hpke_aead_tab[suite.aead_id].Nn;
     if (hpke_expand(suite,HPKE_5869_MODE_FULL,
                     secret,secretlen,
-                    (unsigned char*)HPKE_NONCE_LABEL,strlen(HPKE_NONCE_LABEL),
+                    HPKE_NONCE_LABEL,strlen(HPKE_NONCE_LABEL),
                     ks_context,ks_contextlen,
                     noncelen,nonce,&noncelen)!=1) {
         erv=__LINE__; goto err;
@@ -2044,7 +2208,7 @@ err:
 /*!
  * @brief generate a key pair
  * @param mode is the mode (currently unused)
- * @param suite is the ciphersuite (currently unused)
+ * @param suite is the ciphersuite 
  * @param publen is the size of the public key buffer (exact length on output)
  * @param pub is the public value
  * @param privlen is the size of the private key buffer (exact length on output)
@@ -2117,16 +2281,8 @@ int hpke_kg(
     if (lprivlen > *privlen) {
         erv=__LINE__; goto err;
     }
-    memcpy(priv,lpriv,lprivlen);
-    /*
-     * We're actually outputting a PEM encoding so should (if we can)
-     * add a NUL byte
-     */
-    if (lprivlen < *privlen) {
-        priv[lprivlen]=0x00;
-    }
-
     *privlen=lprivlen;
+    memcpy(priv,lpriv,lprivlen);
 
 err:
 
@@ -2134,6 +2290,74 @@ err:
     if (pctx!=NULL) EVP_PKEY_CTX_free(pctx);
     if (lpub!=NULL) OPENSSL_free(lpub);
     if (bfp!=NULL) BIO_free_all(bfp);
+    return(erv);
+}
+
+/*!
+ * @brief generate a key pair keeping private inside API
+ * @param mode is the mode (currently unused)
+ * @param suite is the ciphersuite 
+ * @param publen is the size of the public key buffer (exact length on output)
+ * @param pub is the public value
+ * @param priv is the private key
+ * @return 1 for good (OpenSSL style), not-1 for error
+ */
+int hpke_kg_evp(
+        unsigned int mode, hpke_suite_t suite,
+        size_t *publen, unsigned char *pub,
+        EVP_PKEY **priv)
+{
+    if (hpke_suite_check(suite)!=1) return(__LINE__);
+    if (!pub || !priv) return(__LINE__);
+    int erv=1; /* Our error return value - 1 is success */
+    EVP_PKEY_CTX *pctx=NULL;
+    EVP_PKEY *skR=NULL;
+    unsigned char *lpub=NULL;
+
+    /* step 1. generate sender's key pair */
+    if (hpke_kem_id_nist_curve(suite.kem_id)==1) {
+        pctx = EVP_PKEY_CTX_new_id(EVP_PKEY_EC, NULL);
+        if (pctx == NULL) {
+            erv=__LINE__; goto err;
+        }
+        if (1 != EVP_PKEY_paramgen_init(pctx)) {
+            erv=__LINE__; goto err;
+        }
+        if (1 != EVP_PKEY_CTX_set_ec_paramgen_curve_nid(pctx, hpke_kem_tab[suite.kem_id].groupid)) {
+            erv=__LINE__; goto err;
+        }
+    } else {
+        pctx = EVP_PKEY_CTX_new_id(hpke_kem_tab[suite.kem_id].groupid, NULL);
+        if (pctx == NULL) {
+            erv=__LINE__; goto err;
+        }
+    }
+    if (EVP_PKEY_keygen_init(pctx) <= 0) {
+        erv=__LINE__; goto err;
+    }
+    if (EVP_PKEY_keygen(pctx, &skR) <= 0) {
+        erv=__LINE__; goto err;
+    }
+    EVP_PKEY_CTX_free(pctx); pctx=NULL;
+    size_t lpublen = EVP_PKEY_get1_tls_encodedpoint(skR,&lpub);
+    if (lpub==NULL || lpublen == 0) {
+        erv=__LINE__; goto err;
+    }
+    if (lpublen>*publen) {
+        erv=__LINE__; goto err;
+    }
+    *publen=lpublen;
+    memcpy(pub,lpub,lpublen);
+    OPENSSL_free(lpub);lpub=NULL;
+    *priv=skR;
+    if (pctx!=NULL) EVP_PKEY_CTX_free(pctx);
+    if (lpub!=NULL) OPENSSL_free(lpub);
+    return(erv);
+
+err:
+    if (skR!=NULL) EVP_PKEY_free(skR);
+    if (pctx!=NULL) EVP_PKEY_CTX_free(pctx);
+    if (lpub!=NULL) OPENSSL_free(lpub);
     return(erv);
 }
 

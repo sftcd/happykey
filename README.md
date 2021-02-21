@@ -31,7 +31,8 @@ encrypt to that public key, and finally we try a decrypt with happykey. That
 round-trip works ok in a basic test, (had some issues with test-code
 initially), so the fact that ECH from NSS to my openssl build is currently
 failing should be due to some protocol level thing and not something wrong
-inside HPKE, which should be good.
+inside HPKE, which should be good.... Aargh (and face palm;-) - turned out I
+was compiling in draft-06 labels in the openssl build of hpke. 
 
 - 20201216: Updated for draft-07, only changes made is the new
 labels, and disable support for draft-05 - still haven't added exporter stuff.

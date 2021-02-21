@@ -33,10 +33,13 @@ NINCL=  -I../nss/lib \
 # the next line:
 # testvectors=-D TESTVECTORS -I ../json-c
 
-# include DRAFT_06 or DRAFT_07 you want that - ECH (in esni-09)
-# requires DRAFT_07 (which is the current default 
-# if nothing is passed here)
-CFLAGS=-g ${testvectors} -DHAPPYKEY -DDRAFT_07
+# ECH (in esni-09) requires hpke-draft-07 labels, which is
+# what we now do. (TODO: upgrade to hpke-draft-08 once the
+# ECH/ESNI draft calls for it.
+# There used be a -DDRAFT_07 here for that and might be 
+# again in future;-)
+CFLAGS=-g ${testvectors} -DHAPPYKEY 
+
 #
 # For DRAFT_05 just omit it
 # CFLAGS=-g ${testvectors} -DHAPPYKEY 
