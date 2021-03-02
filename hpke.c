@@ -591,10 +591,6 @@ err:
 
 }
 
-#define HPKE_5869_MODE_PURE 0 ///< Do "pure" RFC5869
-#define HPKE_5869_MODE_KEM  1 ///< Abide by HPKE section 4.1
-#define HPKE_5869_MODE_FULL 2 ///< Abide by HPKE section 5.1
-
 #define HPKE_VERLABEL    "HPKE-07"  ///< The version string label
 #define HPKE_SEC41LABEL  "KEM"       ///< The "suite_id" label for 4.1
 #define HPKE_SEC51LABEL  "HPKE"      ///< The "suite_id" label for 5.1
@@ -1462,23 +1458,6 @@ static int hpke_enc_int(
     } else if (evpcaller) {
 
         pkE=extsenderpriv;
-        if (EVP_PKEY_set1_tls_encodedpoint(pkE,extsenderpub,extsenderpublen)!=1) {
-            erv=__LINE__; goto err;
-        }
-        pkE=extsenderpriv;
-
-#if 0
-        /*
-         * Double check we're a good key pair
-         */
-        unsigned char *checkpub=NULL;
-        size_t checkpublen=EVP_PKEY_get1_tls_encodedpoint(pkE,&checkpub);
-        if (checkpublen!=extsenderpublen ||
-                memcmp(checkpub,extsenderpub,checkpublen)) {
-            erv=__LINE__; goto err;
-        }
-        OPENSSL_free(checkpub);
-#endif
 
     } else if (rawcaller) {
 

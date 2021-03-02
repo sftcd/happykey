@@ -21,6 +21,8 @@ High level notes:
 
 ## Recent Changes
 
+- 20210301: fixed the ``hpke_enc_evp`` variant
+
 - 20210220: improvement/fix inside ``hpke_expand`` - was assuming desired
 output length and available buffer size (as input) were the same which is
 not always the case.

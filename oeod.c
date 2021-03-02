@@ -10,9 +10,10 @@
 /**
  * @file
  *
- * A round-trip test using NSS to encrypt and my code to decrypt.
+ * A round-trip test using my new EVP mode for the sender ephemeral to encrypt and my code to decrypt.
  *
  */
+
 
 /*
  * Openssl includes
@@ -33,20 +34,6 @@
 #include "hpke.h"
 
 #define MEMCHAR 0xfa
-
-/*
- * Our Happykey wrapper for NSS stuff
- */
-extern int nss_enc(
-        char *pskid, size_t psklen, unsigned char *psk,
-        size_t publen, unsigned char *pub,
-        size_t privlen, unsigned char *priv,
-        size_t clearlen, unsigned char *clear,
-        size_t aadlen, unsigned char *aad,
-        size_t infolen, unsigned char *info,
-        size_t *senderpublen, unsigned char *senderpub,
-        size_t *cipherlen, unsigned char *cipher
-        );
 
 /*!
  * @brief for odd/occasional debugging
@@ -96,32 +83,29 @@ int main(int argc, char **argv)
     memset(pub,MEMCHAR,publen);
     size_t privlen=HPKE_MAXSIZE; unsigned char priv[HPKE_MAXSIZE];
     memset(priv,MEMCHAR,privlen);
-#define EVP
-#ifdef EVP
+
     EVP_PKEY *privevp=NULL;
     int rv=hpke_kg_evp(
         hpke_mode, hpke_suite,
         &publen, pub,
         &privevp);
     if (rv!=1) {
-        fprintf(stderr,"Error (%d) from hpke_kg\n",rv);
+        fprintf(stderr,"Error (%d) from hpke_kg (receiver)\n",rv);
         exit(1);
     } 
-#else
-    int rv=hpke_kg(
-        hpke_mode, hpke_suite,
-        &publen, pub,
-        &privlen, priv);
-    if (rv!=1) {
-        fprintf(stderr,"Error (%d) from hpke_kg\n",rv);
-        exit(1);
-    } 
-#endif
-
-#ifndef EVP
-    printf("receiver priv:\n%s",priv);
-#endif
     neod_pbuf("receiver pub",pub,publen);
+
+    EVP_PKEY *senderpriv=NULL;
+    size_t senderpublen=HPKE_MAXSIZE; unsigned char senderpub[HPKE_MAXSIZE];
+    rv=hpke_kg_evp(
+        hpke_mode, hpke_suite,
+        &senderpublen, senderpub,
+        &senderpriv);
+    if (rv!=1) {
+        fprintf(stderr,"Error (%d) from hpke_kg (sender)\n",rv);
+        exit(1);
+    } 
+    neod_pbuf("sender pub",senderpub,senderpublen);
 
     /*
      * Setup AAD/Info buffers etc.
@@ -129,7 +113,6 @@ int main(int argc, char **argv)
     size_t aadlen=HPKE_MAXSIZE; unsigned char aad[HPKE_MAXSIZE];
     size_t infolen=HPKE_MAXSIZE; unsigned char info[HPKE_MAXSIZE];
     size_t cipherlen=HPKE_MAXSIZE; unsigned char cipher[HPKE_MAXSIZE];
-    size_t senderpublen=HPKE_MAXSIZE; unsigned char senderpub[HPKE_MAXSIZE];
     size_t psklen=0; unsigned char *psk=NULL; char *pskid=NULL;
     size_t clearlen=HPKE_MAXSIZE; unsigned char clear[HPKE_MAXSIZE];
 
@@ -150,9 +133,10 @@ int main(int argc, char **argv)
     memset(cipher,MEMCHAR,cipherlen);
 
     /*
-     * Call NSS encrypt
+     * Call EVP mode encrypt
      */
-    rv=nss_enc(
+    rv=hpke_enc_evp(
+        hpke_mode, hpke_suite,
         pskid, psklen, psk,
         publen, pub,
         0, NULL,
@@ -160,14 +144,13 @@ int main(int argc, char **argv)
         aadlen, aad,
         // 0, NULL, // infolen, info,
         infolen, info,
-        &senderpublen, senderpub,
+        senderpublen, senderpub, senderpriv,
         &cipherlen, cipher
         );
     if (rv!=1) {
         printf("Error Encrypting (%d) - exiting\n",rv);
         exit(rv);
     }
-    neod_pbuf("sender pub",senderpub,senderpublen);
     neod_pbuf("ciphertext",cipher,cipherlen);
     neod_pbuf("psk",psk,psklen);
     printf("pskid: %s\n",(pskid==NULL?"NULL":pskid));
@@ -178,11 +161,7 @@ int main(int argc, char **argv)
     rv=hpke_dec( hpke_mode, hpke_suite,
             pskid, psklen, psk,
             0, NULL, // publen, pub,
-#ifdef EVP
             0, NULL, privevp,
-#else
-            privlen, priv, NULL,
-#endif
             senderpublen, senderpub,
             cipherlen, cipher,
             aadlen,aad,

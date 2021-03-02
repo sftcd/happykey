@@ -45,7 +45,7 @@ CFLAGS=-g ${testvectors} -DHAPPYKEY
 # CFLAGS=-g ${testvectors} -DHAPPYKEY 
 CC=gcc
 
-all: hpkemain neod
+all: hpkemain neod oeod
 
 # This is a round-trip test with NSS encrypting and my code decrypting
 # (no parameters for now)
@@ -61,6 +61,15 @@ neod_nss.o: neod_nss.c
 
 neodtest: neod
 	- LD_LIBRARY_PATH=${OSSL}:${NSSL} ./neod
+
+# A round-trip to test EVP mode for sender public
+#
+oeod: oeod.o hpke.o 
+	${CC} ${CFLAGS} -g -o $@ oeod.o hpke.o -L ${OSSL} -lssl -lcrypto 
+
+oeod.o: oeod.c
+	${CC} ${CFLAGS} -g -I ${INCL} -c $<
+
 
 # do a test run
 test: hpkemain
