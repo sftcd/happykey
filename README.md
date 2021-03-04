@@ -21,6 +21,9 @@ High level notes:
 
 ## Recent Changes
 
+- 20210304: built against rebased upstream openssl - there are some
+deprecations still to handle, but otherwise happkeys is ok
+
 - 20210301: fixed the ``hpke_enc_evp`` variant
 
 - 20210220: improvement/fix inside ``hpke_expand`` - was assuming desired

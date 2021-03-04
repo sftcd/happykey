@@ -34,10 +34,8 @@ NINCL=  -I../nss/lib \
 # testvectors=-D TESTVECTORS -I ../json-c
 
 # ECH (in esni-09) requires hpke-draft-07 labels, which is
-# what we now do. (TODO: upgrade to hpke-draft-08 once the
-# ECH/ESNI draft calls for it.
-# There used be a -DDRAFT_07 here for that and might be 
-# again in future;-)
+# what we now do. That will change shortlhy to the hopefully
+# final label.
 CFLAGS=-g ${testvectors} -DHAPPYKEY 
 
 #
@@ -51,7 +49,7 @@ all: hpkemain neod oeod
 # (no parameters for now)
 
 neod: neod.o hpke.o neod_nss.o
-	${CC} ${CFLAGS} -g -o $@ neod.o hpke.o neod_nss.o -L ${OSSL} -lssl -lcrypto -L ${NSSL} -lnss3 -lnspr4
+	LD_LIBRARY_PATH=${OSSL}:${NSSL} ${CC} ${CFLAGS} -g -o $@ neod.o hpke.o neod_nss.o -L ${OSSL} -lssl -lcrypto -L ${NSSL} -lnss3 -lnspr4
 
 neod.o: neod.c
 	${CC} ${CFLAGS} -g -I ${INCL} -c $<
@@ -103,6 +101,7 @@ docclean:
 
 clean:
 	- rm -f hpkemain.o hpke.o hpketv.o hpkemain 
-	- rm -f neod.o neod_nss.o 
+	- rm -f neod neod.o neod_nss.o 
+	- rm -f oeod oeod.o
 	- rm -rf scratch/*
 

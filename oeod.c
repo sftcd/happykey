@@ -79,6 +79,7 @@ int main(int argc, char **argv)
      */
     int hpke_mode=HPKE_MODE_BASE;
     hpke_suite_t hpke_suite = HPKE_SUITE_DEFAULT;
+    hpke_suite.kem_id=HPKE_KEM_ID_P384;
     size_t publen=HPKE_MAXSIZE; unsigned char pub[HPKE_MAXSIZE];
     memset(pub,MEMCHAR,publen);
     size_t privlen=HPKE_MAXSIZE; unsigned char priv[HPKE_MAXSIZE];
@@ -142,10 +143,12 @@ int main(int argc, char **argv)
         0, NULL,
         clearlen, clear,
         aadlen, aad,
-        // 0, NULL, // infolen, info,
         infolen, info,
         senderpublen, senderpub, senderpriv,
         &cipherlen, cipher
+#ifdef TESTVECTORS
+        , NULL
+#endif
         );
     if (rv!=1) {
         printf("Error Encrypting (%d) - exiting\n",rv);
@@ -158,16 +161,17 @@ int main(int argc, char **argv)
     /*
      * Call happykey decrypt
      */
-    rv=hpke_dec( hpke_mode, hpke_suite,
+    rv=hpke_dec( 
+            hpke_mode, hpke_suite,
             pskid, psklen, psk,
             0, NULL, // publen, pub,
             0, NULL, privevp,
             senderpublen, senderpub,
             cipherlen, cipher,
             aadlen,aad,
-            // 0, NULL, // infolen, info,
             infolen, info,
-            &clearlen, clear); 
+            &clearlen, clear
+            ); 
     if (rv!=1) {
         printf("Error decrypting (%d) - exiting\n",rv);
         exit(rv);
