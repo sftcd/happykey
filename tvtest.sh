@@ -44,11 +44,13 @@ function usage()
     echo "  -t <file> to use the given test vector file"
     echo "  -h means print this"
     echo "  -v means be verbose"
+    echo "  -s means be super-verbose"
     echo "  -V means run with valgrind"
     exit 99
 }
 # default values for parameters
 verbose="no"
+superverbose="no"
 VG="no"
 
 # We're used to guess which draft, based on the content of 
@@ -64,7 +66,7 @@ VG="no"
 TVFILE="test-vectors-07.json"
 
 # options may be followed by one colon to indicate they have a required argument
-if ! options=$(/usr/bin/getopt -s bash -o ht:vV -l help,testvectors:,verbose,valgrind -- "$@")
+if ! options=$(/usr/bin/getopt -s bash -o hst:vV -l help,super,testvectors:,verbose,valgrind -- "$@")
 then
     # something went wrong, getopt will put out an error message for us
     exit 1
@@ -75,6 +77,7 @@ while [ $# -gt 0 ]
 do
     case "$1" in
         -h|--help) usage;;
+        -s|--super) superverbose="yes" ;;
         -t|--testvectors) TVFILE=$2; shift ;;
         -v|--verbose) verbose="yes" ;;
         -V|--valgrind) VG="yes" ;;
@@ -104,7 +107,14 @@ do
                     VALGRIND="valgrind --leak-check=full --show-leak-kinds=all"
 	                $VALGRIND $BINDIR/hpkemain -T$TVFILE -m $mode -c $kem,$kdf,$aead 
                 else 
-	                $BINDIR/hpkemain -T$TVFILE -m $mode -c $kem,$kdf,$aead >/dev/null 2>&1
+                    if [[ "$superverbose" == "yes" ]]
+                    then
+                        echo "====="
+                        echo "Running: $BINDIR/hpkemain -T$TVFILE -m $mode -c $kem,$kdf,$aead"
+	                    $BINDIR/hpkemain -T$TVFILE -m $mode -c $kem,$kdf,$aead 
+                    else
+	                    $BINDIR/hpkemain -T$TVFILE -m $mode -c $kem,$kdf,$aead >/dev/null 2>&1
+                    fi
                 fi
 	            res=$?
 	            if [[ "$res" == "0" ]]

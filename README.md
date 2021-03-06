@@ -21,6 +21,9 @@ High level notes:
 
 ## Recent Changes
 
+- 20210305: Added external API to map from buffer & kem-id to private
+key.
+
 - 20210304: built against rebased upstream openssl - there are some
 deprecations still to handle, but otherwise happkeys is ok
 

@@ -806,6 +806,27 @@ int main(int argc, char **argv)
             fprintf(stderr,"Error reading input - exiting\n");
             exit(rv);
         }
+#define USEBUF2EVP
+#ifdef USEBUF2EVP
+        EVP_PKEY *privevp=NULL;
+        rv=hpke_prbuf2evp(hpke_suite.kem_id,
+                priv,
+                privlen,
+                &privevp);
+        if (rv!=1) {
+            fprintf(stderr,"Error mapping private key 2 EVP - exiting\n");
+            exit(rv);
+        }
+        rv=hpke_dec( hpke_mode, hpke_suite,
+                pskid, psklen, psk,
+                publen, pub,
+                0, NULL, privevp,
+                senderpublen, senderpub,
+                cipherlen, cipher,
+                aadlen,aad,
+                infolen,info,
+                &clearlen, clear); 
+#else
         rv=hpke_dec( hpke_mode, hpke_suite,
                 pskid, psklen, psk,
                 publen, pub,
@@ -815,11 +836,15 @@ int main(int argc, char **argv)
                 aadlen,aad,
                 infolen,info,
                 &clearlen, clear); 
+#endif
         if (pub!=NULL) OPENSSL_free(pub);
         if (priv!=NULL) OPENSSL_free(priv);
         if (info!=NULL) OPENSSL_free(info);
         if (aad!=NULL) OPENSSL_free(aad);
         if (psk) OPENSSL_free(psk);
+#ifdef USEBUF2EVP
+        if (privevp) EVP_PKEY_free(privevp);
+#endif
         if (rv!=1) {
             fprintf(stderr,"Error decrypting (%d) - exiting\n",rv);
             exit(rv);
