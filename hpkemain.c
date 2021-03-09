@@ -810,8 +810,8 @@ int main(int argc, char **argv)
 #ifdef USEBUF2EVP
         EVP_PKEY *privevp=NULL;
         rv=hpke_prbuf2evp(hpke_suite.kem_id,
-                priv,
-                privlen,
+                priv, privlen,
+                NULL, 0,
                 &privevp);
         if (rv!=1) {
             fprintf(stderr,"Error mapping private key 2 EVP - exiting\n");

@@ -21,6 +21,10 @@ High level notes:
 
 ## Recent Changes
 
+- 20210309: Still needs tidying but I've gotten rid of the deprecation
+warnings finally. So this is just an overnight checkpoint before I
+tidy that up.
+
 - 20210305: Added external API to map from buffer & kem-id to private
 key.
 
