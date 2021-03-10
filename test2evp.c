@@ -162,7 +162,7 @@ int main(int argc, char **argv)
     ah_decode(strlen(xpubstr),xpubstr,&xpublen,&xpubbuf);
 
     /* 
-     * First do a p-256 one that works, then an x25519 one that does not.
+     * First do p-256 then x25519 
      */
 
     rv=bufs2evp("EC","P-256",nprivbuf,nprivlen,npubbuf,npublen,&retkey);
