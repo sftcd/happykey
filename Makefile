@@ -31,7 +31,7 @@ NINCL=  -I../nss/lib \
 # There are test vectors for this - see comments in hpketv.h.
 # If you want to compile in test vector checks then uncomment 
 # the next line:
-# testvectors=-D TESTVECTORS -I ../json-c
+testvectors=-D TESTVECTORS -I ../json-c
 
 # ECH (in esni-09) requires hpke-draft-07 labels, which is
 # what we now do. That will change shortlhy to the hopefully

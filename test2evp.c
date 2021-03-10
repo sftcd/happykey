@@ -11,9 +11,8 @@
  * @file
  *
  * A couple of tests making EVP_PKEY's from pub/priv for NIST and non-NIST algs
- * (I've not found a way to get the same code to work, so this is just a simplified
- * demo of that problem.)
- *
+ * Took a while, and some help, to figure out which flavour of what to put 
+ * where.
  */
 
 #include <stddef.h>
@@ -29,6 +28,7 @@
 #include <openssl/core_names.h>
 
 int bufs2evp(
+        const char *keytype,
         char *groupname,
         unsigned char *privbuf, size_t privbuflen,
         unsigned char *pubuf, size_t pubuflen,
@@ -41,38 +41,38 @@ int bufs2evp(
     OSSL_PARAM_BLD *param_bld=NULL;;
     OSSL_PARAM *params = NULL;
 
-    priv = BN_bin2bn(privbuf, privbuflen, NULL);
-    if (!priv) {
-        erv=__LINE__; goto err; 
-    } 
     param_bld = OSSL_PARAM_BLD_new();
     if (!param_bld) {
         erv=__LINE__; goto err; 
     }
+    if (groupname!=NULL && OSSL_PARAM_BLD_push_utf8_string(param_bld, "group", groupname,0)!=1) {
+        erv=__LINE__; goto err; 
+    }
     if (pubuf && pubuflen>0) {
-        if (OSSL_PARAM_BLD_push_utf8_string(param_bld, "group", groupname,0)!=1) {
-            erv=__LINE__; goto err; 
-        }
-        if (OSSL_PARAM_BLD_push_BN(param_bld, "priv", priv)!=1) {
-            erv=__LINE__; goto err; 
-        }
         if (OSSL_PARAM_BLD_push_octet_string(param_bld, "pub", pubuf, pubuflen)!=1) {
             erv=__LINE__; goto err; 
         }
-        params = OSSL_PARAM_BLD_to_param(param_bld);
-    } else {
-        if (OSSL_PARAM_BLD_push_utf8_string(param_bld, "group", groupname,0)!=1) {
+    } 
+    if (keytype && strlen(keytype)==2 && !strcmp(keytype,"EC")) {
+        priv = BN_bin2bn(privbuf, privbuflen, NULL);
+        if (!priv) {
             erv=__LINE__; goto err; 
-        }
+        } 
         if (OSSL_PARAM_BLD_push_BN(param_bld, "priv", priv)!=1) {
             erv=__LINE__; goto err; 
         }
-        params = OSSL_PARAM_BLD_to_param(param_bld);
+    } else {
+        if (OSSL_PARAM_BLD_push_octet_string(param_bld, "priv", privbuf, privbuflen)!=1) {
+            erv=__LINE__; goto err; 
+        }
     }
+
+    params = OSSL_PARAM_BLD_to_param(param_bld);
     if (!params) {
         erv=__LINE__; goto err; 
     }
-    ctx = EVP_PKEY_CTX_new_from_name(NULL,"EC", NULL);
+
+    ctx = EVP_PKEY_CTX_new_from_name(NULL,keytype, NULL);
     if (ctx == NULL) {
         erv=__LINE__; goto err; 
     }
@@ -82,7 +82,6 @@ int bufs2evp(
     if (EVP_PKEY_fromdata(ctx, pkey, EVP_PKEY_KEYPAIR, params) <= 0) {
         erv=__LINE__; goto err; 
     } 
-    BN_free(priv);
     EVP_PKEY_CTX_free(ctx);
     OSSL_PARAM_BLD_free(param_bld);
     OSSL_PARAM_BLD_free_params(params);
@@ -92,7 +91,6 @@ err:
     if (ctx) EVP_PKEY_CTX_free(ctx);
     if (param_bld) OSSL_PARAM_BLD_free(param_bld);
     if (params) OSSL_PARAM_BLD_free_params(params);
-    // leaky but doesn't matter here
     return erv;
 }
 
@@ -167,7 +165,7 @@ int main(int argc, char **argv)
      * First do a p-256 one that works, then an x25519 one that does not.
      */
 
-    rv=bufs2evp("P-256",nprivbuf,nprivlen,npubbuf,npublen,&retkey);
+    rv=bufs2evp("EC","P-256",nprivbuf,nprivlen,npubbuf,npublen,&retkey);
     if (rv==1) {
         printf("P-256 with key pair worked\n");
     } else {
@@ -175,7 +173,7 @@ int main(int argc, char **argv)
     }
     EVP_PKEY_free(retkey);retkey=NULL;
 
-    rv=bufs2evp("P-256",nprivbuf,nprivlen,NULL,0,&retkey);
+    rv=bufs2evp("EC","P-256",nprivbuf,nprivlen,NULL,0,&retkey);
     if (rv==1) {
         printf("P-256 with just private key worked\n");
     } else {
@@ -183,7 +181,7 @@ int main(int argc, char **argv)
     }
     EVP_PKEY_free(retkey);retkey=NULL;
 
-    rv=bufs2evp("X25519",xprivbuf,xprivlen,xpubbuf,xpublen,&retkey);
+    rv=bufs2evp("X25519",NULL,xprivbuf,xprivlen,xpubbuf,xpublen,&retkey);
     if (rv==1) {
         printf("X25519 with key pair worked\n");
     } else {
@@ -191,7 +189,7 @@ int main(int argc, char **argv)
     }
     EVP_PKEY_free(retkey);retkey=NULL;
 
-    rv=bufs2evp("X25519",xprivbuf,xprivlen,NULL,0,&retkey);
+    rv=bufs2evp("X25519",NULL,xprivbuf,xprivlen,NULL,0,&retkey);
     if (rv==1) {
         printf("X25519 with just private key worked\n");
     } else {
