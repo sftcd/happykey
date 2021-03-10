@@ -31,7 +31,7 @@ NINCL=  -I../nss/lib \
 # There are test vectors for this - see comments in hpketv.h.
 # If you want to compile in test vector checks then uncomment 
 # the next line:
-#testvectors=-D TESTVECTORS -I ../json-c
+# testvectors=-D TESTVECTORS -I ../json-c
 
 # ECH (in esni-09) requires hpke-draft-07 labels, which is
 # what we now do. That will change shortlhy to the hopefully
@@ -43,7 +43,7 @@ CFLAGS=-g ${testvectors} -DHAPPYKEY
 # CFLAGS=-g ${testvectors} -DHAPPYKEY 
 CC=gcc
 
-all: hpkemain neod oeod
+all: hpkemain neod oeod test2evp
 
 # This is a round-trip test with NSS encrypting and my code decrypting
 # (no parameters for now)
@@ -66,6 +66,14 @@ oeod: oeod.o hpke.o
 	${CC} ${CFLAGS} -g -o $@ oeod.o hpke.o -L ${OSSL} -lssl -lcrypto 
 
 oeod.o: oeod.c
+	${CC} ${CFLAGS} -g -I ${INCL} -c $<
+
+# A test of a buffer->EVP_PKEY problem
+
+test2evp: test2evp.o 
+	LD_LIBRARY_PATH=${OSSL} ${CC} ${CFLAGS} -g -o $@ test2evp.o -L ${OSSL} -lssl -lcrypto 
+
+test2evp.o: test2evp.c
 	${CC} ${CFLAGS} -g -I ${INCL} -c $<
 
 
@@ -103,5 +111,6 @@ clean:
 	- rm -f hpkemain.o hpke.o hpketv.o hpkemain 
 	- rm -f neod neod.o neod_nss.o 
 	- rm -f oeod oeod.o
+	- rm -f test2evp test2evp.o
 	- rm -rf scratch/*
 

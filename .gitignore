@@ -2,5 +2,7 @@
 *.o
 hpkemain
 neod
+oeod
+test2evp
 doxy/
 scratch/

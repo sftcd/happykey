@@ -21,6 +21,9 @@ High level notes:
 
 ## Recent Changes
 
+- 20210310: added test2evp.c to see if we can unify the buffer to
+``EVP_PKEY`` code for NIST and non-NIST curves.
+
 - 20210309: Still needs tidying but I've gotten rid of the deprecation
 warnings finally. So this is just an overnight checkpoint before I
 tidy that up.

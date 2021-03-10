@@ -145,8 +145,8 @@ hpke_kem_info_t hpke_kem_tab[]={
     {29, NULL, 0, NULL, 0, 0, 0 }, // this is needed to keep indexing correct
     {30, NULL, 0, NULL, 0, 0, 0 }, // this is needed to keep indexing correct
     {31, NULL, 0, NULL, 0, 0, 0 }, // this is needed to keep indexing correct
-    { HPKE_KEM_ID_25519, "x25519", EVP_PKEY_X25519, EVP_sha256, 32, 32, 32, 32 },
-    { HPKE_KEM_ID_448, "x448", EVP_PKEY_X448, EVP_sha512, 64, 56, 56, 56 },
+    { HPKE_KEM_ID_25519, "X25519", EVP_PKEY_X25519, EVP_sha256, 32, 32, 32, 32 },
+    { HPKE_KEM_ID_448, "X448", EVP_PKEY_X448, EVP_sha512, 64, 56, 56, 56 },
     {34, NULL, 0, NULL, 0, 0, 0 }, // this is needed to keep indexing correct
 };
 
@@ -1300,6 +1300,7 @@ static EVP_PKEY* hpke_EVP_PKEY_new_raw_nist_private_key(
 
     }
     ctx = EVP_PKEY_CTX_new_from_name(NULL, "EC", NULL);
+    //ctx = EVP_PKEY_CTX_new_id(hpke_kem_tab[curve].groupid, NULL);
     if (ctx == NULL
         || params == NULL
         || EVP_PKEY_fromdata_init(ctx) <= 0
@@ -1402,13 +1403,13 @@ err:
     } else {
         printf("%s: ret is NULL\n",__func__);
     }
-    //pblen=EC_KEY_priv2buf(ec_key,&pbuf);
-    //hpke_pbuf(stdout,"EARLY private",pbuf,pblen); 
 #endif
 #ifdef NEWWAY
     if (erv!=1 && ret) EVP_PKEY_free(ret);
 #endif
 #ifdef OLDWAY
+    pblen=EC_KEY_priv2buf(ec_key,&pbuf);
+    hpke_pbuf(stdout,"EARLY private",pbuf,pblen); 
     if (pub_key) EC_POINT_free(pub_key);
 #endif
     if (erv==1) return(ret);
@@ -1601,7 +1602,6 @@ static int hpke_enc_int(
 
     /* load auth key pair if using an auth mode */
     if (mode==HPKE_MODE_AUTH||mode==HPKE_MODE_PSKAUTH) {
-        //erv=hpke_prbuf2evp(suite.kem_id,priv,privlen,NULL,0,&skI);
 #ifdef TESTVECTORS
         if (ltv) {
             unsigned char *bin_pkS=NULL; size_t bin_pkSlen=0;
@@ -1615,8 +1615,8 @@ static int hpke_enc_int(
 #else
         erv=hpke_prbuf2evp(suite.kem_id,priv,privlen,pub,publen,&skI);
 #endif
-
         if (erv!=1) goto err;
+
         if (!skI) { 
             erv=__LINE__;goto err;
         }
@@ -2463,7 +2463,7 @@ int hpke_prbuf2evp(
         size_t prbuf_len,
         unsigned char *pubuf,
         size_t pubuf_len,
-        EVP_PKEY **priv)
+        EVP_PKEY **retpriv)
 {
     int erv=1;
 #if defined(SUPERVERBOSE) || defined(TESTVECTORS)
@@ -2473,67 +2473,56 @@ int hpke_prbuf2evp(
 #endif
 
     EVP_PKEY *lpriv=NULL;
-    if (prbuf==NULL || prbuf_len==0 || priv==NULL) {
+    if (prbuf==NULL || prbuf_len==0 || retpriv==NULL) {
         return __LINE__;
     }
     if (hpke_kem_id_check(kem_id)!=1) return(__LINE__);
 
-#undef NEWWAY
-#ifdef NEWWAY
+#undef NEWESTWAY
+#ifdef NEWESTWAY
     if (hpke_kem_tab[kem_id].Npriv==prbuf_len) {
-        if (hpke_kem_id_nist_curve(kem_id)==1) {
 
-            /*
-             * We're still (for now) special-casing NIST curves
-             */
-
-	        EVP_PKEY_CTX *ctx;
-	        BIGNUM *priv;
-	        OSSL_PARAM_BLD *param_bld;
-	        OSSL_PARAM *params = NULL;
-	        priv = BN_bin2bn(prbuf, prbuf_len, NULL);
-	        if (!priv) {
-	            erv=__LINE__; goto err; 
-	        } 
-	        param_bld = OSSL_PARAM_BLD_new();
-	        if (param_bld==NULL) {
-	            erv=__LINE__; goto err; 
-	        }
-	        if (pubuf && pubuf_len>0) {
-	            if (OSSL_PARAM_BLD_push_utf8_string(param_bld, "group", hpke_kem_tab[kem_id].algstr,0)
-	                && OSSL_PARAM_BLD_push_BN(param_bld, "priv", priv)
-	                && OSSL_PARAM_BLD_push_octet_string(param_bld, "pub", pubuf, pubuf_len )) {
-	                    params = OSSL_PARAM_BLD_to_param(param_bld);
-	            }
-	        } else {
-	            if (OSSL_PARAM_BLD_push_utf8_string(param_bld, "group", hpke_kem_tab[kem_id].algstr,0)
-	                && OSSL_PARAM_BLD_push_BN(param_bld, "priv", priv)) {
-	                    params = OSSL_PARAM_BLD_to_param(param_bld);
-	            }
-	        }
-	        if (!params) {
-	            erv=__LINE__; goto err; 
-	        }
-	        ctx = EVP_PKEY_CTX_new_from_name(NULL, "EC", NULL);
-	        if (ctx == NULL
-	            || params == NULL
-	            || EVP_PKEY_fromdata_init(ctx) <= 0
-	            || EVP_PKEY_fromdata(ctx, &lpriv, EVP_PKEY_KEYPAIR, params) <= 0) {
-	            erv=__LINE__; goto err; 
-	        } 
-	        EVP_PKEY_CTX_free(ctx);
-	        OSSL_PARAM_BLD_free_params(params);
-	        OSSL_PARAM_BLD_free(param_bld);
-
-        } else {
-            lpriv=EVP_PKEY_new_raw_private_key(hpke_kem_tab[kem_id].groupid,NULL,prbuf,prbuf_len);
+        EVP_PKEY_CTX *ctx;
+        BIGNUM *priv;
+        OSSL_PARAM_BLD *param_bld;
+        OSSL_PARAM *params = NULL;
+        priv = BN_bin2bn(prbuf, prbuf_len, NULL);
+        if (!priv) {
+            erv=__LINE__; goto err; 
+        } 
+        param_bld = OSSL_PARAM_BLD_new();
+        if (param_bld==NULL) {
+            erv=__LINE__; goto err; 
         }
+        if (OSSL_PARAM_BLD_push_utf8_string(param_bld, "group", hpke_kem_tab[kem_id].algstr,0)
+            && OSSL_PARAM_BLD_push_BN(param_bld, "priv", priv)
+            && OSSL_PARAM_BLD_push_octet_string(param_bld, "pub", pubuf, pubuf_len )) {
+                params = OSSL_PARAM_BLD_to_param(param_bld);
+        }
+        if (!params) {
+            erv=__LINE__; goto err; 
+        }
+        ctx = EVP_PKEY_CTX_new_from_name(NULL, "EC", NULL);
+        if (ctx == NULL) {
+            erv=__LINE__; goto err; 
+        }
+        if (EVP_PKEY_fromdata_init(ctx) <= 0) {
+            erv=__LINE__; goto err; 
+        } 
+        if (EVP_PKEY_fromdata(ctx, &lpriv, EVP_PKEY_KEYPAIR, params) <= 0) {
+            erv=__LINE__; goto err; 
+        } 
+        EVP_PKEY_CTX_free(ctx);
+        OSSL_PARAM_BLD_free_params(params);
+        OSSL_PARAM_BLD_free(param_bld);
+        if (!lpriv) {
+            erv=__LINE__; goto err; 
+        } 
 
     }
 #else
     if (hpke_kem_tab[kem_id].Npriv==prbuf_len) {
         if (hpke_kem_id_nist_curve(kem_id)==1) {
-            //lpriv = hpke_EVP_PKEY_new_raw_nist_private_key(hpke_kem_tab[kem_id].groupid,prbuf,prbuf_len);
             lpriv = hpke_EVP_PKEY_new_raw_nist_private_key(kem_id,prbuf,prbuf_len,pubuf,pubuf_len);
         } else {
             lpriv=EVP_PKEY_new_raw_private_key(hpke_kem_tab[kem_id].groupid,NULL,prbuf,prbuf_len);
@@ -2580,12 +2569,15 @@ int hpke_prbuf2evp(
         }
     }
     if (!lpriv) return(__LINE__); 
-    *priv=lpriv;
+    *retpriv=lpriv;
 #if defined(SUPERVERBOSE) || defined(TESTVECTORS)
     printf("hpke_prbuf2evp success\n");
 #endif
     return(1);
 err:
+#if defined(SUPERVERBOSE) || defined(TESTVECTORS)
+    printf("hpke_prbuf2evp FAILED at %d\n",erv);
+#endif
     // clean up
     return(0);
 }
