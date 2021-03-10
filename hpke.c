@@ -98,7 +98,8 @@ const char *hpke_aead_strtab[]={
  */
 typedef struct {
     uint16_t            kem_id; ///< code point for key encipherment method
-    char                *algstr; ///< string form of algorithm name
+    const char          *keytype; ///< string form of algorithm type "EC"/"X25519"/"X448"
+    const char          *groupname; ///< string form of EC group needed for NIST curves "P-256"/"p-384"/"p-521"
     int                 groupid; ///< NID of KEM
     const EVP_MD*       (*hash_init_func)(void); ///< the hash alg we're using for the HKDF
     size_t              Nsecret; ///< size of secrets
@@ -113,41 +114,41 @@ typedef struct {
  * Ok we're wasting space here, but not much and it's ok
  */
 hpke_kem_info_t hpke_kem_tab[]={
-    { 0, NULL, 0, NULL, 0, 0, 0 }, // this is needed to keep indexing correct
-    { 1, NULL, 0, NULL, 0, 0, 0 }, // this is needed to keep indexing correct
-    { 2, NULL, 0, NULL, 0, 0, 0 }, // this is needed to keep indexing correct
-    { 3, NULL, 0, NULL, 0, 0, 0 }, // this is needed to keep indexing correct
-    { 4, NULL, 0, NULL, 0, 0, 0 }, // this is needed to keep indexing correct
-    { 5, NULL, 0, NULL, 0, 0, 0 }, // this is needed to keep indexing correct
-    { 6, NULL, 0, NULL, 0, 0, 0 }, // this is needed to keep indexing correct
-    { 7, NULL, 0, NULL, 0, 0, 0 }, // this is needed to keep indexing correct
-    { 8, NULL, 0, NULL, 0, 0, 0 }, // this is needed to keep indexing correct
-    { 9, NULL, 0, NULL, 0, 0, 0 }, // this is needed to keep indexing correct
-    {10, NULL, 0, NULL, 0, 0, 0 }, // this is needed to keep indexing correct
-    {11, NULL, 0, NULL, 0, 0, 0 }, // this is needed to keep indexing correct
-    {12, NULL, 0, NULL, 0, 0, 0 }, // this is needed to keep indexing correct
-    {13, NULL, 0, NULL, 0, 0, 0 }, // this is needed to keep indexing correct
-    {14, NULL, 0, NULL, 0, 0, 0 }, // this is needed to keep indexing correct
-    {15, NULL, 0, NULL, 0, 0, 0 }, // this is needed to keep indexing correct
-    { HPKE_KEM_ID_P256, "P-256", NID_X9_62_prime256v1, EVP_sha256, 32, 65, 65, 32 }, // maybe "prime256v1" instead of P-256?
-    { HPKE_KEM_ID_P384, "P-384", NID_secp384r1, EVP_sha384, 48, 97, 97, 48 },
-    { HPKE_KEM_ID_P521, "P-521", NID_secp521r1, EVP_sha512, 64, 133, 133, 66 },
-    {19, NULL, 0, NULL, 0, 0, 0 }, // this is needed to keep indexing correct
-    {20, NULL, 0, NULL, 0, 0, 0 }, // this is needed to keep indexing correct
-    {21, NULL, 0, NULL, 0, 0, 0 }, // this is needed to keep indexing correct
-    {22, NULL, 0, NULL, 0, 0, 0 }, // this is needed to keep indexing correct
-    {23, NULL, 0, NULL, 0, 0, 0 }, // this is needed to keep indexing correct
-    {24, NULL, 0, NULL, 0, 0, 0 }, // this is needed to keep indexing correct
-    {25, NULL, 0, NULL, 0, 0, 0 }, // this is needed to keep indexing correct
-    {26, NULL, 0, NULL, 0, 0, 0 }, // this is needed to keep indexing correct
-    {27, NULL, 0, NULL, 0, 0, 0 }, // this is needed to keep indexing correct
-    {28, NULL, 0, NULL, 0, 0, 0 }, // this is needed to keep indexing correct
-    {29, NULL, 0, NULL, 0, 0, 0 }, // this is needed to keep indexing correct
-    {30, NULL, 0, NULL, 0, 0, 0 }, // this is needed to keep indexing correct
-    {31, NULL, 0, NULL, 0, 0, 0 }, // this is needed to keep indexing correct
-    { HPKE_KEM_ID_25519, "X25519", EVP_PKEY_X25519, EVP_sha256, 32, 32, 32, 32 },
-    { HPKE_KEM_ID_448, "X448", EVP_PKEY_X448, EVP_sha512, 64, 56, 56, 56 },
-    {34, NULL, 0, NULL, 0, 0, 0 }, // this is needed to keep indexing correct
+    { 0, NULL, NULL, 0, NULL, 0, 0, 0 }, // this is needed to keep indexing correct
+    { 1, NULL, NULL, 0, NULL, 0, 0, 0 }, // this is needed to keep indexing correct
+    { 2, NULL, NULL, 0, NULL, 0, 0, 0 }, // this is needed to keep indexing correct
+    { 3, NULL, NULL, 0, NULL, 0, 0, 0 }, // this is needed to keep indexing correct
+    { 4, NULL, NULL, 0, NULL, 0, 0, 0 }, // this is needed to keep indexing correct
+    { 5, NULL, NULL, 0, NULL, 0, 0, 0 }, // this is needed to keep indexing correct
+    { 6, NULL, NULL, 0, NULL, 0, 0, 0 }, // this is needed to keep indexing correct
+    { 7, NULL, NULL, 0, NULL, 0, 0, 0 }, // this is needed to keep indexing correct
+    { 8, NULL, NULL, 0, NULL, 0, 0, 0 }, // this is needed to keep indexing correct
+    { 9, NULL, NULL, 0, NULL, 0, 0, 0 }, // this is needed to keep indexing correct
+    {10, NULL, NULL, 0, NULL, 0, 0, 0 }, // this is needed to keep indexing correct
+    {11, NULL, NULL, 0, NULL, 0, 0, 0 }, // this is needed to keep indexing correct
+    {12, NULL, NULL, 0, NULL, 0, 0, 0 }, // this is needed to keep indexing correct
+    {13, NULL, NULL, 0, NULL, 0, 0, 0 }, // this is needed to keep indexing correct
+    {14, NULL, NULL, 0, NULL, 0, 0, 0 }, // this is needed to keep indexing correct
+    {15, NULL, NULL, 0, NULL, 0, 0, 0 }, // this is needed to keep indexing correct
+    { HPKE_KEM_ID_P256, "EC", "P-256", NID_X9_62_prime256v1, EVP_sha256, 32, 65, 65, 32 }, // maybe "prime256v1" instead of P-256?
+    { HPKE_KEM_ID_P384, "EC", "P-384", NID_secp384r1, EVP_sha384, 48, 97, 97, 48 },
+    { HPKE_KEM_ID_P521, "EC", "P-521", NID_secp521r1, EVP_sha512, 64, 133, 133, 66 },
+    {19, NULL, NULL, 0, NULL, 0, 0, 0 }, // this is needed to keep indexing correct
+    {20, NULL, NULL, 0, NULL, 0, 0, 0 }, // this is needed to keep indexing correct
+    {21, NULL, NULL, 0, NULL, 0, 0, 0 }, // this is needed to keep indexing correct
+    {22, NULL, NULL, 0, NULL, 0, 0, 0 }, // this is needed to keep indexing correct
+    {23, NULL, NULL, 0, NULL, 0, 0, 0 }, // this is needed to keep indexing correct
+    {24, NULL, NULL, 0, NULL, 0, 0, 0 }, // this is needed to keep indexing correct
+    {25, NULL, NULL, 0, NULL, 0, 0, 0 }, // this is needed to keep indexing correct
+    {26, NULL, NULL, 0, NULL, 0, 0, 0 }, // this is needed to keep indexing correct
+    {27, NULL, NULL, 0, NULL, 0, 0, 0 }, // this is needed to keep indexing correct
+    {28, NULL, NULL, 0, NULL, 0, 0, 0 }, // this is needed to keep indexing correct
+    {29, NULL, NULL, 0, NULL, 0, 0, 0 }, // this is needed to keep indexing correct
+    {30, NULL, NULL, 0, NULL, 0, 0, 0 }, // this is needed to keep indexing correct
+    {31, NULL, NULL, 0, NULL, 0, 0, 0 }, // this is needed to keep indexing correct
+    { HPKE_KEM_ID_25519, "X25519", NULL, EVP_PKEY_X25519, EVP_sha256, 32, 32, 32, 32 },
+    { HPKE_KEM_ID_448, "X448", NULL, EVP_PKEY_X448, EVP_sha512, 64, 56, 56, 56 },
+    {34, NULL, NULL, 0, NULL, 0, 0, 0 }, // this is needed to keep indexing correct
 };
 
 /*
@@ -1268,9 +1269,8 @@ static EVP_PKEY* hpke_EVP_PKEY_new_raw_nist_private_key(
     int erv=1;
     EVP_PKEY *ret=NULL;
 
-#define NEWWAY
+#undef NEWWAY
 #ifdef NEWWAY
-
     EVP_PKEY_CTX *ctx;
     BIGNUM *priv;
     OSSL_PARAM_BLD *param_bld;
@@ -1282,7 +1282,7 @@ static EVP_PKEY* hpke_EVP_PKEY_new_raw_nist_private_key(
     param_bld = OSSL_PARAM_BLD_new();
     if (pubbuf && pubbuflen>0) {
         if (priv != NULL && param_bld != NULL
-            && OSSL_PARAM_BLD_push_utf8_string(param_bld, "group", hpke_kem_tab[curve].algstr, 0)
+            && OSSL_PARAM_BLD_push_utf8_string(param_bld, "group", hpke_kem_tab[curve].groupname, 0)
             && OSSL_PARAM_BLD_push_BN(param_bld, "priv", priv)
             && OSSL_PARAM_BLD_push_octet_string(param_bld, "pub", pubbuf, pubbuflen )) {
                 params = OSSL_PARAM_BLD_to_param(param_bld);
@@ -1291,7 +1291,7 @@ static EVP_PKEY* hpke_EVP_PKEY_new_raw_nist_private_key(
         }
     } else {
         if (priv != NULL && param_bld != NULL
-            && OSSL_PARAM_BLD_push_utf8_string(param_bld, "group", hpke_kem_tab[curve].algstr, 0)
+            && OSSL_PARAM_BLD_push_utf8_string(param_bld, "group", hpke_kem_tab[curve].groupname, 0)
             && OSSL_PARAM_BLD_push_BN(param_bld, "priv", priv)) {
                 params = OSSL_PARAM_BLD_to_param(param_bld);
         } else {
@@ -1299,8 +1299,7 @@ static EVP_PKEY* hpke_EVP_PKEY_new_raw_nist_private_key(
         }
 
     }
-    ctx = EVP_PKEY_CTX_new_from_name(NULL, "EC", NULL);
-    //ctx = EVP_PKEY_CTX_new_id(hpke_kem_tab[curve].groupid, NULL);
+    ctx = EVP_PKEY_CTX_new_from_name(NULL, hpke_kem_tab[curve].keytype, NULL);
     if (ctx == NULL
         || params == NULL
         || EVP_PKEY_fromdata_init(ctx) <= 0
@@ -1310,64 +1309,6 @@ static EVP_PKEY* hpke_EVP_PKEY_new_raw_nist_private_key(
     EVP_PKEY_CTX_free(ctx);
     OSSL_PARAM_BLD_free_params(params);
     OSSL_PARAM_BLD_free(param_bld);
-
-#endif
-#ifdef NEWISHWAY
-    OSSL_PARAM params[4];
-
-    params[0] = OSSL_PARAM_construct_utf8_string(OSSL_PKEY_PARAM_GROUP_NAME, hpke_kem_tab[curve].algstr, 0);
-    if (pubbuf!=NULL) {
-        params[1] = OSSL_PARAM_construct_octet_string(OSSL_PKEY_PARAM_PRIV_KEY, buf,buflen);
-        //params[2] = OSSL_PARAM_construct_octet_string(OSSL_PKEY_PARAM_ENCODED_PUBLIC_KEY, pubbuf,pubbuflen);
-        params[2] = OSSL_PARAM_construct_octet_string(OSSL_PKEY_PARAM_PUB_KEY, pubbuf,pubbuflen);
-        params[3] = OSSL_PARAM_construct_end();
-    } else {
-        params[1] = OSSL_PARAM_construct_octet_string(OSSL_PKEY_PARAM_PRIV_KEY, buf,buflen);
-        params[2] = OSSL_PARAM_construct_end();
-    }
-
-    EVP_PKEY_CTX *gctx =EVP_PKEY_CTX_new_from_name(NULL, "EC", NULL);
-    EVP_PKEY_fromdata_init(gctx);
-    //EVP_PKEY_fromdata(gctx, &ret, OSSL_KEYMGMT_SELECT_DOMAIN_PARAMETERS, params);
-    EVP_PKEY_fromdata(gctx, &ret, EVP_PKEY_KEYPAIR, params);
-    //EVP_PKEY_set1_encoded_public_key(ret,pubbuf,pubbuflen);
-    EVP_PKEY_CTX_free(gctx);
-
-    //EVP_PKEY_keygen_init(gctx);
-    //EVP_PKEY_paramgen_init(gctx);
-    //EVP_PKEY_CTX_set_params(gctx, params);
-    //if (EVP_PKEY_keygen(gctx, &ret) <= 0) {
-        //erv=__LINE__; goto err; 
-    //}
-    // if (EVP_PKEY_paramgen(gctx, &ret) <= 0) {
-        // erv=__LINE__; goto err; 
-    // }
-    // EVP_PKEY_gen(gctx, &ret);
-    //if (EVP_PKEY_set1_encoded_public_key(ret,buf,buflen)!=1) {
-        //erv=__LINE__; goto err; 
-    //}
-    //EVP_PKEY_CTX_free(gctx);
-#endif
-
-#ifdef MIDWAY
-    EVP_PKEY_CTX *pctx = NULL;
-    //pctx=EVP_PKEY_CTX_new_from_name(NULL,hpke_kem_tab[curve].algstr,NULL);
-    pctx=EVP_PKEY_CTX_new_id(curve,NULL);
-    if (pctx == NULL) {
-        erv=__LINE__; goto err; 
-    }
-    if (EVP_PKEY_paramgen_init(pctx) <= 0) {
-        erv=__LINE__; goto err; 
-    }
-    //if (!EVP_PKEY_CTX_set_group_name(pctx, hpke_kem_tab[curve].algstr)) {
-        //erv=__LINE__; goto err; 
-    //}
-    if (EVP_PKEY_paramgen(pctx, &ret) <= 0) {
-        erv=__LINE__; goto err; 
-    }
-    if (EVP_PKEY_set1_encoded_public_key(ret,buf,buflen)!=1) {
-        erv=__LINE__; goto err; 
-    }
 
 #endif
 #ifdef OLDWAY
@@ -1630,6 +1571,7 @@ static int hpke_enc_int(
     if (erv!=1) {
         goto err;
     }
+    if (mypub!=NULL) { OPENSSL_free(mypub); mypub=NULL; }
 
     /* step 3. create context buffer */
     /*
@@ -1789,6 +1731,7 @@ err:
     }
 #endif
 
+    if (mypub!=NULL) { OPENSSL_free(mypub); mypub=NULL; }
     if (bfp!=NULL) BIO_free_all(bfp);
     if (pkR!=NULL) EVP_PKEY_free(pkR);
     if (!evpcaller && pkE!=NULL) EVP_PKEY_free(pkE);
@@ -2478,31 +2421,49 @@ int hpke_prbuf2evp(
     }
     if (hpke_kem_id_check(kem_id)!=1) return(__LINE__);
 
-#undef NEWESTWAY
+#define NEWESTWAY
 #ifdef NEWESTWAY
+
+    EVP_PKEY_CTX *ctx=NULL;
+    BIGNUM *priv=NULL;
+    OSSL_PARAM_BLD *param_bld=NULL;;
+    OSSL_PARAM *params = NULL;
+    const char *keytype=hpke_kem_tab[kem_id].keytype;
+    const char *groupname=hpke_kem_tab[kem_id].groupname;
+
     if (hpke_kem_tab[kem_id].Npriv==prbuf_len) {
 
-        EVP_PKEY_CTX *ctx;
-        BIGNUM *priv;
-        OSSL_PARAM_BLD *param_bld;
-        OSSL_PARAM *params = NULL;
-        priv = BN_bin2bn(prbuf, prbuf_len, NULL);
-        if (!priv) {
-            erv=__LINE__; goto err; 
-        } 
+        if (!keytype) return(0);
         param_bld = OSSL_PARAM_BLD_new();
-        if (param_bld==NULL) {
+        if (!param_bld) {
             erv=__LINE__; goto err; 
         }
-        if (OSSL_PARAM_BLD_push_utf8_string(param_bld, "group", hpke_kem_tab[kem_id].algstr,0)
-            && OSSL_PARAM_BLD_push_BN(param_bld, "priv", priv)
-            && OSSL_PARAM_BLD_push_octet_string(param_bld, "pub", pubuf, pubuf_len )) {
-                params = OSSL_PARAM_BLD_to_param(param_bld);
+        if (groupname!=NULL && OSSL_PARAM_BLD_push_utf8_string(param_bld, "group", groupname,0)!=1) {
+            erv=__LINE__; goto err; 
         }
+        if (pubuf && pubuf_len>0) {
+            if (OSSL_PARAM_BLD_push_octet_string(param_bld, "pub", pubuf, pubuf_len)!=1) {
+                erv=__LINE__; goto err; 
+            }
+        } 
+        if (strlen(keytype)==2 && !strcmp(keytype,"EC")) {
+            priv = BN_bin2bn(prbuf, prbuf_len, NULL);
+            if (!priv) {
+                erv=__LINE__; goto err; 
+            } 
+            if (OSSL_PARAM_BLD_push_BN(param_bld, "priv", priv)!=1) {
+                erv=__LINE__; goto err; 
+            }
+        } else {
+            if (OSSL_PARAM_BLD_push_octet_string(param_bld, "priv", prbuf, prbuf_len)!=1) {
+                erv=__LINE__; goto err; 
+            }
+        }
+        params = OSSL_PARAM_BLD_to_param(param_bld);
         if (!params) {
             erv=__LINE__; goto err; 
         }
-        ctx = EVP_PKEY_CTX_new_from_name(NULL, "EC", NULL);
+        ctx = EVP_PKEY_CTX_new_from_name(NULL,keytype, NULL);
         if (ctx == NULL) {
             erv=__LINE__; goto err; 
         }
@@ -2512,13 +2473,6 @@ int hpke_prbuf2evp(
         if (EVP_PKEY_fromdata(ctx, &lpriv, EVP_PKEY_KEYPAIR, params) <= 0) {
             erv=__LINE__; goto err; 
         } 
-        EVP_PKEY_CTX_free(ctx);
-        OSSL_PARAM_BLD_free_params(params);
-        OSSL_PARAM_BLD_free(param_bld);
-        if (!lpriv) {
-            erv=__LINE__; goto err; 
-        } 
-
     }
 #else
     if (hpke_kem_tab[kem_id].Npriv==prbuf_len) {
@@ -2573,12 +2527,19 @@ int hpke_prbuf2evp(
 #if defined(SUPERVERBOSE) || defined(TESTVECTORS)
     printf("hpke_prbuf2evp success\n");
 #endif
+    if (priv) BN_free(priv);
+    if (ctx) EVP_PKEY_CTX_free(ctx);
+    if (param_bld) OSSL_PARAM_BLD_free(param_bld);
+    if (params) OSSL_PARAM_BLD_free_params(params);
     return(1);
 err:
 #if defined(SUPERVERBOSE) || defined(TESTVECTORS)
     printf("hpke_prbuf2evp FAILED at %d\n",erv);
 #endif
-    // clean up
+    if (priv) BN_free(priv);
+    if (ctx) EVP_PKEY_CTX_free(ctx);
+    if (param_bld) OSSL_PARAM_BLD_free(param_bld);
+    if (params) OSSL_PARAM_BLD_free_params(params);
     return(0);
 }
 

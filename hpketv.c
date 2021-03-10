@@ -123,13 +123,14 @@ int hpke_tv_load(char *fname, int *nelems, hpke_tv_t **array)
     struct json_tokener* tok=json_tokener_new();
     json_object *jobj = NULL;
     char *mystring;
-    mystring=malloc(640*1024);
+    size_t mssize=10*640*1024; // 10 microsoft units 
+    mystring=malloc(mssize+1); // one more for a definite end of string NUL
+    memset(mystring,0,mssize+1);
     int stringlen = 0;
     enum json_tokener_error jerr;
     do {
         if (!feof(fp)) {
-            memset(mystring,0,640*1024);
-            fread(mystring,640*1024,1,fp);
+            fread(mystring,mssize,1,fp);
         } else {
             fprintf(stderr, "Error: reached EOF of %s before json decode done - exiting\n",fname);
             return(__LINE__);

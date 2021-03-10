@@ -21,6 +21,8 @@ High level notes:
 
 ## Recent Changes
 
+- 20210310: tidied up hpke.c and esp ``hpke_buf2evp``
+
 - 20210310: added test2evp.c to see if we can unify the buffer to
 ``EVP_PKEY`` code for NIST and non-NIST curves. Got some help on
 openssl-users list for that from Matt Caswell which sorted it out.
