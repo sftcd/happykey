@@ -183,19 +183,19 @@ int main(int argc, char **argv)
     }
     EVP_PKEY_free(retkey);retkey=NULL;
 
-    rv=bufs2evp("X25519",xprivbuf,xprivlen,NULL,0,&retkey);
-    if (rv==1) {
-        printf("X25519 with just private key worked\n");
-    } else {
-        printf("X25519 with key pair failed at %d\n",rv);
-    }
-    EVP_PKEY_free(retkey);retkey=NULL;
-
     rv=bufs2evp("X25519",xprivbuf,xprivlen,xpubbuf,xpublen,&retkey);
     if (rv==1) {
         printf("X25519 with key pair worked\n");
     } else {
         printf("X25519 with key pair failed at %d\n",rv);
+    }
+    EVP_PKEY_free(retkey);retkey=NULL;
+
+    rv=bufs2evp("X25519",xprivbuf,xprivlen,NULL,0,&retkey);
+    if (rv==1) {
+        printf("X25519 with just private key worked\n");
+    } else {
+        printf("X25519 with just private key failed at %d\n",rv);
     }
     EVP_PKEY_free(retkey);retkey=NULL;
 
