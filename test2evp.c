@@ -41,6 +41,8 @@ int bufs2evp(
     OSSL_PARAM_BLD *param_bld=NULL;;
     OSSL_PARAM *params = NULL;
 
+    if (!keytype) return(0);
+
     param_bld = OSSL_PARAM_BLD_new();
     if (!param_bld) {
         erv=__LINE__; goto err; 
@@ -53,7 +55,7 @@ int bufs2evp(
             erv=__LINE__; goto err; 
         }
     } 
-    if (keytype && strlen(keytype)==2 && !strcmp(keytype,"EC")) {
+    if (strlen(keytype)==2 && !strcmp(keytype,"EC")) {
         priv = BN_bin2bn(privbuf, privbuflen, NULL);
         if (!priv) {
             erv=__LINE__; goto err; 
@@ -85,6 +87,7 @@ int bufs2evp(
     EVP_PKEY_CTX_free(ctx);
     OSSL_PARAM_BLD_free(param_bld);
     OSSL_PARAM_BLD_free_params(params);
+    if (priv) BN_free(priv);
     return 1;
 err:
     if (priv) BN_free(priv);
