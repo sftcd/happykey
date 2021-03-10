@@ -21,6 +21,14 @@ High level notes:
 
 ## Recent Changes
 
+- 20210310: Surprisingly easy update to draft-08 and the (hopefully)
+final test vectors and version label. The Makefile defines the "DRAFT_08"
+symbol which causes the runtime to use the "HPKE-v1" label and to
+use the ``test-vectors-08.json`` file. If that's not defined then
+the "HPKE-07" label will be used instead. (Note to self: once 
+Cloudflare and/or NSS have upgraded to draft-10 of ECH/draft-08 of
+HPKE then I'll change the default. That'll hopefully be soon.)
+
 - 20210310: tidied up hpke.c and esp ``hpke_buf2evp``
 
 - 20210310: added test2evp.c to see if we can unify the buffer to
