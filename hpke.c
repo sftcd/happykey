@@ -1251,113 +1251,6 @@ static int hpke_psk_check(
 }
 
 /*!
- * @brief hpke wrapper to import NIST curve private key as easily as x25519/x448
- * @param curve is the curve NID
- * @param buf is the binary buffer with the private value
- * @param buflen is the length of the private key buffer
- * @return a working EVP_PKEY * or NULL
- *
- * Loadsa malarky required as it turns out...
- * You gotta: 1) name group 2) import private 3) then
- * manually re-calc public key before 4) make an EVP_PKEY
- */
-static EVP_PKEY* hpke_EVP_PKEY_new_raw_nist_private_key(
-        int curve,
-        unsigned char *buf, size_t buflen,
-        unsigned char *pubbuf, size_t pubbuflen) 
-{
-    int erv=1;
-    EVP_PKEY *ret=NULL;
-
-#undef NEWWAY
-#ifdef NEWWAY
-    EVP_PKEY_CTX *ctx;
-    BIGNUM *priv;
-    OSSL_PARAM_BLD *param_bld;
-    OSSL_PARAM *params = NULL;
-    priv = BN_bin2bn(buf, buflen, NULL);
-    if (!priv) {
-        erv=__LINE__; goto err; 
-    } 
-    param_bld = OSSL_PARAM_BLD_new();
-    if (pubbuf && pubbuflen>0) {
-        if (priv != NULL && param_bld != NULL
-            && OSSL_PARAM_BLD_push_utf8_string(param_bld, "group", hpke_kem_tab[curve].groupname, 0)
-            && OSSL_PARAM_BLD_push_BN(param_bld, "priv", priv)
-            && OSSL_PARAM_BLD_push_octet_string(param_bld, "pub", pubbuf, pubbuflen )) {
-                params = OSSL_PARAM_BLD_to_param(param_bld);
-        } else {
-            erv=__LINE__; goto err; 
-        }
-    } else {
-        if (priv != NULL && param_bld != NULL
-            && OSSL_PARAM_BLD_push_utf8_string(param_bld, "group", hpke_kem_tab[curve].groupname, 0)
-            && OSSL_PARAM_BLD_push_BN(param_bld, "priv", priv)) {
-                params = OSSL_PARAM_BLD_to_param(param_bld);
-        } else {
-            erv=__LINE__; goto err; 
-        }
-
-    }
-    ctx = EVP_PKEY_CTX_new_from_name(NULL, hpke_kem_tab[curve].keytype, NULL);
-    if (ctx == NULL
-        || params == NULL
-        || EVP_PKEY_fromdata_init(ctx) <= 0
-        || EVP_PKEY_fromdata(ctx, &ret, EVP_PKEY_KEYPAIR, params) <= 0) {
-        erv=__LINE__; goto err; 
-    } 
-    EVP_PKEY_CTX_free(ctx);
-    OSSL_PARAM_BLD_free_params(params);
-    OSSL_PARAM_BLD_free(param_bld);
-
-#endif
-#ifdef OLDWAY
-    EC_POINT* pub_key = NULL;
-    EC_KEY* ec_key = EC_KEY_new_by_curve_name(curve);
-    if (!ec_key) { erv=__LINE__; goto err; }
-    const EC_GROUP* generator = EC_KEY_get0_group(ec_key);
-    if (!generator) { erv=__LINE__; goto err; }
-    pub_key = EC_POINT_new(generator);
-    if (1!=EC_KEY_oct2priv(ec_key, buf, buflen)) {
-        erv=__LINE__; goto err; 
-    }
-    if (1!=EC_POINT_mul(generator, pub_key, EC_KEY_get0_private_key(ec_key), NULL, NULL, NULL)) {
-        erv=__LINE__; goto err; 
-    }
-    if (1!=EC_KEY_set_public_key(ec_key, pub_key)) {
-        erv=__LINE__; goto err; 
-    }
-    ret = EVP_PKEY_new();
-    if (!ret) { erv=__LINE__; goto err; }
-    if (1!=EVP_PKEY_assign_EC_KEY(ret, ec_key)) {
-        erv=__LINE__; goto err; 
-    }
-#endif
-
-err:
-
-#if defined(SUPERVERBOSE) || defined(TESTVECTORS)
-    if (ret) {
-        pblen = EVP_PKEY_get1_tls_encodedpoint(ret,&pbuf); 
-        hpke_pbuf(stdout,"EARLY re-calc public",pbuf,pblen); 
-        if (pblen) OPENSSL_free(pbuf);
-    } else {
-        printf("%s: ret is NULL\n",__func__);
-    }
-#endif
-#ifdef NEWWAY
-    if (erv!=1 && ret) EVP_PKEY_free(ret);
-#endif
-#ifdef OLDWAY
-    pblen=EC_KEY_priv2buf(ec_key,&pbuf);
-    hpke_pbuf(stdout,"EARLY private",pbuf,pblen); 
-    if (pub_key) EC_POINT_free(pub_key);
-#endif
-    if (erv==1) return(ret);
-    else return NULL;
-}
-
-/*!
  * @brief Internal HPKE single-shot encryption function
  * @param mode is the HPKE mode
  * @param suite is the ciphersuite to use
@@ -2421,9 +2314,6 @@ int hpke_prbuf2evp(
     }
     if (hpke_kem_id_check(kem_id)!=1) return(__LINE__);
 
-#define NEWESTWAY
-#ifdef NEWESTWAY
-
     EVP_PKEY_CTX *ctx=NULL;
     BIGNUM *priv=NULL;
     OSSL_PARAM_BLD *param_bld=NULL;;
@@ -2474,15 +2364,7 @@ int hpke_prbuf2evp(
             erv=__LINE__; goto err; 
         } 
     }
-#else
-    if (hpke_kem_tab[kem_id].Npriv==prbuf_len) {
-        if (hpke_kem_id_nist_curve(kem_id)==1) {
-            lpriv = hpke_EVP_PKEY_new_raw_nist_private_key(kem_id,prbuf,prbuf_len,pubuf,pubuf_len);
-        } else {
-            lpriv=EVP_PKEY_new_raw_private_key(hpke_kem_tab[kem_id].groupid,NULL,prbuf,prbuf_len);
-        }
-    }
-#endif
+
     if (!lpriv) {
         /* check PEM decode - that might work :-) */
         BIO *bfp=BIO_new(BIO_s_mem());
