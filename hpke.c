@@ -2418,7 +2418,7 @@ int hpke_prbuf2evp(
     if (ctx) EVP_PKEY_CTX_free(ctx);
     if (param_bld) OSSL_PARAM_BLD_free(param_bld);
     if (params) OSSL_PARAM_BLD_free_params(params);
-    return(1);
+    return(erv);
 err:
 #if defined(SUPERVERBOSE) || defined(TESTVECTORS)
     printf("hpke_prbuf2evp FAILED at %d\n",erv);
@@ -2427,7 +2427,7 @@ err:
     if (ctx) EVP_PKEY_CTX_free(ctx);
     if (param_bld) OSSL_PARAM_BLD_free(param_bld);
     if (params) OSSL_PARAM_BLD_free_params(params);
-    return(0);
+    return(erv);
 }
 
 
