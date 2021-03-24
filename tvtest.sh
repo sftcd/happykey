@@ -53,15 +53,8 @@ verbose="no"
 superverbose="no"
 VG="no"
 
-# We're used to guess which draft, based on the content of 
-# the Makefile. (Yes, that's iccky, but shouldn't be needed
-# for long I hope;-)
-mline=`grep DRAFT_08 Makefile | grep CFLAGS`
-TVFILE="test-vectors-07.json"
-if [[ "${mline:0:1}" == "C" ]]
-then
-    TVFILE="test-vectors-08.json"
-fi
+# test vectors file
+TVFILE="test-vectors-08.json"
 
 # options may be followed by one colon to indicate they have a required argument
 if ! options=$(/usr/bin/getopt -s bash -o hst:vV -l help,super,testvectors:,verbose,valgrind -- "$@")
