@@ -86,14 +86,14 @@ int bufs2evp(
     } 
     EVP_PKEY_CTX_free(ctx);
     OSSL_PARAM_BLD_free(param_bld);
-    OSSL_PARAM_BLD_free_params(params);
+    OSSL_PARAM_free(params);
     if (priv) BN_free(priv);
     return 1;
 err:
     if (priv) BN_free(priv);
     if (ctx) EVP_PKEY_CTX_free(ctx);
     if (param_bld) OSSL_PARAM_BLD_free(param_bld);
-    if (params) OSSL_PARAM_BLD_free_params(params);
+    if (params) OSSL_PARAM_free(params);
     return erv;
 }
 
