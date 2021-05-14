@@ -57,6 +57,7 @@ static void usage(char *prog,char *errmsg)
     fprintf(stderr,"\t-c specify ciphersuite\n");
     fprintf(stderr,"\t-d decrypt\n");
     fprintf(stderr,"\t-e encrypt\n");
+    fprintf(stderr,"\t-g output a GREASEy value\n");
     fprintf(stderr,"\t-h help\n");
     fprintf(stderr,"\t-I additional info to bind to key - file name or actual value\n");
     fprintf(stderr,"\t-i input file name or actual value (stdin if not specified)\n");
@@ -468,6 +469,7 @@ int main(int argc, char **argv)
 {
     int overallreturn=0;
     int doing_enc=1; ///< whether we're encrypting (default) or decrypting 
+    int doing_grease=1; ///< whether we're just greasing
     int generate=0; ///< whether we're generating a key pair (default off)
     /*
      * the xxx_in vars could be a filename or b64 value, we'll check later
@@ -496,9 +498,9 @@ int main(int argc, char **argv)
     int opt;
 
 #ifdef TESTVECTORS
-    while((opt = getopt(argc, argv, "?c:hkedvP:p:a:I:i:m:n:o:s:T::")) != -1) {
+    while((opt = getopt(argc, argv, "?c:ghkedvP:p:a:I:i:m:n:o:s:T::")) != -1) {
 #else
-    while((opt = getopt(argc, argv, "?c:hkedvP:p:a:I:i:m:n:o:s:")) != -1) {
+    while((opt = getopt(argc, argv, "?c:ghkedvP:p:a:I:i:m:n:o:s:")) != -1) {
 #endif
         switch(opt) {
             case '?': usage(argv[0],"Unexpected option"); break;
@@ -506,6 +508,7 @@ int main(int argc, char **argv)
             case 'c': suitestr=optarg; break;
             case 'd': doing_enc=0; break;
             case 'e': doing_enc=1; break;
+            case 'g': doing_grease=1; break;
             case 'h': usage(argv[0],NULL); break;
             case 'I': info_in=optarg; break;
             case 'i': inp_in=optarg; break;
@@ -533,6 +536,22 @@ int main(int argc, char **argv)
     size_t infolen=0; unsigned char *info=NULL;
     size_t plainlen=0; unsigned char *plain=NULL;
     size_t psklen=0; unsigned char *psk=NULL;
+
+    /* if we're just greasing get that out of the way and exit */
+    if (doing_grease==1) {
+        hpke_suite_t g_suite;
+        unsigned char g_pub[HPKE_MAXSIZE];
+        size_t g_pub_len=HPKE_MAXSIZE;
+        unsigned char g_cipher[HPKE_MAXSIZE];
+        size_t g_cipher_len=266;
+
+        if (hpke_good4grease(NULL,g_suite,g_pub,&g_pub_len,g_cipher,g_cipher_len)!=1) {
+            printf("hpke_good4grease failed, bummer\n");
+        } else {
+            printf("hpke_good4grease worked, yay! (use debugger or SUPERVERBOSE to see what it does:-)\n");
+        }
+        return(1);
+    }
 
     /* check command line args */
     if (modestr!=NULL) {

@@ -402,6 +402,26 @@ int hpke_prbuf2evp(
         size_t pubuf_len,
         EVP_PKEY **priv);
 
+/*!
+ * brief return a (possibly) random suite, public key and ciphertext for GREASErs
+ *
+ * @param suite-in specifies the preferred suite or NULL for a random choice
+ * @param suite is the chosen or random suite
+ * @param pub is a random value of the appropriate length for a sender public value
+ * @param pub_len is the length of pub (buffer size on input)
+ * @param cipher is a random value of the appropriate length for a ciphertext
+ * @param cipher_len is the length of cipher
+ * @return 1 for success, otherwise failure
+ *
+ * As usual buffers are caller allocated and lengths on input are buffer size.
+ */
+int hpke_good4grease(
+        hpke_suite_t *suite_in,
+        hpke_suite_t suite,
+        unsigned char *pub,
+        size_t *pub_len,
+        unsigned char *cipher,
+        size_t cipher_len);
 
 #endif
 
