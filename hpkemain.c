@@ -466,7 +466,7 @@ int main(int argc, char **argv)
 {
     int overallreturn=0;
     int doing_enc=1; ///< whether we're encrypting (default) or decrypting 
-    int doing_grease=1; ///< whether we're just greasing
+    int doing_grease=0; ///< whether we're just greasing
     int generate=0; ///< whether we're generating a key pair (default off)
     /*
      * the xxx_in vars could be a filename or b64 value, we'll check later

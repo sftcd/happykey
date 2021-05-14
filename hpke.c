@@ -2455,7 +2455,7 @@ static int hpke_random_suite(hpke_suite_t *suite)
     /* check aead */
     int naeads=sizeof(hpke_aead_tab)/sizeof(hpke_aead_info_t)-1;
     if (RAND_bytes_ex(NULL, &rval, sizeof(rval)) <= 0) return(__LINE__);
-    suite->aead_id=hpke_aead_tab[(rval%nkdfs+1)].aead_id;
+    suite->aead_id=hpke_aead_tab[(rval%naeads+1)].aead_id;
 
     return 1;
 }
