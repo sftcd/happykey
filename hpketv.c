@@ -1,5 +1,5 @@
 /*
- * Copyright 2019 Stephen Farrell. All Rights Reserved.
+ * Copyright 2019-2021 Stephen Farrell. All Rights Reserved.
  *
  * Licensed under the OpenSSL license (the "License").  You may not use
  * this file except in compliance with the License.  You can obtain a copy
@@ -22,7 +22,7 @@
  *
  * Source for test vectors is:
  * https://raw.githubusercontent.com/cfrg/draft-irtf-cfrg-hpke/master/test-vectors.json
- * A copy from 20191126 is are also in this repo in test-vectors.json
+ * The latest copy from that repo is also in this repo in test-vectors.json
  *
  */
 

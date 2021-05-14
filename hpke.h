@@ -1,5 +1,5 @@
 /*
- * Copyright 2019 Stephen Farrell. All Rights Reserved.
+ * Copyright 2019-2021 Stephen Farrell. All Rights Reserved.
  *
  * Licensed under the OpenSSL license (the "License").  You may not use
  * this file except in compliance with the License.  You can obtain a copy
@@ -11,9 +11,6 @@
  * @file 
  * This has the data structures and prototypes (both internal and external)
  * for an OpenSSL-based HPKE implementation following draft-irtf-cfrg-hpke
- *
- * I plan to use this for my ESNI-enabled OpenSSL build when the time is 
- * right, that's: https://github.com/sftcd/openssl)
  */
 
 #ifndef HPKE_H_INCLUDED

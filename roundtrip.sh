@@ -2,7 +2,7 @@
 
 # set -x
 
-# Copyright 2019 Stephen Farrell. All Rights Reserved.
+# Copyright 2019-2021 Stephen Farrell. All Rights Reserved.
 #
 # Licensed under the OpenSSL license (the "License").  You may not use
 # this file except in compliance with the License.  You can obtain a copy
@@ -11,9 +11,6 @@
 #
 # An OpenSSL-based HPKE implementation following draft-irtf-cfrg-hpke
 #
-# I plan to use this for my ESNI-enabled OpenSSL build (https://github.com/sftcd/openssl)
-# when the time is right.
-
 # If you wanna use valgrind uncomment this
 # VALGRIND="valgrind --leak-check=full --show-leak-kinds=all"
 
