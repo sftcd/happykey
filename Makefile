@@ -29,7 +29,7 @@ NINCL=  -I../nss/lib \
 # There are test vectors for this - see comments in hpketv.h.
 # If you want to compile in test vector checks then uncomment 
 # the next line:
-#testvectors=-D TESTVECTORS -I ../json-c
+# testvectors=-D TESTVECTORS -I ../json-c
 
 CFLAGS=-g ${testvectors} -DHAPPYKEY 
 
