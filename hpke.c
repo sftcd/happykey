@@ -2219,7 +2219,7 @@ int hpke_kg_evp(
             erv=__LINE__; goto err;
         }
     }
-    if (EVP_PKEY_gen(pctx, &skR) <= 0) {
+    if (EVP_PKEY_generate(pctx, &skR) <= 0) {
         erv=__LINE__; goto err;
     }
     EVP_PKEY_CTX_free(pctx); pctx=NULL;
