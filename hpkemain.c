@@ -575,7 +575,7 @@ int main(int argc, char **argv)
     if (suitestr) {
         if (verbose) printf("Using ciphersuite %s\n",suitestr);
 
-        if (hpke_str2suite(suitestr,hpke_suite)!=1) {
+        if (hpke_str2suite(suitestr,&hpke_suite)!=1) {
             usage(argv[0],"Bad ciphersuite string");
         }
 
