@@ -21,6 +21,14 @@ High level notes:
 
 ## Recent Changes
 
+- 20210816: a pile of cosmetic checks to stick to 80-char line
+  lengths (for OpenSSL style points:-)
+
+- 20210816: added ``hpke_expansion`` allowing caller to know the
+  ciphertext length, they'll see for a given plaintext length 
+  (basically 16 more octets for an aead tag:-) which is needed
+  for ECH draft-13.
+
 - 20210310: Surprisingly easy update to draft-08 and the (hopefully)
 final test vectors and version label. The Makefile defines the "DRAFT_08"
 symbol which causes the runtime to use the "HPKE-v1" label and to
