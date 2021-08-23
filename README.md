@@ -21,6 +21,9 @@ High level notes:
 
 ## Recent Changes
 
+- 20210823: more cosmetic stuff - get rid of spaces at end of
+  lines (also for OpenSSL style points apparently;-)
+
 - 20210816: a pile of cosmetic checks to stick to 80-char line
   lengths (for OpenSSL style points:-)
 
