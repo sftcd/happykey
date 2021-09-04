@@ -144,6 +144,7 @@ int main(int argc, char **argv)
         clearlen, clear,
         aadlen, aad,
         infolen, info,
+        0, NULL, /* seq */
         senderpublen, senderpub, senderpriv,
         &cipherlen, cipher
 #ifdef TESTVECTORS
@@ -170,6 +171,7 @@ int main(int argc, char **argv)
             cipherlen, cipher,
             aadlen,aad,
             infolen, info,
+            0, NULL, /* seq */
             &clearlen, clear
             ); 
     if (rv!=1) {

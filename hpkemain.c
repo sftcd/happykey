@@ -711,6 +711,7 @@ int main(int argc, char **argv)
             plainlen, plain,
             aadlen, aad,
             infolen, info,
+            0,NULL, /* seq */
             &senderpublen, senderpub,
             &cipherlen, cipher
 #ifdef TESTVECTORS
@@ -796,6 +797,7 @@ int main(int argc, char **argv)
                 cipherlen, cipher,
                 aadlen,aad,
                 infolen,info,
+                0,NULL, /* seq */
                 &clearlen, clear); 
 #else
         rv=hpke_dec( hpke_mode, hpke_suite,
@@ -806,6 +808,7 @@ int main(int argc, char **argv)
                 cipherlen, cipher,
                 aadlen,aad,
                 infolen,info,
+                0,NULL, /* seq */
                 &clearlen, clear); 
 #endif
         if (pub!=NULL) OPENSSL_free(pub);

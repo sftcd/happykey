@@ -188,6 +188,7 @@ int main(int argc, char **argv)
             aadlen,aad,
             // 0, NULL, // infolen, info,
             infolen, info,
+            0, NULL, /* seq */
             &clearlen, clear); 
     if (rv!=1) {
         printf("Error decrypting (%d) - exiting\n",rv);

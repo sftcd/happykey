@@ -21,6 +21,16 @@ High level notes:
 
 ## Recent Changes
 
+- 20210903: doing interop testing with boringssl, TLS HRR handing
+  requires use of the same HPKE context twice, which in turn
+  implies incrementing the nonce, so we added a sequence input
+  to ``hpke_enc()`` and ``hpke_dec()`` and co. HRR handing
+  isn't yet working, but this change moves us along a bit it
+  seems. (However, more change here may also be needed, we'll
+  have to see.) This also generates a TODO: - to add some 2nd
+  encryptions to the test vector tests - we'll get back to that
+  once get we interop for HRR cases.
+
 - 20210823: more cosmetic stuff - get rid of spaces at end of
   lines (also for OpenSSL style points apparently;-)
 
