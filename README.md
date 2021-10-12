@@ -21,6 +21,9 @@ High level notes:
 
 ## Recent Changes
 
+- 20211012: fixed doube-free if bad value fed to NIST decoding of
+  public key buffer
+
 - 20210903: doing interop testing with boringssl, TLS HRR handing
   requires use of the same HPKE context twice, which in turn
   implies incrementing the nonce, so we added a sequence input
