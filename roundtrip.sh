@@ -59,7 +59,7 @@ then
 fi
 
 # Next line is handy when debugging with gdb
-# echo "RUnning: $BINDIR/hpkemain -d -p $TMPNAM.priv -i $TMPNAM.cipher"
+echo "RUnning: $BINDIR/hpkemain -d -p $TMPNAM.priv -i $TMPNAM.cipher"
 $VALGRIND $BINDIR/hpkemain -d -p $TMPNAM.priv -i $TMPNAM.cipher -o $TMPNAM.recovered $*
 res=$?
 if [[ "$res" == "0" ]]

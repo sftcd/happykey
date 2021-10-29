@@ -156,10 +156,18 @@ static int map_input(const char *inp, size_t *outlen, unsigned char **outbuf, in
         FILE *fp=fopen(inp,"r"); /* check if inp is file name */
         if (fp) {
             /* that worked - so read file up to max into buffer */
-            toutlen=fread(tbuf,1,HPKE_MAXSIZE,fp);
+            size_t fsize=0;
+            fseek(fp,0,SEEK_END);
+            fsize=ftell(fp);
+            fseek(fp,0,SEEK_SET);
+            *outbuf=OPENSSL_malloc(fsize);
+            if (!*outbuf) return(__LINE__);
+            toutlen=fread(*outbuf,1,fsize,fp);
             if (verbose) fprintf(stderr,"got %lu bytes from file %s\n",(unsigned long)toutlen,inp);
             if (ferror(fp)) { fclose(fp); return(__LINE__); }
             fclose(fp);
+            *outlen=toutlen;
+            return(1);
         } else {
             if (verbose) fprintf(stderr,"got %lu bytes direct from commandline %s\n",
                             (unsigned long)toutlen,inp);
@@ -312,10 +320,15 @@ static int hpkemain_write_ct(const char *fname,
         return(__LINE__);
     }
 
-    char eb[HPKE_MAXSIZE];
-    size_t eblen=HPKE_MAXSIZE;
+    size_t eblen=3*(splen+ctlen);
+    char *eb=OPENSSL_malloc(eblen);
+    if (!eb) {
+        fprintf(stderr,"Error allocating %lu bytes\n",(unsigned long)eblen);
+        return(__LINE__);
+    }
     if (splen>HPKE_MAXSIZE) {
         fprintf(stderr,"Error key too big %lu bytes\n",(unsigned long)splen);
+        OPENSSL_free(eb);
         return(__LINE__);
     }
     eblen=EVP_EncodeBlock(eb, sp, splen);
@@ -324,23 +337,22 @@ static int hpkemain_write_ct(const char *fname,
     if (rrv!=eblen) {
         fprintf(stderr,"Error writing %lu bytes of output to %s (only %lu written)\n",
                     (unsigned long)splen,fname,(unsigned long)rrv);
+        OPENSSL_free(eb);
         return(__LINE__);
     }
     fprintf(fout,"\n%s\n",HPKE_END_SP);
     fprintf(fout,"%s\n",HPKE_START_CP);
-    if (ctlen>HPKE_MAXSIZE) {
-        fprintf(stderr,"Error ciphertext too big %lu bytes\n",(unsigned long)ctlen);
-        return(__LINE__);
-    }
     eblen=EVP_EncodeBlock(eb, ct, ctlen);
     rrv=fwrite(eb,1,eblen,fout);
     if (rrv!=eblen) {
         fprintf(stderr,"Error writing %lu bytes of output to %s (only %lu written)\n",
                     (unsigned long)ctlen,fname,(unsigned long)rrv);
+        OPENSSL_free(eb);
         return(__LINE__);
     }
     fprintf(fout,"\n%s\n",HPKE_END_CP);
     fclose(fout);
+    OPENSSL_free(eb);
     return(1);
 }
 
@@ -373,23 +385,35 @@ static int hpkemain_write_ct(const char *fname,
  */
 static int hpkemain_read_ct(const char *fname,
                 size_t  *splen, unsigned char *sp,
-                size_t  *ctlen, unsigned char *ct) 
+                size_t  *ctlen, unsigned char **ct) 
 {
     FILE *fin=NULL;
-    char fbuf[HPKE_MAXSIZE]; 
+    char *fbuf=NULL;
+    size_t fsize=0;
     const char *pfname=fname;
     if (!fname || fname[0]=='\0') {
         fin=stdin;
         pfname="STDIN";
+        fsize=HPKE_MAXSIZE;
+        fbuf=OPENSSL_malloc(HPKE_MAXSIZE);
+        if (!fbuf) return(__LINE__);
     } else {
+        int frv;
         fin=fopen(fname,"rb");
         if (!fin) {
             fprintf(stderr,"Error opening %s for read\n",fname);
+            OPENSSL_free(fbuf);
             return(__LINE__);
         }
-        int frv=fread(fbuf,1,HPKE_MAXSIZE,fin);
-        if (frv>=HPKE_MAXSIZE) {
-            fprintf(stderr,"Error file %s too big\n",fname);
+        fseek(fin,0,SEEK_END);
+        fsize=ftell(fin);
+        fseek(fin,0,SEEK_SET);
+        fbuf=OPENSSL_malloc(fsize);
+        if (!fbuf) return(__LINE__);
+        frv=fread(fbuf,1,fsize,fin);
+        if (frv!=fsize) {
+            fprintf(stderr,"Error reading file %s\n",fname);
+            OPENSSL_free(fbuf);
             return(__LINE__);
         }
         fclose(fin);
@@ -402,6 +426,7 @@ static int hpkemain_read_ct(const char *fname,
             labptr=strstr(buf,lab); \
             if (!labptr) { \
                 fprintf(stderr,"Error can't find boundary (%s) in file  %s\n",lab,pfname); \
+                OPENSSL_free(fbuf);\
                 return(__LINE__); \
             } \
         }
@@ -418,10 +443,16 @@ static int hpkemain_read_ct(const char *fname,
     cte--; /* there's a LF before */
 
     /* next we gotta chew whitespace... boring, isn't it? ;-( */
-    char b64buf[HPKE_MAXSIZE];
-    memset(b64buf,0,HPKE_MAXSIZE);
+    char *b64buf=OPENSSL_malloc(fsize);
+    if (!b64buf) {
+        OPENSSL_free(fbuf);
+        return(__LINE__);
+    }
+    memset(b64buf,0,fsize);
+
     char *bp=b64buf;
     char *bstart=sps+strlen(HPKE_START_SP)+1;
+
     for (char *cp=bstart;cp<spe;cp++) {
         if (!isspace(*cp)) *bp++=*cp;
     }
@@ -431,11 +462,12 @@ static int hpkemain_read_ct(const char *fname,
     size_t lsplen=EVP_DecodeBlock(sp,b64buf,bp-b64buf);
     if (lsplen<=0) {
         fprintf(stderr,"Error base64 decoding sender public within file %s\n",pfname);
+        OPENSSL_free(fbuf);
+        OPENSSL_free(b64buf);
         return(__LINE__);
     }
     *splen=lsplen-paddingoctets;
 
-    memset(b64buf,0,HPKE_MAXSIZE);
     bp=b64buf;
     bstart=cts+strlen(HPKE_START_CP)+1;
     for (char *cp=bstart;cp<cte;cp++) {
@@ -444,12 +476,23 @@ static int hpkemain_read_ct(const char *fname,
     paddingoctets=0;
     bbp=bp-1;
     while (*bbp=='=') { paddingoctets++; bbp--;}
-    size_t lctlen=EVP_DecodeBlock(ct,b64buf,bp-b64buf);
+    *ct=OPENSSL_malloc(fsize);
+    if (!*ct) {
+        OPENSSL_free(fbuf);
+        OPENSSL_free(b64buf);
+        return(__LINE__);
+    }
+    size_t lctlen=EVP_DecodeBlock(*ct,b64buf,bp-b64buf);
     if (lctlen<=0) {
         fprintf(stderr,"Error base64 decoding ciphertezt within file %s\n",pfname);
+        OPENSSL_free(fbuf);
+        OPENSSL_free(b64buf);
+        OPENSSL_free(*ct);
         return(__LINE__);
     }
     *ctlen=lctlen-paddingoctets;
+    OPENSSL_free(fbuf);
+    OPENSSL_free(b64buf);
     return(1);
 }
 
@@ -702,22 +745,29 @@ int main(int argc, char **argv)
         
     } else if (doing_enc) {
         size_t senderpublen=HPKE_MAXSIZE; unsigned char senderpub[HPKE_MAXSIZE];
-        size_t cipherlen=HPKE_MAXSIZE; unsigned char cipher[HPKE_MAXSIZE];
-        int rv=hpke_enc(
-            hpke_mode, hpke_suite,
-            pskid, psklen, psk,
-            publen, pub,
-            privlen, priv,
-            plainlen, plain,
-            aadlen, aad,
-            infolen, info,
-            0,NULL, /* seq */
-            &senderpublen, senderpub,
-            &cipherlen, cipher
+        size_t cipherlen=plainlen+32; unsigned char *cipher=NULL;
+        int rv;
+        cipher=malloc(cipherlen);
+        if (cipher==NULL) {
+            fprintf(stderr,"Error from malloc\n");
+            overallreturn=101;
+        } else {
+            rv=hpke_enc(
+                hpke_mode, hpke_suite,
+                pskid, psklen, psk,
+                publen, pub,
+                privlen, priv,
+                plainlen, plain,
+                aadlen, aad,
+                infolen, info,
+                0,NULL, /* seq */
+                &senderpublen, senderpub,
+                &cipherlen, cipher
 #ifdef TESTVECTORS
-            ,tv
+                ,tv
 #endif
-            );
+                );
+        }
         if (pub!=NULL) OPENSSL_free(pub);
         if (priv!=NULL) OPENSSL_free(priv);
         if (plain!=NULL) OPENSSL_free(plain);
@@ -761,6 +811,7 @@ int main(int argc, char **argv)
                 if (wrv!=1) {
                     return(wrv);
                 }
+                free(cipher);
 
 #ifdef TESTVECTORS
             }
@@ -771,13 +822,23 @@ int main(int argc, char **argv)
          * try decode and then decrypt so
          */
         size_t senderpublen=HPKE_MAXSIZE; unsigned char senderpub[HPKE_MAXSIZE];
-        size_t cipherlen=HPKE_MAXSIZE; unsigned char cipher[HPKE_MAXSIZE];
-        size_t clearlen=HPKE_MAXSIZE; unsigned char clear[HPKE_MAXSIZE];
-        int rv=hpkemain_read_ct(inp_in,&senderpublen,senderpub,&cipherlen,cipher);
+        size_t cipherlen=0; unsigned char *cipher=NULL;
+        size_t clearlen=0; unsigned char *clear=NULL;
+
+        int rv=hpkemain_read_ct(inp_in,&senderpublen,senderpub,&cipherlen,&cipher);
         if (rv!=1) {
             fprintf(stderr,"Error reading input - exiting\n");
             exit(rv);
         }
+
+        clearlen=cipherlen;
+        clear=OPENSSL_malloc(clearlen);
+        if (!clear) {
+            OPENSSL_free(cipher);
+            fprintf(stderr,"Error reading input - exiting\n");
+            exit(rv);
+        }
+
 #define USEBUF2EVP
 #ifdef USEBUF2EVP
         EVP_PKEY *privevp=NULL;
@@ -787,6 +848,8 @@ int main(int argc, char **argv)
                 &privevp);
         if (rv!=1) {
             fprintf(stderr,"Error mapping private key 2 EVP - exiting\n");
+            OPENSSL_free(cipher);
+            OPENSSL_free(clear);
             exit(rv);
         }
         rv=hpke_dec( hpke_mode, hpke_suite,
@@ -811,6 +874,7 @@ int main(int argc, char **argv)
                 0,NULL, /* seq */
                 &clearlen, clear); 
 #endif
+        if (cipher!=NULL) OPENSSL_free(cipher);
         if (pub!=NULL) OPENSSL_free(pub);
         if (priv!=NULL) OPENSSL_free(priv);
         if (info!=NULL) OPENSSL_free(info);
@@ -821,6 +885,7 @@ int main(int argc, char **argv)
 #endif
         if (rv!=1) {
             fprintf(stderr,"Error decrypting (%d) - exiting\n",rv);
+            OPENSSL_free(clear);
             exit(rv);
         }
 
@@ -831,6 +896,7 @@ int main(int argc, char **argv)
             fout=fopen(out_in,"wb");
             if (!fout) {
                 fprintf(stderr,"Decryption worked but can't open (%s) - exiting\n",out_in);
+                OPENSSL_free(clear);
                 exit(1);
             }
         }
@@ -838,6 +904,7 @@ int main(int argc, char **argv)
         if (frv!=clearlen) {
             fprintf(stderr,"Error writing %lu bytes of output to %s (only %lu written)\n",
                         (unsigned long)clearlen,(out_in?out_in:"STDOUT"),(unsigned long)frv);
+            OPENSSL_free(clear);
             exit(1);
         }
         if (out_in!=NULL) {
@@ -845,6 +912,7 @@ int main(int argc, char **argv)
             if (verbose) printf("All worked: Recovered plain is %lu octets.\n",
                         (unsigned long)clearlen);
         }
+        OPENSSL_free(clear);
     } 
 
 #ifdef TESTVECTORS

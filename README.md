@@ -21,6 +21,10 @@ High level notes:
 
 ## Recent Changes
 
+- 20211029: removed size restriction on plaintext and ciphertext
+  (keys and other structures are still internallhy stack-based 
+  and limited to ``HPKE_MAXSIZE``).
+
 - 20211012: fixed doube-free if bad value fed to NIST decoding of
   public key buffer
 

@@ -14,7 +14,7 @@
 # run through all the options and see what happens
 
 # If you wanna use valgrind uncomment this
-# VALGRIND="valgrind --leak-check=full --show-leak-kinds=all"
+VALGRIND="valgrind --leak-check=full --show-leak-kinds=all"
 
 # if you want verbose output...
 # VERBOSE=yes
