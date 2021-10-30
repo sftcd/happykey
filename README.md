@@ -21,6 +21,12 @@ High level notes:
 
 ## Recent Changes
 
+- 20211030: added ``HPKE_DEFSIZE`` (40kB) for handling e.g. stdin 
+  when we don't know plaintext/ciphertext buffer size and reduced 
+  the value of ``HPKE_MAXSIZE`` to 2kB as that's now only used 
+  for keys and internal buffers that won't be that big until we hit
+  PQC or something (which is not now:-). 
+
 - 20211029: removed size restriction on plaintext and ciphertext
   (keys and other structures are still internallhy stack-based 
   and limited to ``HPKE_MAXSIZE``).

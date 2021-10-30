@@ -137,9 +137,9 @@ static int map_input(const char *inp, size_t *outlen, unsigned char **outbuf, in
 {
     if (!outlen || !outbuf) return(__LINE__);
     /* on-stack buffer/length to handle various cases */
-    size_t toutlen=HPKE_MAXSIZE;
-    unsigned char tbuf[HPKE_MAXSIZE];
-    memset(tbuf,0,HPKE_MAXSIZE); /* need this so valgrind doesn't complain about b64 strspn below with short values */
+    size_t toutlen=HPKE_DEFSIZE;
+    unsigned char tbuf[HPKE_DEFSIZE];
+    memset(tbuf,0,HPKE_DEFSIZE); /* need this so valgrind doesn't complain about b64 strspn below with short values */
     /* asci hex is easy:-) either case allowed*/
     const char *AH_alphabet="0123456789ABCDEFabcdef\n";
     /* and base64 isn't much harder */
@@ -147,7 +147,7 @@ static int map_input(const char *inp, size_t *outlen, unsigned char **outbuf, in
 
     /* if no input, try stdin */
     if (!inp) {
-        toutlen=fread(tbuf,1,HPKE_MAXSIZE,stdin);
+        toutlen=fread(tbuf,1,HPKE_DEFSIZE,stdin);
         if (verbose) fprintf(stderr,"got %lu bytes from stdin\n",(unsigned long)toutlen);
         if (!feof(stdin)) return(__LINE__);
     } else {
@@ -174,7 +174,7 @@ static int map_input(const char *inp, size_t *outlen, unsigned char **outbuf, in
             memcpy(tbuf,inp,toutlen);
         }
     }
-    if (toutlen>HPKE_MAXSIZE) return(__LINE__);
+    if (toutlen>HPKE_DEFSIZE) return(__LINE__);
 
     /* ascii-hex or b64 decode as needed */
     /* try from most constrained to least in that order */
@@ -371,7 +371,6 @@ static int hpkemain_write_ct(const char *fname,
  * -----END CIPHERTEXT-----
  *
  * Our decoding rules are:
- * - file size < HPKE_MAXSIZE (640kb)
  * - labels MUST be in that order
  * - we'll chew any whitespace between labels before
  *   attempting base64 decode
@@ -394,8 +393,8 @@ static int hpkemain_read_ct(const char *fname,
     if (!fname || fname[0]=='\0') {
         fin=stdin;
         pfname="STDIN";
-        fsize=HPKE_MAXSIZE;
-        fbuf=OPENSSL_malloc(HPKE_MAXSIZE);
+        fsize=HPKE_DEFSIZE;
+        fbuf=OPENSSL_malloc(HPKE_DEFSIZE);
         if (!fbuf) return(__LINE__);
     } else {
         int frv;
