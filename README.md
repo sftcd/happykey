@@ -21,6 +21,10 @@ High level notes:
 
 ## Recent Changes
 
+- 20211104: Added ``hpke_setlibctx()`` API to allow caller to set
+  a new default ``OSSL_LIB_CTX`` - that's needed for the OpenSSL
+  ``make test`` target that makes use of such.
+
 - 20211030: added ``HPKE_DEFSIZE`` (40kB) for handling e.g. stdin 
   when we don't know plaintext/ciphertext buffer size and reduced 
   the value of ``HPKE_MAXSIZE`` to 2kB as that's now only used 
