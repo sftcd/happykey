@@ -223,6 +223,8 @@ const char *hpke_kdf_strtab[]={
     HPKE_KDFSTR_512};
 #endif
 
+static OSSL_LIB_CTX *hpke_libctx=NULL;
+
 /*!
  * <pre>
  * Since I always have to reconstruct this again in my head...
@@ -2472,7 +2474,7 @@ int hpke_prbuf2evp(
         if (!params) {
             erv=__LINE__; goto err;
         }
-        ctx = EVP_PKEY_CTX_new_from_name(NULL,keytype, NULL);
+        ctx = EVP_PKEY_CTX_new_from_name(hpke_libctx,keytype, NULL);
         if (ctx == NULL) {
             erv=__LINE__; goto err;
         }
@@ -2763,7 +2765,14 @@ int hpke_expansion(hpke_suite_t suite,
  */
 int hpke_setlibctx(OSSL_LIB_CTX *libctx)
 {
-    OSSL_LIB_CTX *retctx=OSSL_LIB_CTX_set0_default(libctx);
-    if (retctx==NULL) return(0);
+    /*
+     * This use to call OSSL_LIB_CTX_set0_default() but that caused some
+     * *very* odd errors when this code was executed in the context of 
+     * the OpenSSL test harness in an undefined behaviour sanitizer build.
+     * In the end, not calling the above (but without really understanding
+     * the issue) is where we landed.
+     */
+    hpke_libctx=libctx;
     return(1);
 }
+
