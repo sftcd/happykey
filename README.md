@@ -21,6 +21,9 @@ High level notes:
 
 ## Recent Changes
 
+- 20211127: minor tweak as I documented things to prepare a PR 
+  for OpenSSL.
+
 - 20211104: Added ``hpke_setlibctx()`` API to allow caller to set
   a new default ``OSSL_LIB_CTX`` - that's needed for the OpenSSL
   ``make test`` target that makes use of such.
