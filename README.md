@@ -21,6 +21,9 @@ High level notes:
 
 ## Recent Changes
 
+- 20211128: added ossplayground.c as a place play with code to be
+  added to OpenSSL ``make test`` target.
+
 - 20211127: minor tweak as I documented things to prepare a PR 
   for OpenSSL.
 

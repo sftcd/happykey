@@ -838,7 +838,7 @@ int main(int argc, char **argv)
             exit(rv);
         }
 
-#define USEBUF2EVP
+#undef USEBUF2EVP
 #ifdef USEBUF2EVP
         EVP_PKEY *privevp=NULL;
         rv=hpke_prbuf2evp(hpke_suite.kem_id,

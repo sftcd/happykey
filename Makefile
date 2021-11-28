@@ -35,13 +35,19 @@ CFLAGS=-g ${testvectors} -DHAPPYKEY
 
 CC=gcc
 
-all: hpkemain neod oeod test2evp
+all: hpkemain neod oeod test2evp ossplayround
 
 # This is a round-trip test with NSS encrypting and my code decrypting
 # (no parameters for now)
 
+ossplayround: ossplayround.o 
+	LD_LIBRARY_PATH=${OSSL} ${CC} ${CFLAGS} -g -o $@ ossplayround.o -L ${OSSL} -lcrypto -L ${NSSL} -lnss3 -lnspr4
+
+ossplayround.o: ossplayround.c
+	${CC} ${CFLAGS} -g -I ${INCL} -c $<
+
 neod: neod.o hpke.o neod_nss.o
-	LD_LIBRARY_PATH=${OSSL}:${NSSL} ${CC} ${CFLAGS} -g -o $@ neod.o hpke.o neod_nss.o -L ${OSSL} -lssl -lcrypto -L ${NSSL} -lnss3 -lnspr4
+	LD_LIBRARY_PATH=${OSSL}:${NSSL} ${CC} ${CFLAGS}  -g -o $@ neod.o hpke.o neod_nss.o -L ${OSSL} -lssl -lcrypto -L ${NSSL} -lnss3 -lnspr4
 
 neod.o: neod.c
 	${CC} ${CFLAGS} -g -I ${INCL} -c $<
@@ -103,6 +109,7 @@ clean:
 	- rm -f hpkemain.o hpke.o hpketv.o hpkemain 
 	- rm -f neod neod.o neod_nss.o 
 	- rm -f oeod oeod.o
+	- rm -f osslplayground osslplayground.o
 	- rm -f test2evp test2evp.o
 	- rm -rf scratch/*
 
