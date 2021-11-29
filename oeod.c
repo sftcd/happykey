@@ -140,7 +140,7 @@ int main(int argc, char **argv)
         hpke_mode, hpke_suite,
         pskid, psklen, psk,
         publen, pub,
-        0, NULL,
+        0, NULL, NULL,
         clearlen, clear,
         aadlen, aad,
         infolen, info,

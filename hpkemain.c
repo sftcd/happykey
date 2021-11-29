@@ -755,7 +755,7 @@ int main(int argc, char **argv)
                 hpke_mode, hpke_suite,
                 pskid, psklen, psk,
                 publen, pub,
-                privlen, priv,
+                privlen, priv, NULL,
                 plainlen, plain,
                 aadlen, aad,
                 infolen, info,

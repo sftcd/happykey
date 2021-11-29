@@ -35,15 +35,15 @@ CFLAGS=-g ${testvectors} -DHAPPYKEY
 
 CC=gcc
 
-all: hpkemain neod oeod test2evp ossplayround
+all: hpkemain neod oeod test2evp osslplayground
 
 # This is a round-trip test with NSS encrypting and my code decrypting
 # (no parameters for now)
 
-ossplayround: ossplayround.o 
-	LD_LIBRARY_PATH=${OSSL} ${CC} ${CFLAGS} -g -o $@ ossplayround.o -L ${OSSL} -lcrypto -L ${NSSL} -lnss3 -lnspr4
+osslplayground: osslplayground.o 
+	LD_LIBRARY_PATH=${OSSL} ${CC} ${CFLAGS} -g -o $@ osslplayground.o -L ${OSSL} -lcrypto -L ${NSSL} -lnss3 -lnspr4
 
-ossplayround.o: ossplayround.c
+osslplayground.o: osslplayground.c
 	${CC} ${CFLAGS} -g -I ${INCL} -c $<
 
 neod: neod.o hpke.o neod_nss.o

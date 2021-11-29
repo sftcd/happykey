@@ -41,17 +41,21 @@ int main()
     if (hpke_enc(hpke_mode, hpke_suite,
                 NULL, 0, NULL, /* psk */
                 publen, pub,
-                privlen, priv,
+                0, NULL, NULL, /* priv */
                 plainlen, plain,
                 0, NULL, /* aad */
                 0, NULL, /* info */
                 0, NULL, /* seq */
                 &senderpublen, senderpub,
-                &cipherlen, cipher)!=1)
+                &cipherlen, cipher
+#ifdef TESTVECTORS
+                ,NULL
+#endif
+                )!=1)
         goto err;
     if (hpke_dec( hpke_mode, hpke_suite,
                 NULL, 0, NULL, /* psk */
-                0, NULL, //publen, pub,
+                0, NULL, /* authpub */
                 privlen, priv, NULL,
                 senderpublen, senderpub,
                 cipherlen, cipher,

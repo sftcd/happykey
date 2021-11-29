@@ -21,6 +21,11 @@ High level notes:
 
 ## Recent Changes
 
+- 20211129: Fixed some issues that became apparent as I was documenting
+  HPKE for an OpenSSL PR - mostly just parameter name changes but one
+  real change was to allow an ``EVP_PKEY*`` form for the private key
+  for authentication in ``hpke_enc()`` 
+
 - 20211128: added ossplayground.c as a place play with code to be
   added to OpenSSL ``make test`` target.
 
