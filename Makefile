@@ -31,6 +31,10 @@ NINCL=  -I../nss/lib \
 # the next line:
 # testvectors=-D TESTVECTORS -I ../json-c
 
+# define this if you want to use HPKE from libcrypto rather
+# than from the source here
+# uselibcrypto=y
+
 CFLAGS=-g ${testvectors} -DHAPPYKEY 
 
 CC=gcc
@@ -94,8 +98,13 @@ ifdef testvectors
 hpkemain: hpkemain.o hpke.o hpketv.o
 	${CC} ${CFLAGS} -o $@ hpkemain.o hpke.o hpketv.o -L ${OSSL} -lssl -lcrypto -L ../json-c/.libs -ljson-c
 else
+ifdef uselibcrypto
+hpkemain: hpkemain.o
+	${CC} ${CFLAGS} -o $@ hpkemain.o -L ${OSSL} -lssl -lcrypto
+else
 hpkemain: hpkemain.o hpke.o 
 	${CC} ${CFLAGS} -o $@ hpkemain.o hpke.o -L ${OSSL} -lssl -lcrypto
+endif
 endif
 
 doc: hpke.c hpke.h hpketv.h hpketv.c
