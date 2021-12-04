@@ -53,6 +53,15 @@ FAIL2BUILD("Don't build hpkeyv.c without TESTVECRTORS being defined")
 #endif
 
 
+#ifndef HPKE_A2B
+/*!
+ * @brief  Map ascii to binary - utility macro used in >1 place
+ */
+#define HPKE_A2B(__c__) (__c__>='0'&&__c__<='9'?(__c__-'0'):\
+                        (__c__>='A'&&__c__<='F'?(__c__-'A'+10):\
+                        (__c__>='a'&&__c__<='f'?(__c__-'a'+10):0)))
+#endif
+
 /*
  * Marcros to grab a numeric or string field from json-c object 
  * and whack in same-named field of ours

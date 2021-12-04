@@ -17,7 +17,7 @@
 #include <stdio.h>
 #include <string.h>
 #include <openssl/ssl.h>
-#include <crypto/hpke.h>
+#include <openssl/hpke.h>
 
 int main()
 {

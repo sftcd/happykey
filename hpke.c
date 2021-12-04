@@ -62,6 +62,13 @@ static const char *hpke_mode_strtab[] = {
 #endif
 
 /*!
+ * @brief  Map ascii to binary - utility macro used in >1 place
+ */
+#define HPKE_A2B(__c__) (__c__>='0'&&__c__<='9'?(__c__-'0'):\
+                        (__c__>='A'&&__c__<='F'?(__c__-'A'+10):\
+                        (__c__>='a'&&__c__<='f'?(__c__-'a'+10):0)))
+
+/*!
  * @brief info about an AEAD
  */
 typedef struct {
@@ -272,22 +279,27 @@ int hpke_ah_decode(
         size_t *blen, unsigned char **buf)
 {
     size_t lblen = 0;
-    size_t i = 0;
+    int i = 0;
+    int nibble = 0;
     unsigned char *lbuf = NULL;
 
     if (ahlen <= 0 || ah == NULL || blen == NULL || buf == NULL) {
         return 0;
     }
-    if (ahlen%1) {
-        return 0;
+    if (ahlen % 2 == 1) {
+        nibble = 1;
     }
-    lblen = ahlen / 2;
+    lblen = ahlen / 2 + nibble;
     lbuf = OPENSSL_malloc(lblen);
     if (lbuf == NULL) {
         return 0;
     }
-    for (i = 0; i != lblen; i++) {
-        lbuf[i] = HPKE_A2B(ah[2*i])*16+HPKE_A2B(ah[2*i+1]);
+    for (i = ahlen - 1; i > nibble ; i -= 2) {
+        int j = i / 2;
+        lbuf[j] = HPKE_A2B(ah[i-1]) * 16 + HPKE_A2B(ah[i]);
+    }
+    if (nibble) {
+        lbuf[0]=HPKE_A2B(ah[0]);
     }
     *blen = lblen;
     *buf = lbuf;
@@ -2655,6 +2667,7 @@ int hpke_str2suite(char *suitestr, hpke_suite_t *suite)
     suite->kem_id = kem;
     suite->kdf_id = kdf;
     suite->aead_id = aead;
+#if 0
     /*
      * this line is only needed to avoid a complile error in a CI build
      * that sets -Werror=unused-but-set-parameter
@@ -2663,6 +2676,7 @@ int hpke_str2suite(char *suitestr, hpke_suite_t *suite)
     if (suite->kem_id == 0 || suite->kdf_id == 0 || suite->aead_id == 0) {
         erv = __LINE__; return erv;
     }
+#endif
     return 1;
 }
 

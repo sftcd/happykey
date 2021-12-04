@@ -97,13 +97,6 @@ typedef struct {
     { HPKE_KEM_ID_448, HPKE_KDF_ID_HKDF_SHA512, HPKE_AEAD_ID_CHACHA_POLY1305 }
 
 
-/*!
- * @brief  Map ascii to binary - utility macro used in >1 place
- */
-#define HPKE_A2B(__c__) (__c__>='0'&&__c__<='9'?(__c__-'0'):\
-                        (__c__>='A'&&__c__<='F'?(__c__-'A'+10):\
-                        (__c__>='a'&&__c__<='f'?(__c__-'a'+10):0)))
-
 /*
  * @brief HPKE single-shot encryption function
  *
