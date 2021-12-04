@@ -160,6 +160,10 @@ do
                             if [[ "$res" == 0 || -f $TMPNAM.$mode.$kem.$kdf.$aead.unrecovered ]]
                             then
                                 echo "$mode,$kem,$kdf,$aead DECRYPT WORKED when it shouldn't!"
+                                echo "What failed was: $VALGRIND $BINDIR/hpkemain -d -p $TMPNAM.$mode.$kem.rpriv $AUTHDPARMS $BADPSKPARMS \
+                                -i $TMPNAM.$mode.$kem.$kdf.$aead.cipher -o $TMPNAM.$mode.$kem.$kdf.$aead.unrecovered \
+                                -m $mode -c $kem,$kdf,$aead "
+                                echo "PSK good params: $GOODPSKPARMS, bad params: $BADPSKPARMS"
                                 overall=1
                                 ores=1
                                 failed=$((failed+1))

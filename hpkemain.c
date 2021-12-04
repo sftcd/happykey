@@ -731,7 +731,7 @@ int main(int argc, char **argv)
             &privlen, priv);
         if (rv!=1) {
             fprintf(stderr,"Error (%d) from hpke_kg\n",rv);
-            exit(1);
+            exit(3);
         }
         rv=hpkemain_write_keys(publen, pub, privlen, priv,
                 priv_in,pub_in);
@@ -739,7 +739,7 @@ int main(int argc, char **argv)
             fprintf(stderr,"Error (%d) writing files (%s,%s)\n",rv,
                     (priv_in?priv_in:"NULL"),
                     (pub_in?pub_in:"NULL"));
-            exit(1);
+            exit(4);
         }
         
     } else if (doing_enc) {
@@ -802,7 +802,7 @@ int main(int argc, char **argv)
                 }
                 OPENSSL_free(bcipher);
                 if (goodres==0) {
-                    exit(1);
+                    exit(5);
                 }
             } else {
 #endif
@@ -827,7 +827,7 @@ int main(int argc, char **argv)
         int rv=hpkemain_read_ct(inp_in,&senderpublen,senderpub,&cipherlen,&cipher);
         if (rv!=1) {
             fprintf(stderr,"Error reading input - exiting\n");
-            exit(rv);
+            exit(6);
         }
 
         clearlen=cipherlen;
@@ -835,7 +835,7 @@ int main(int argc, char **argv)
         if (!clear) {
             OPENSSL_free(cipher);
             fprintf(stderr,"Error reading input - exiting\n");
-            exit(rv);
+            exit(7);
         }
 
 #undef USEBUF2EVP
@@ -849,7 +849,7 @@ int main(int argc, char **argv)
             fprintf(stderr,"Error mapping private key 2 EVP - exiting\n");
             OPENSSL_free(cipher);
             OPENSSL_free(clear);
-            exit(rv);
+            exit(8);
         }
         rv=hpke_dec( hpke_mode, hpke_suite,
                 pskid, psklen, psk,
@@ -885,7 +885,7 @@ int main(int argc, char **argv)
         if (rv!=1) {
             fprintf(stderr,"Error decrypting (%d) - exiting\n",rv);
             OPENSSL_free(clear);
-            exit(rv);
+            exit(9);
         }
 
         FILE *fout=NULL;
@@ -896,7 +896,7 @@ int main(int argc, char **argv)
             if (!fout) {
                 fprintf(stderr,"Decryption worked but can't open (%s) - exiting\n",out_in);
                 OPENSSL_free(clear);
-                exit(1);
+                exit(10);
             }
         }
         size_t frv=fwrite(clear,1,clearlen,fout);
@@ -904,7 +904,7 @@ int main(int argc, char **argv)
             fprintf(stderr,"Error writing %lu bytes of output to %s (only %lu written)\n",
                         (unsigned long)clearlen,(out_in?out_in:"STDOUT"),(unsigned long)frv);
             OPENSSL_free(clear);
-            exit(1);
+            exit(11);
         }
         if (out_in!=NULL) {
             fclose(fout);

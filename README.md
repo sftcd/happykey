@@ -21,6 +21,14 @@ High level notes:
 
 ## Recent Changes
 
+- 20211204: many teeny cosmetic changes to better match OpenSSL code
+  style. (One interesting change to return explicit non-zero error values
+  from hpkemain - one of our __LINE__ error returns was on line 512 and
+  when tha percolated out to the shell as the parameter to an ``exit()``
+  call it was of course seen as zero - confusing my test scripts into
+  seeing an unexpectd success when a failed decryption was the nominal
+  text extpection!)
+
 - 20211129: Fixed some issues that became apparent as I was documenting
   HPKE for an OpenSSL PR - mostly just parameter name changes but one
   real change was to allow an ``EVP_PKEY*`` form for the private key
