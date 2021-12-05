@@ -21,6 +21,13 @@ High level notes:
 
 ## Recent Changes
 
+- 20211205: Half-way house - ``#ifdef NEWTHING`` protecting calls to
+  ``EVP_KDF_*`` APIs instead of ``EVP_PKEY_derive*`` APIs as advised
+  by OpenSSL upstream maintainer. Still needs to be cleaned up and
+  tested in ``HPKE-PR`` and ``ECH-draft-13a`` builds. Seems to work
+  but more testing needed (in particular leak tests in the face of
+  failures).
+
 - 20211204: many teeny cosmetic changes to better match OpenSSL code
   style. (One interesting change to return explicit non-zero error values
   from hpkemain - one of our __LINE__ error returns was on line 512 and

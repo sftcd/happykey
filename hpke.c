@@ -89,7 +89,7 @@ static hpke_aead_info_t hpke_aead_tab[] = {
     { HPKE_AEAD_ID_AES_GCM_256, EVP_aes_256_gcm, "AES-256-GCM", 16, 32, 12 },
 #ifndef OPENSSL_NO_CHACHA20
 #ifndef OPENSSL_NO_POLY1305
-    { HPKE_AEAD_ID_CHACHA_POLY1305, EVP_chacha20_poly1305, 
+    { HPKE_AEAD_ID_CHACHA_POLY1305, EVP_chacha20_poly1305,
         "chacha20-poly1305", 16, 32, 12 }
 #endif
 #endif
@@ -178,6 +178,7 @@ static hpke_kem_info_t hpke_kem_tab[] = {
       64, 56, 56, 56 },
     {34, NULL, NULL, 0, NULL, 0, 0, 0 }, /* keep indexing correct */
 };
+
 
 #if defined(SUPERVERBOSE) || defined(TESTVECTORS)
 /*
@@ -703,7 +704,16 @@ static int hpke_extract(
         const unsigned char *ikm, const size_t ikmlen,
         unsigned char *secret, size_t *secretlen)
 {
+#define NEWTHING
+#ifndef NEWTHING
     EVP_PKEY_CTX *pctx = NULL;
+#else
+    EVP_KDF *kdf = NULL;
+    EVP_KDF_CTX *kctx = NULL;
+    OSSL_PARAM params[5], *p = params;
+    int mode = EVP_PKEY_HKDEF_MODE_EXTRACT_ONLY;
+    const char *mdname = NULL;
+#endif
     unsigned char labeled_ikmbuf[HPKE_MAXSIZE];
     unsigned char *labeled_ikm = labeled_ikmbuf;
     size_t labeled_ikmlen = 0;
@@ -782,6 +792,7 @@ static int hpke_extract(
             erv = __LINE__; goto err;
     }
 
+#ifndef NEWTHING
     pctx = EVP_PKEY_CTX_new_from_name(hpke_libctx, "HKDF", NULL);
     if (!pctx) {
         erv = __LINE__; goto err;
@@ -824,8 +835,56 @@ static int hpke_extract(
     }
     *secretlen = lsecretlen;
     EVP_PKEY_CTX_free(pctx); pctx = NULL;
+#else
+
+    /* Find and allocate a context for the HKDF algorithm */
+    if ((kdf = EVP_KDF_fetch(NULL, "hkdf", NULL)) == NULL) {
+        erv = __LINE__; goto err;
+    }
+    kctx = EVP_KDF_CTX_new(kdf);
+    EVP_KDF_free(kdf); /* The kctx keeps a reference so this is safe */
+    kdf = NULL;
+    if (kctx == NULL) {
+        erv = __LINE__; goto err;
+    }
+    /* Build up the parameters for the derivation */
+    if (mode5869 == HPKE_5869_MODE_KEM) {
+        mdname = EVP_MD_get0_name(hpke_kem_tab[suite.kem_id].hash_init_func());
+        if (!mdname) { erv = __LINE__; goto err; }
+    } else {
+        mdname = EVP_MD_get0_name(hpke_kdf_tab[suite.kdf_id].hash_init_func());
+        if (!mdname) { erv = __LINE__; goto err; }
+    }
+    *p++ = OSSL_PARAM_construct_utf8_string(OSSL_KDF_PARAM_DIGEST,
+            (char*)mdname, 0);
+    *p++ = OSSL_PARAM_construct_int(OSSL_KDF_PARAM_MODE, &mode);
+    *p++ = OSSL_PARAM_construct_octet_string(OSSL_KDF_PARAM_KEY,
+            (unsigned char*) labeled_ikm, labeled_ikmlen );
+    *p++ = OSSL_PARAM_construct_octet_string(OSSL_KDF_PARAM_SALT,
+            (unsigned char*) salt, saltlen);
+    *p = OSSL_PARAM_construct_end();
+    if (EVP_KDF_CTX_set_params(kctx, params) <= 0) {
+        erv = __LINE__; goto err;
+    }
+    lsecretlen = EVP_KDF_CTX_get_kdf_size(kctx);
+    if (lsecretlen > *secretlen) {
+        erv = __LINE__; goto err;
+    }
+    /* Do the derivation */
+    if (EVP_KDF_derive(kctx, secret, lsecretlen, params) <= 0) {
+        erv = __LINE__; goto err;
+    }
+    EVP_KDF_CTX_free(kctx); kctx = NULL;
+    *secretlen = lsecretlen;
+#endif
+
 err:
+#ifndef NEWTHING
     if (pctx != NULL) EVP_PKEY_CTX_free(pctx);
+#else
+    if (kdf != NULL) EVP_KDF_free(kdf);
+    if (kctx != NULL) EVP_KDF_CTX_free(kctx);
+#endif
     memset(labeled_ikmbuf, 0, HPKE_MAXSIZE);
     return erv;
 }
@@ -854,12 +913,20 @@ static int hpke_expand(const hpke_suite_t suite, const int mode5869,
                 const uint32_t L,
                 unsigned char *out, size_t *outlen)
 {
-    EVP_PKEY_CTX *pctx = NULL;
     int erv = 1;
     unsigned char libuf[HPKE_MAXSIZE];
     unsigned char *lip = libuf;
     size_t concat_offset = 0;
     size_t loutlen = L;
+#ifndef NEWTHING
+    EVP_PKEY_CTX *pctx = NULL;
+#else
+    EVP_KDF *kdf = NULL;
+    EVP_KDF_CTX *kctx = NULL;
+    OSSL_PARAM params[5], *p = params;
+    int mode = EVP_PKEY_HKDEF_MODE_EXPAND_ONLY;
+    const char *mdname = NULL;
+#endif
 
     if (L > *outlen) {
         erv = __LINE__; goto err;
@@ -938,6 +1005,8 @@ static int hpke_expand(const hpke_suite_t suite, const int mode5869,
             erv = __LINE__; goto err;
     }
 
+#ifndef NEWTHING
+
     pctx = EVP_PKEY_CTX_new_from_name(hpke_libctx, "HKDF", NULL);
     if (!pctx) {
         erv = __LINE__; goto err;
@@ -968,10 +1037,55 @@ static int hpke_expand(const hpke_suite_t suite, const int mode5869,
     if (EVP_PKEY_derive(pctx, out, &loutlen) != 1 ) {
         erv = __LINE__; goto err;
     }
-    *outlen = loutlen;
     EVP_PKEY_CTX_free(pctx); pctx = NULL;
+
+#else
+
+    /* Find and allocate a context for the HKDF algorithm */
+    if ((kdf = EVP_KDF_fetch(NULL, "hkdf", NULL)) == NULL) {
+        erv = __LINE__; goto err;
+    }
+    kctx = EVP_KDF_CTX_new(kdf);
+    EVP_KDF_free(kdf); /* The kctx keeps a reference so this is safe */
+    kdf = NULL;
+    if (kctx == NULL) {
+        erv = __LINE__; goto err;
+    }
+    /* Build up the parameters for the derivation */
+    if (mode5869 == HPKE_5869_MODE_KEM) {
+        mdname = EVP_MD_get0_name(hpke_kem_tab[suite.kem_id].hash_init_func());
+        if (!mdname) { erv = __LINE__; goto err; }
+    } else {
+        mdname = EVP_MD_get0_name(hpke_kdf_tab[suite.kdf_id].hash_init_func());
+        if (!mdname) { erv = __LINE__; goto err; }
+    }
+    *p++ = OSSL_PARAM_construct_utf8_string(OSSL_KDF_PARAM_DIGEST,
+            (char*)mdname, 0);
+    *p++ = OSSL_PARAM_construct_int(OSSL_KDF_PARAM_MODE, &mode);
+    *p++ = OSSL_PARAM_construct_octet_string(OSSL_KDF_PARAM_KEY,
+            (unsigned char*) prk, prklen );
+    *p++ = OSSL_PARAM_construct_octet_string(OSSL_KDF_PARAM_INFO,
+            libuf, concat_offset);
+    *p = OSSL_PARAM_construct_end();
+    if (EVP_KDF_CTX_set_params(kctx, params) <= 0) {
+        erv = __LINE__; goto err;
+    }
+    /* Do the derivation */
+    if (EVP_KDF_derive(kctx, out, loutlen, params) <= 0) {
+        erv = __LINE__; goto err;
+    }
+    EVP_KDF_CTX_free(kctx); kctx = NULL;
+
+#endif
+
+    *outlen = loutlen;
 err:
+#ifndef NEWTHING
     if (pctx != NULL) EVP_PKEY_CTX_free(pctx);
+#else
+    if (kdf != NULL) EVP_KDF_free(kdf);
+    if (kctx != NULL) EVP_KDF_CTX_free(kctx);
+#endif
     memset(libuf, 0, HPKE_MAXSIZE);
     return erv;
 }
@@ -1969,7 +2083,7 @@ int hpke_dec(
                     hpke_kem_tab[suite.kem_id].groupid, authpub, authpublen);
         } else {
             pkI = EVP_PKEY_new_raw_public_key(
-                    hpke_kem_tab[suite.kem_id].groupid, NULL, 
+                    hpke_kem_tab[suite.kem_id].groupid, NULL,
                     authpub, authpublen);
         }
         if (pkI == NULL) {
@@ -2717,7 +2831,7 @@ int hpke_setlibctx(OSSL_LIB_CTX *libctx)
 {
     /*
      * This use to call OSSL_LIB_CTX_set0_default() but that caused some
-     * *very* odd errors when this code was executed in the context of 
+     * *very* odd errors when this code was executed in the context of
      * the OpenSSL test harness in an undefined behaviour sanitizer build.
      * In the end, not calling the above (but without really understanding
      * the issue) is where we landed.
