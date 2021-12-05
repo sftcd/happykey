@@ -14,10 +14,8 @@ High level notes:
 - For test vectors, see ``tvtest.sh`` output - 96 tests pass, 
   and 84 don't match a test vector. 
 - The default ciphersuite is x25519/hkdf-sha256,hkdf-sha256,aes128gcm. 
-- Only the single-shot APIs are supported.
+- (Almost) Only the single-shot APIs are supported.
 - Exporters are not supported.
-- There is a limit of 40KB on the buffers supported, including plain 
-  and ciphertexts.
 
 ## Recent Changes
 
