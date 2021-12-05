@@ -704,16 +704,11 @@ static int hpke_extract(
         const unsigned char *ikm, const size_t ikmlen,
         unsigned char *secret, size_t *secretlen)
 {
-#define NEWTHING
-#ifndef NEWTHING
-    EVP_PKEY_CTX *pctx = NULL;
-#else
     EVP_KDF *kdf = NULL;
     EVP_KDF_CTX *kctx = NULL;
     OSSL_PARAM params[5], *p = params;
     int mode = EVP_PKEY_HKDEF_MODE_EXTRACT_ONLY;
     const char *mdname = NULL;
-#endif
     unsigned char labeled_ikmbuf[HPKE_MAXSIZE];
     unsigned char *labeled_ikm = labeled_ikmbuf;
     size_t labeled_ikmlen = 0;
@@ -792,53 +787,8 @@ static int hpke_extract(
             erv = __LINE__; goto err;
     }
 
-#ifndef NEWTHING
-    pctx = EVP_PKEY_CTX_new_from_name(hpke_libctx, "HKDF", NULL);
-    if (!pctx) {
-        erv = __LINE__; goto err;
-    }
-    if (EVP_PKEY_derive_init(pctx) != 1) {
-        erv = __LINE__; goto err;
-    }
-    if (EVP_PKEY_CTX_hkdf_mode(pctx, EVP_PKEY_HKDEF_MODE_EXTRACT_ONLY) != 1) {
-        erv = __LINE__; goto err;
-    }
-    if (mode5869 == HPKE_5869_MODE_KEM) {
-        if (EVP_PKEY_CTX_set_hkdf_md(pctx,
-                    hpke_kem_tab[suite.kem_id].hash_init_func()) != 1) {
-            erv = __LINE__; goto err;
-        }
-    } else {
-        if (EVP_PKEY_CTX_set_hkdf_md(pctx,
-                    hpke_kdf_tab[suite.kdf_id].hash_init_func()) != 1) {
-            erv = __LINE__; goto err;
-        }
-    }
-    if (EVP_PKEY_CTX_set1_hkdf_key(pctx, labeled_ikm, labeled_ikmlen) != 1) {
-        erv = __LINE__; goto err;
-    }
-    if (EVP_PKEY_CTX_set1_hkdf_salt(pctx, salt, saltlen) != 1) {
-        erv = __LINE__; goto err;
-    }
-    /*
-     * get the right size set first - new in latest upstream
-     */
-    lsecretlen = *secretlen;
-    if (EVP_PKEY_derive(pctx, NULL, &lsecretlen) != 1) {
-        erv = __LINE__; goto err;
-    }
-    if (EVP_PKEY_derive(pctx, secret, &lsecretlen) != 1) {
-        erv = __LINE__; goto err;
-    }
-    if (lsecretlen > *secretlen) { /* just in case it changed */
-        erv = __LINE__; goto err;
-    }
-    *secretlen = lsecretlen;
-    EVP_PKEY_CTX_free(pctx); pctx = NULL;
-#else
-
     /* Find and allocate a context for the HKDF algorithm */
-    if ((kdf = EVP_KDF_fetch(NULL, "hkdf", NULL)) == NULL) {
+    if ((kdf = EVP_KDF_fetch(hpke_libctx, "hkdf", NULL)) == NULL) {
         erv = __LINE__; goto err;
     }
     kctx = EVP_KDF_CTX_new(kdf);
@@ -876,15 +826,10 @@ static int hpke_extract(
     }
     EVP_KDF_CTX_free(kctx); kctx = NULL;
     *secretlen = lsecretlen;
-#endif
 
 err:
-#ifndef NEWTHING
-    if (pctx != NULL) EVP_PKEY_CTX_free(pctx);
-#else
     if (kdf != NULL) EVP_KDF_free(kdf);
     if (kctx != NULL) EVP_KDF_CTX_free(kctx);
-#endif
     memset(labeled_ikmbuf, 0, HPKE_MAXSIZE);
     return erv;
 }
@@ -918,15 +863,11 @@ static int hpke_expand(const hpke_suite_t suite, const int mode5869,
     unsigned char *lip = libuf;
     size_t concat_offset = 0;
     size_t loutlen = L;
-#ifndef NEWTHING
-    EVP_PKEY_CTX *pctx = NULL;
-#else
     EVP_KDF *kdf = NULL;
     EVP_KDF_CTX *kctx = NULL;
     OSSL_PARAM params[5], *p = params;
     int mode = EVP_PKEY_HKDEF_MODE_EXPAND_ONLY;
     const char *mdname = NULL;
-#endif
 
     if (L > *outlen) {
         erv = __LINE__; goto err;
@@ -1005,44 +946,8 @@ static int hpke_expand(const hpke_suite_t suite, const int mode5869,
             erv = __LINE__; goto err;
     }
 
-#ifndef NEWTHING
-
-    pctx = EVP_PKEY_CTX_new_from_name(hpke_libctx, "HKDF", NULL);
-    if (!pctx) {
-        erv = __LINE__; goto err;
-    }
-    if (EVP_PKEY_derive_init(pctx) != 1) {
-        erv = __LINE__; goto err;
-    }
-    if (EVP_PKEY_CTX_hkdf_mode(pctx, EVP_PKEY_HKDEF_MODE_EXPAND_ONLY) != 1) {
-        erv = __LINE__; goto err;
-    }
-    if (mode5869 == HPKE_5869_MODE_KEM) {
-        if (EVP_PKEY_CTX_set_hkdf_md(pctx,
-                    hpke_kem_tab[suite.kem_id].hash_init_func()) != 1) {
-            erv = __LINE__; goto err;
-        }
-    } else {
-        if (EVP_PKEY_CTX_set_hkdf_md(pctx,
-                    hpke_kdf_tab[suite.kdf_id].hash_init_func()) != 1) {
-            erv = __LINE__; goto err;
-        }
-    }
-    if (EVP_PKEY_CTX_set1_hkdf_key(pctx, prk, prklen) != 1) {
-        erv = __LINE__; goto err;
-    }
-    if (EVP_PKEY_CTX_add1_hkdf_info(pctx, libuf, concat_offset) != 1) {
-        erv = __LINE__; goto err;
-    }
-    if (EVP_PKEY_derive(pctx, out, &loutlen) != 1 ) {
-        erv = __LINE__; goto err;
-    }
-    EVP_PKEY_CTX_free(pctx); pctx = NULL;
-
-#else
-
     /* Find and allocate a context for the HKDF algorithm */
-    if ((kdf = EVP_KDF_fetch(NULL, "hkdf", NULL)) == NULL) {
+    if ((kdf = EVP_KDF_fetch(hpke_libctx, "hkdf", NULL)) == NULL) {
         erv = __LINE__; goto err;
     }
     kctx = EVP_KDF_CTX_new(kdf);
@@ -1075,17 +980,11 @@ static int hpke_expand(const hpke_suite_t suite, const int mode5869,
         erv = __LINE__; goto err;
     }
     EVP_KDF_CTX_free(kctx); kctx = NULL;
-
-#endif
-
     *outlen = loutlen;
+
 err:
-#ifndef NEWTHING
-    if (pctx != NULL) EVP_PKEY_CTX_free(pctx);
-#else
     if (kdf != NULL) EVP_KDF_free(kdf);
     if (kctx != NULL) EVP_KDF_CTX_free(kctx);
-#endif
     memset(libuf, 0, HPKE_MAXSIZE);
     return erv;
 }
