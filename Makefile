@@ -51,16 +51,16 @@ osslplayground.o: osslplayground.c
 	${CC} ${CFLAGS} -g -I ${INCL} -c $<
 
 neod: neod.o hpke.o neod_nss.o
-	LD_LIBRARY_PATH=${OSSL}:${NSSL} ${CC} ${CFLAGS}  -g -o $@ neod.o hpke.o neod_nss.o -L ${OSSL} -lssl -lcrypto -L ${NSSL} -lnss3 -lnspr4
+	if [ -d ${NSSL} ]; then LD_LIBRARY_PATH=${OSSL}:${NSSL} ${CC} ${CFLAGS}  -g -o $@ neod.o hpke.o neod_nss.o -L ${OSSL} -lssl -lcrypto -L ${NSSL} -lnss3 -lnspr4 ; fi
 
 neod.o: neod.c
 	${CC} ${CFLAGS} -g -I ${INCL} -c $<
 
 neod_nss.o: neod_nss.c
-	${CC} -g ${CFLAGS} ${NINCL} -c $<
+	if [ -d ${NSSL} ]; then ${CC} -g ${CFLAGS} ${NINCL} -c $< ; fi
 
 neodtest: neod
-	- LD_LIBRARY_PATH=${OSSL}:${NSSL} ./neod
+	- if [ -d ${NSSL} ]; then LD_LIBRARY_PATH=${OSSL}:${NSSL} ./neod ; fi
 
 # A round-trip to test EVP mode for sender public
 #
