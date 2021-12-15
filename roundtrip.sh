@@ -49,7 +49,9 @@ fi
 TMPNAM=`mktemp $SCRATCH/tmpXXXX`
 cp $SCRATCH/plain $TMPNAM.plain
 
+echo "Running: $VALGRIND $BINDIR/hpkemain -k -p $TMPNAM.priv -P $TMPNAM.pub $*"
 $VALGRIND $BINDIR/hpkemain -k -p $TMPNAM.priv -P $TMPNAM.pub $*
+echo "Running $VALGRIND $BINDIR/hpkemain -e -P $TMPNAM.pub -i $TMPNAM.plain -o $TMPNAM.cipher  $*"
 $VALGRIND $BINDIR/hpkemain -e -P $TMPNAM.pub -i $TMPNAM.plain -o $TMPNAM.cipher  $*
 res=$?
 if [[ "$res" != "0" ]]
@@ -59,7 +61,7 @@ then
 fi
 
 # Next line is handy when debugging with gdb
-echo "RUnning: $BINDIR/hpkemain -d -p $TMPNAM.priv -i $TMPNAM.cipher"
+echo "Running: $BINDIR/hpkemain -d -p $TMPNAM.priv -i $TMPNAM.cipher $*"
 $VALGRIND $BINDIR/hpkemain -d -p $TMPNAM.priv -i $TMPNAM.cipher -o $TMPNAM.recovered $*
 res=$?
 if [[ "$res" == "0" ]]
