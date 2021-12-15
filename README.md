@@ -19,6 +19,10 @@ High level notes:
 
 ## Recent Changes
 
+- 20211215: added a sketch of a [higher level API](hpkehigh.h) that
+  could be developed as part of discussion of PR for upstream. My
+  current working hypothesis is that that'd be a bad plan. 
+
 - 20211205: Changed to use ``EVP_KDF_*`` APIs for extract/expand instead 
   of ``EVP_PKEY_derive*`` as advised by OpenSSL upstream maintainer. 
 
