@@ -2,14 +2,14 @@
 
 # set -x
 
-# Copyright 2019-2021 Stephen Farrell. All Rights Reserved.
+# Copyright 2019-2022 Stephen Farrell. All Rights Reserved.
 #
 # Licensed under the OpenSSL license (the "License").  You may not use
 # this file except in compliance with the License.  You can obtain a copy
 # in the file LICENSE in the source distribution or at
 # https://www.openssl.org/source/license.html
 #
-# An OpenSSL-based HPKE implementation following draft-irtf-cfrg-hpke
+# An OpenSSL-based HPKE implementation of RFC9180
 #
 # If you wanna use valgrind uncomment this
 # VALGRIND="valgrind --leak-check=full --show-leak-kinds=all"

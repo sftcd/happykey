@@ -1,9 +1,9 @@
 # happykey
 
 This is a work-in-progress implementation of
-[draft-irtf-cfrg-hpke](https://tools.ietf.org/html/draft-irtf-cfrg-hpke), using
+[HPKE](https://www.rfc-editor.org/rfc/rfc9180.html), using
 OpenSSL, as a precursor to using that as part of the next [Encrypted SNI/ECH
-draft](https://tools.ietf.org/html/draft-ietf-tls-esni) with my [ESNI-enabled
+draft](https://tools.ietf.org/html/draft-ietf-tls-esni) with my [ECH-enabled
 OpenSSL](https://github.com/sftcd/openssl) fork.  This needs to be
 built against a master/tip version of OpenSSL such as my fork.
 
@@ -18,6 +18,9 @@ High level notes:
 - Exporters are not supported.
 
 ## Recent Changes
+
+- 20220225: HPKE is now [RFC9180](https://www.rfc-editor.org/rfc/rfc9180.html),
+  so various comments updated accordingly.
 
 - 20211215: added a sketch of a [higher level API](hpkehigh.h) that
   could be developed as part of discussion of PR for upstream. My

@@ -1,5 +1,5 @@
 /*
- * Copyright 2019-2021 Stephen Farrell. All Rights Reserved.
+ * Copyright 2019-2022 The OpenSSL Project Authors. All Rights Reserved.
  *
  * Licensed under the OpenSSL license (the "License").  You may not use
  * this file except in compliance with the License.  You can obtain a copy
@@ -9,7 +9,7 @@
 
 /**
  * @file 
- * An OpenSSL-based HPKE implementation following draft-irtf-cfrg-hpke
+ * An OpenSSL-based HPKE implementation of RFC9180
  */
 
 #include <stddef.h>
@@ -34,7 +34,7 @@ static int verbose=0; ///< global var for verbosity
 static void usage(char *prog,char *errmsg) 
 {
     if (errmsg) fprintf(stderr,"\nError! %s\n\n",errmsg);
-    fprintf(stderr,"HPKE (draft-irtf-cfrg-hpke) tester, options are:\n");
+    fprintf(stderr,"HPKE (RFC9180) tester, options are:\n");
     fprintf(stderr,"Key generaion:\n");
     fprintf(stderr,"\tUsage: %s -k -p private [-P public] [-c suite]\n",prog);
     fprintf(stderr,"Encryption:\n");
