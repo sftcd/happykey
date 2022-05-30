@@ -19,6 +19,9 @@ High level notes:
 
 ## Recent Changes
 
+- 20220530: Added instructions for building with an OpenSSL that 
+  includes HPKE (from my fork) and rebasing, 'cause I always forget ;em;-)
+
 - 20220225: HPKE is now [RFC9180](https://www.rfc-editor.org/rfc/rfc9180.html),
   so various comments updated accordingly.
 
@@ -143,7 +146,8 @@ the right things (hint: ``-DDRAFT_06`` is one way:-).
 
 ## Build 
 
-Assuming you want to build within ``$HOME/code``, as I do, then:
+Assuming you want to build within ``$HOME/code``, with the upstream
+OpenSSL library, as I usually do, then:
 
             $ cd $HOME/code
             $ git clone https://github.com/sftcd/happykey
@@ -217,6 +221,63 @@ If you do build this, ``hpkemain`` is the test tool, so start with
               For example "-c x25519,hkdf-sha256,aes128gcm" (the default)
 
 There's a bit of (unfinished) doxygen-generated documentation of the [API](hpke-api.pdf).
+
+## Build with OpenSSL that includes HPKE
+
+I have an OpenSSL fork with a [branch](https://github.com/sftcd/openssl/tree/HPKE-PR) 
+that has HPKE built into the library. (And a related [PR](https://github.com/openssl/openssl/pull/17172)
+for inclusion of that with upstream. If you want to build with that then
+instead of the above you want:
+
+            $ cd $HOME/code
+            $ git clone https://github.com/sftcd/openssl.git
+            $ cd openssl
+            $ git checkout HPKE-PR
+            $ ./config  
+            $ make -j8
+
+Then you need to modify the Makefile for happykey:
+
+            $ cd $HOME/code/happykey
+            $ vi Makefile
+            # uncomment the line for uselibcrypto=y
+            $ make
+            $ ./alltest.sh
+            All done. All good. (480 tests)
+
+## Rebasing the OpenSSL that includes HPKE
+
+Upstream code changes all the time and I always forget how to
+catch up with that properly. (And probably do it wrong in any
+case;-) Doing this obvious requires you to have write access
+to the origin, so this note is mostly for me:-)
+
+Here's how I'm currently doing that and plan to in
+future:
+
+            $ cd $HOME/code
+            $ git clone git@github.com:sftcd/openssl.git openssl-rebase
+            $ cd openssl-rebase
+            $ git remote add upstream https://github.com/openssl/openssl.git
+            $ git fetch upstream
+            $ git checkout master
+            $ git reset --hard upstream/master
+            $ git push origin master --force 
+
+That gets the ``master`` branch up to date with upstream. Next is to rebase
+my own branch(es) with that, e.g. for HPKE-PR.
+
+            $ git checkout HPKE-PR
+            $ git rebase master HPKE-PR
+
+That last has needs some repetitive stuff but works in the end
+but don't forget to build/test/push to origin too.
+
+            $ make clean
+            $ ./config
+            $ make -j8
+            $ make test
+            $ git push
 
 ## PEM-like ciphertext file format
 
