@@ -1,5 +1,7 @@
 .gitignore
 *.o
+*-forlib
+priv
 hpkemain
 neod
 oeod

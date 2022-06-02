@@ -39,7 +39,32 @@ CFLAGS=-g ${testvectors} -DHAPPYKEY
 
 CC=gcc
 
-all: hpkemain neod oeod test2evp osslplayground
+all: hpkemain neod oeod test2evp osslplayground 
+
+# hpke.c and hpke.h here incldue some additional tracing and test vector
+# support that's not desirable in the version we'd like to see merged
+# with OpenSSL - we use the unifdef tool to generate those files from
+# the ones here. 
+#
+# If/when you make new ones of these then you need to manually move
+# them over to an OpenSSL build and commit them there separately. We
+# don't expect to do that often, once the HPKE PR for OpenSSL has been
+# merged. If/when other developers do work on hpke.c within OpenSSL
+# then, yes, this will break, but such is life.
+#
+# The "-x 1" below is just to get unifdef to return zero if the input
+# and output differ, which should be the case for us.
+forlib: hpke.c-forlib hpke.h-forlib
+
+hpke.c-forlib: hpke.c
+	- unifdef -x 1 -UHAPPYKEY -USUPERVERBOSE -UTESTVECTORS hpke.c >hpke.c-forlib
+
+hpke.h-forlib: hpke.h
+	- unifdef -x 1 -UHAPPYKEY -USUPERVERBOSE -UTESTVECTORS hpke.h >hpke.h-forlib
+
+forlibclean:
+	- rm -f hpke.h-forlib
+	- rm -f hpke.c-forlib
 
 # This is a round-trip test with NSS encrypting and my code decrypting
 # (no parameters for now)

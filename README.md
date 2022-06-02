@@ -1,11 +1,19 @@
 # happykey
 
-This is a work-in-progress implementation of
-[HPKE](https://www.rfc-editor.org/rfc/rfc9180.html), using
-OpenSSL, as a precursor to using that as part of the next [Encrypted SNI/ECH
-draft](https://tools.ietf.org/html/draft-ietf-tls-esni) with my [ECH-enabled
-OpenSSL](https://github.com/sftcd/openssl) fork.  This needs to be
-built against a master/tip version of OpenSSL such as my fork.
+This is an implementation of [HPKE](https://www.rfc-editor.org/rfc/rfc9180.html), 
+using OpenSSL, as a precursor to using that for 
+[Encrypted SNI/ECH](https://tools.ietf.org/html/draft-ietf-tls-esni) with my 
+[ECH-enabled OpenSSL fork](https://github.com/sftcd/openssl).  This needs to be built
+against a master/tip version of OpenSSL such as my fork.
+
+I've submitted a [pull request](https://github.com/openssl/openssl/pull/17172)
+for inclusion of HPKE in OpenSSL, based on this code. Since that'll take a
+while to happen, and then turn up in an official OpenSSL release, the idea is
+that applications can use this as a sort of "polyfill" (borrowing the 
+[concept](https://en.wikipedia.org/wiki/Polyfill_(programming) used in web 
+development:-) in the meantime. I also plan to update this as newer
+HPKE ciphersuites are defined but that code won't (at least initially)
+be part of the OpenSSL PR.
 
 High level notes:
 
@@ -18,6 +26,10 @@ High level notes:
 - Exporters are not supported.
 
 ## Recent Changes
+
+- 20220602: A number of changes taking the "polyfill" approach and
+  reacting to comments on the PR we've submitted for the OpenSSL library.
+  (I've only partly handled those comments so far.)
 
 - 20220530: Added instructions for building with an OpenSSL that 
   includes HPKE (from my fork) and rebasing, 'cause I always forget ;em;-)
