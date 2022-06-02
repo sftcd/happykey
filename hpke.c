@@ -8,7 +8,7 @@
  */
 
 /**
- * @file
+ * @file 
  * An OpenSSL-based HPKE implementation of RFC9180
  */
 
@@ -37,7 +37,8 @@
 #ifdef TESTVECTORS
 #include "hpketv.h"
 #endif
-#else
+
+#else /* For OpenSSL library */
 #include <openssl/hpke.h>
 #include <openssl/err.h>
 #endif
@@ -48,12 +49,10 @@
 #else
 #define HPKE_err { ERR_raise(ERR_LIB_SSL, ERR_R_INTERNAL_ERROR); erv = __LINE__; goto err; }
 #endif
-
 #if defined(SUPERVERBOSE) || defined(TESTVECTORS)
 unsigned char *pbuf; /**< global var for debug printing */
 size_t pblen = 1024; /**< global var for debug printing */
 #endif
-
 #if defined(SUPERVERBOSE) || defined(TESTVECTORS)
 /*
  * @brief table of mode strings
@@ -282,7 +281,7 @@ static OSSL_LIB_CTX *hpke_libctx = NULL;
  * @param buf is a pointer to the internally allocated binary buffer
  * @return 1 for good otherwise bad
  */
-int hpke_ah_decode(
+static int hpke_ah_decode(
         size_t ahlen, const char *ah,
         size_t *blen, unsigned char **buf)
 {
@@ -1756,130 +1755,6 @@ err:
 }
 
 /*!
- * @brief HPKE single-shot encryption function
- *
- * @param mode is the HPKE mode
- * @param suite is the ciphersuite to use
- * @param pskid is the pskid string fpr a PSK mode (can be NULL)
- * @param psklen is the psk length
- * @param psk is the psk
- * @param publen is the length of the recipient public key
- * @param pub is the encoded recipient public key
- * @param authprivlen is the length of the private (authentication) key
- * @param authpriv is the encoded private (authentication) key
- * @param authpriv_evp is the EVP_PKEY* form of private (authentication) key
- * @param clearlen is the length of the cleartext
- * @param clear is the encoded cleartext
- * @param aadlen is the lenght of the additional data (can be zero)
- * @param aad is the encoded additional data (can be NULL)
- * @param infolen is the lenght of the info data (can be zero)
- * @param info is the encoded info data (can be NULL)
- * @param seqlen is the length of the sequence data (can be zero)
- * @param seq is the encoded sequence data (can be NULL)
- * @param senderpublen length of the input buffer for the sender's public key
- * @param senderpub is the input buffer for ciphertext
- * @param cipherlen length of the input buffer for ciphertext
- * @param cipher is the input buffer for ciphertext
- * @return 1 for good (OpenSSL style), not 1 for error
- */
-int hpke_enc(
-        unsigned int mode, hpke_suite_t suite,
-        char *pskid, size_t psklen, unsigned char *psk,
-        size_t publen, unsigned char *pub,
-        size_t authprivlen, unsigned char *authpriv, EVP_PKEY* authpriv_evp,
-        size_t clearlen, unsigned char *clear,
-        size_t aadlen, unsigned char *aad,
-        size_t infolen, unsigned char *info,
-        size_t seqlen, unsigned char *seq,
-        size_t *senderpublen, unsigned char *senderpub,
-        size_t *cipherlen, unsigned char *cipher
-#ifdef TESTVECTORS
-        , void *tv
-#endif
-        )
-{
-    return hpke_enc_int(mode, suite,
-            pskid, psklen, psk,
-            publen, pub,
-            authprivlen, authpriv, authpriv_evp,
-            clearlen, clear,
-            aadlen, aad,
-            infolen, info,
-            seqlen, seq,
-            0, NULL,
-            NULL, 0, NULL,
-            senderpublen, senderpub,
-            cipherlen, cipher
-#ifdef TESTVECTORS
-            , tv
-#endif
-           );
-}
-
-/*!
- * @brief Internal HPKE single-shot encryption function
- *
- * @param mode is the HPKE mode
- * @param suite is the ciphersuite to use
- * @param pskid is the pskid string fpr a PSK mode (can be NULL)
- * @param psklen is the psk length
- * @param psk is the psk
- * @param publen is the length of the recipient public key
- * @param pub is the encoded recipient public key
- * @param authprivlen is the length of the private (authentication) key
- * @param authpriv is the encoded private (authentication) key
- * @param authpriv_evp is the EVP_PKEY* form of private (authentication) key
- * @param clearlen is the length of the cleartext
- * @param clear is the encoded cleartext
- * @param aadlen is the lenght of the additional data (can be zero)
- * @param aad is the encoded additional data (can be NULL)
- * @param infolen is the lenght of the info data (can be zero)
- * @param info is the encoded info data (can be NULL)
- * @param seqlen is the length of the sequence data (can be zero)
- * @param seq is the encoded sequence data (can be NULL)
- * @param senderpublen length of the input buffer with the sender's public key
- * @param senderpub is the input buffer for sender public key
- * @param senderpriv has the handle for the sender private key
- * @param cipherlen length of the input buffer for ciphertext
- * @param cipher is the input buffer for ciphertext
- * @return 1 for good (OpenSSL style), not 1 for error
- */
-int hpke_enc_evp(
-        unsigned int mode, hpke_suite_t suite,
-        char *pskid, size_t psklen, unsigned char *psk,
-        size_t publen, unsigned char *pub,
-        size_t authprivlen, unsigned char *authpriv, EVP_PKEY *authpriv_evp,
-        size_t clearlen, unsigned char *clear,
-        size_t aadlen, unsigned char *aad,
-        size_t infolen, unsigned char *info,
-        size_t seqlen, unsigned char *seq,
-        size_t extsenderpublen, unsigned char *extsenderpub,
-        EVP_PKEY *extsenderpriv,
-        size_t *cipherlen, unsigned char *cipher
-#ifdef TESTVECTORS
-        , void *tv
-#endif
-        )
-{
-    return hpke_enc_int(mode, suite,
-            pskid, psklen, psk,
-            publen, pub,
-            authprivlen, authpriv, authpriv_evp,
-            clearlen, clear,
-            aadlen, aad,
-            infolen, info,
-            seqlen, seq,
-            extsenderpublen, extsenderpub,
-            extsenderpriv, 0, NULL,
-            0, NULL,
-            cipherlen, cipher
-#ifdef TESTVECTORS
-            , tv
-#endif
-           );
-}
-
-/*!
  * @brief HPKE single-shot decryption function
  *
  * @param mode is the HPKE mode
@@ -1906,7 +1781,7 @@ int hpke_enc_evp(
  * @param clear is the encoded cleartext
  * @return 1 for good (OpenSSL style), not 1 for error
  */
-int hpke_dec(
+static int hpke_dec_int(
         unsigned int mode, hpke_suite_t suite,
         char *pskid, size_t psklen, unsigned char *psk,
         size_t authpublen, unsigned char *authpub,
@@ -2182,57 +2057,6 @@ err:
 }
 
 /*!
- * @brief generate a key pair
- *
- * @param mode is the mode (currently unused)
- * @param suite is the ciphersuite
- * @param publen is the size of the public key buffer (exact length on output)
- * @param pub is the public value
- * @param privlen is the size of the private key buffer (exact length on output)
- * @param priv is the private key
- * @return 1 for good (OpenSSL style), not 1 for error
- */
-int hpke_kg(
-        unsigned int mode, hpke_suite_t suite,
-        size_t *publen, unsigned char *pub,
-        size_t *privlen, unsigned char *priv)
-{
-    int erv = 1; /* Our error return value - 1 is success */
-    EVP_PKEY *skR = NULL;
-    BIO *bfp = NULL;
-    unsigned char lpriv[HPKE_MAXSIZE];
-    size_t lprivlen = 0;
-
-    if (hpke_suite_check(suite) != 1) return(__LINE__);
-    if (!pub || !priv) return(__LINE__);
-    erv = hpke_kg_evp(mode, suite, publen, pub, &skR);
-    if (erv != 1) {
-        return(erv);
-    }
-    bfp = BIO_new(BIO_s_mem());
-    if (!bfp) {
-        HPKE_err;
-    }
-    if (!PEM_write_bio_PrivateKey(bfp, skR, NULL, NULL, 0, NULL, NULL)) {
-        HPKE_err;
-    }
-    lprivlen = BIO_read(bfp, lpriv, HPKE_MAXSIZE);
-    if (lprivlen <= 0) {
-        HPKE_err;
-    }
-    if (lprivlen > *privlen) {
-        HPKE_err;
-    }
-    *privlen = lprivlen;
-    memcpy(priv, lpriv, lprivlen);
-
-err:
-    if (skR != NULL) EVP_PKEY_free(skR);
-    if (bfp != NULL) BIO_free_all(bfp);
-    return(erv);
-}
-
-/*!
  * @brief generate a key pair keeping private inside API
  *
  * @param mode is the mode (currently unused)
@@ -2242,7 +2066,7 @@ err:
  * @param priv is the private key pointer
  * @return 1 for good (OpenSSL style), not 1 for error
  */
-int hpke_kg_evp(
+static int hpke_kg_evp(
         unsigned int mode, hpke_suite_t suite,
         size_t *publen, unsigned char *pub,
         EVP_PKEY **priv)
@@ -2307,6 +2131,57 @@ err:
     return(erv);
 }
 
+/*!
+ * @brief generate a key pair
+ *
+ * @param mode is the mode (currently unused)
+ * @param suite is the ciphersuite
+ * @param publen is the size of the public key buffer (exact length on output)
+ * @param pub is the public value
+ * @param privlen is the size of the private key buffer (exact length on output)
+ * @param priv is the private key
+ * @return 1 for good (OpenSSL style), not 1 for error
+ */
+static int hpke_kg(
+        unsigned int mode, hpke_suite_t suite,
+        size_t *publen, unsigned char *pub,
+        size_t *privlen, unsigned char *priv)
+{
+    int erv = 1; /* Our error return value - 1 is success */
+    EVP_PKEY *skR = NULL;
+    BIO *bfp = NULL;
+    unsigned char lpriv[HPKE_MAXSIZE];
+    size_t lprivlen = 0;
+
+    if (hpke_suite_check(suite) != 1) return(__LINE__);
+    if (!pub || !priv) return(__LINE__);
+    erv = hpke_kg_evp(mode, suite, publen, pub, &skR);
+    if (erv != 1) {
+        return(erv);
+    }
+    bfp = BIO_new(BIO_s_mem());
+    if (!bfp) {
+        HPKE_err;
+    }
+    if (!PEM_write_bio_PrivateKey(bfp, skR, NULL, NULL, 0, NULL, NULL)) {
+        HPKE_err;
+    }
+    lprivlen = BIO_read(bfp, lpriv, HPKE_MAXSIZE);
+    if (lprivlen <= 0) {
+        HPKE_err;
+    }
+    if (lprivlen > *privlen) {
+        HPKE_err;
+    }
+    *privlen = lprivlen;
+    memcpy(priv, lpriv, lprivlen);
+
+err:
+    if (skR != NULL) EVP_PKEY_free(skR);
+    if (bfp != NULL) BIO_free_all(bfp);
+    return(erv);
+}
+
 /**
  * @brief check if a suite is supported locally
  *
@@ -2359,10 +2234,10 @@ int hpke_suite_check(hpke_suite_t suite)
 }
 
 /*!
- * @brief: map a kem_id and a private key buffer into an EVP_PKEY
+ * @brief map a kem_id and a private key buffer into an EVP_PKEY
  *
- * Note that the buffer is expected to be some form of the PEM encoded
- * private key, but could still have the PEM header or not, and might
+ * Note that the buffer is expected to be some form of the encoded
+ * private key, and could still have the PEM header or not, and might
  * or might not be base64 encoded. We'll try handle all those options.
  *
  * @param kem_id is what'd you'd expect (using the HPKE registry values)
@@ -2397,19 +2272,12 @@ int hpke_prbuf2evp(
     hpke_pbuf(stdout, "hpke_prbuf2evp priv input", prbuf, prbuf_len);
     hpke_pbuf(stdout, "hpke_prbuf2evp pub input", pubuf, pubuf_len);
 #endif
-
-    if (prbuf == NULL || prbuf_len == 0 || retpriv == NULL) {
-        return __LINE__;
-    }
-    if (hpke_kem_id_check(kem_id) != 1) return(__LINE__);
-
+    if (prbuf == NULL || prbuf_len == 0 || retpriv == NULL) { HPKE_err; }
+    if (hpke_kem_id_check(kem_id) != 1) { HPKE_err; }
     if (hpke_kem_tab[kem_id].Npriv == prbuf_len) {
-
-        if (!keytype) return(0);
+        if (!keytype) { HPKE_err; }
         param_bld = OSSL_PARAM_BLD_new();
-        if (!param_bld) {
-            HPKE_err;
-        }
+        if (!param_bld) { HPKE_err; }
         if (groupname != NULL &&
             OSSL_PARAM_BLD_push_utf8_string(param_bld,
                 "group", groupname, 0) != 1) {
@@ -2454,13 +2322,11 @@ int hpke_prbuf2evp(
     if (!lpriv) {
         /* check PEM decode - that might work :-) */
         BIO *bfp = BIO_new(BIO_s_mem());
-        if (!bfp) {
-            return(__LINE__);
-        }
+        if (!bfp) { HPKE_err; }
         BIO_write(bfp, prbuf, prbuf_len);
         if (!PEM_read_bio_PrivateKey(bfp, &lpriv, NULL, NULL)) {
             BIO_free_all(bfp); bfp = NULL;
-            return(__LINE__);
+            HPKE_err;
         }
         if (bfp != NULL) {
             BIO_free_all(bfp); bfp = NULL;
@@ -2480,20 +2346,18 @@ int hpke_prbuf2evp(
                     strlen(PEM_PRIVATEFOOTER));
             hf_prbuf_len += strlen(PEM_PRIVATEFOOTER);
             bfp = BIO_new(BIO_s_mem());
-            if (!bfp) {
-                return(__LINE__);
-            }
+            if (!bfp) { HPKE_err; }
             BIO_write(bfp, hf_prbuf, hf_prbuf_len);
             if (!PEM_read_bio_PrivateKey(bfp, &lpriv, NULL, NULL)) {
                 BIO_free_all(bfp); bfp = NULL;
-                return(__LINE__);
+                HPKE_err;
             }
             if (bfp != NULL) {
                 BIO_free_all(bfp); bfp = NULL;
             }
         }
     }
-    if (!lpriv) return(__LINE__);
+    if (!lpriv) { HPKE_err; }
     *retpriv = lpriv;
 #if defined(SUPERVERBOSE) || defined(TESTVECTORS)
     printf("hpke_prbuf2evp success\n");
@@ -2737,3 +2601,364 @@ int hpke_setlibctx(OSSL_LIB_CTX *libctx)
     return(1);
 }
 
+/*
+ * The same functions, but with "public" names that work for 
+ * the OpenSSL project's naming conventions. Seems likely the
+ * prototypes for these may change in discussion with project 
+ * members, so initially, the implementations of these will be 
+ * simple wrappers of the above. Once the prototypes seem ok, 
+ * then we can zap the hpke_* variants and just go with the 
+ * OSSL_HPKE_* ones.
+ */
+
+/*
+ * @brief HPKE single-shot encryption function
+ *
+ * This function generates an ephemeral ECDH value internally and
+ * provides the public component as an output.
+ *
+ *
+ * @param libctx is the context to use (normally NULL)
+ * @param mode is the HPKE mode
+ * @param suite is the ciphersuite to use
+ * @param pskid is the pskid string fpr a PSK mode (can be NULL)
+ * @param psklen is the psk length
+ * @param psk is the psk
+ * @param publen is the length of the public key
+ * @param pub is the encoded public key
+ * @param authprivlen is the length of the private (authentication) key
+ * @param authpriv is the encoded private (authentication) key
+ * @param authpriv_evp is the EVP_PKEY* form of private (authentication) key
+ * @param clearlen is the length of the cleartext
+ * @param clear is the encoded cleartext
+ * @param aadlen is the length of the additional data
+ * @param aad is the encoded additional data
+ * @param infolen is the length of the info data (can be zero)
+ * @param info is the encoded info data (can be NULL)
+ * @param seqlen is the length of the sequence data (can be zero)
+ * @param seq is the encoded sequence data (can be NULL)
+ * @param senderpublen length of the input buffer for sender's public key
+ * @param senderpub is the input buffer for sender public key
+ * @param cipherlen is the length of the input buffer for ciphertext
+ * @param cipher is the input buffer for ciphertext
+ * @return 1 for good (OpenSSL style), not-1 for error
+ *
+ * Oddity: we're passing an hpke_suit_t directly, but 48 bits is actually
+ * smaller than a 64 bit pointer, so that's grand, if odd:-)
+ */
+int OSSL_HPKE_enc(
+        OSSL_LIB_CTX *libctx,
+        unsigned int mode, hpke_suite_t suite,
+        char *pskid, size_t psklen, unsigned char *psk,
+        size_t publen, unsigned char *pub,
+        size_t authprivlen, unsigned char *authpriv, EVP_PKEY *authpriv_evp,
+        size_t clearlen, unsigned char *clear,
+        size_t aadlen, unsigned char *aad,
+        size_t infolen, unsigned char *info,
+        size_t seqlen, unsigned char *seq,
+        size_t *senderpublen, unsigned char *senderpub,
+        size_t *cipherlen, unsigned char *cipher
+#ifdef TESTVECTORS
+        , void *tv
+#endif
+        )
+{
+    if (libctx != NULL) hpke_setlibctx(libctx);
+    return hpke_enc_int(mode, suite,
+            pskid, psklen, psk,
+            publen, pub,
+            authprivlen, authpriv, authpriv_evp,
+            clearlen, clear,
+            aadlen, aad,
+            infolen, info,
+            seqlen, seq,
+            0, NULL,
+            NULL, 0, NULL,
+            senderpublen, senderpub,
+            cipherlen, cipher
+#ifdef TESTVECTORS
+            , tv
+#endif
+           );
+}
+
+/*
+ * @brief HPKE encryption function, with externally supplied sender key pair
+ *
+ * This function is provided with an ECDH key pair that is used for
+ * HPKE encryption.
+ *
+ * @param libctx is the context to use (normally NULL)
+ * @param mode is the HPKE mode
+ * @param suite is the ciphersuite to use
+ * @param pskid is the pskid string fpr a PSK mode (can be NULL)
+ * @param psklen is the psk length
+ * @param psk is the psk
+ * @param publen is the length of the public key
+ * @param pub is the encoded public key
+ * @param authprivlen is the length of the private (authentication) key
+ * @param authpriv is the encoded private (authentication) key
+ * @param authpriv_evp is the EVP_PKEY* form of private (authentication) key
+ * @param clearlen is the length of the cleartext
+ * @param clear is the encoded cleartext
+ * @param aadlen is the length of the additional data
+ * @param aad is the encoded additional data
+ * @param infolen is the length of the info data (can be zero)
+ * @param info is the encoded info data (can be NULL)
+ * @param seqlen is the length of the sequence data (can be zero)
+ * @param seq is the encoded sequence data (can be NULL)
+ * @param senderpublen length of the input buffer with the sender's public key
+ * @param senderpub is the input buffer for sender public key
+ * @param senderpriv has the handle for the sender private key
+ * @param cipherlen length of the input buffer for ciphertext
+ * @param cipher is the input buffer for ciphertext
+ * @return 1 for good (OpenSSL style), not-1 for error
+ *
+ * Oddity: we're passing an hpke_suit_t directly, but 48 bits is actually
+ * smaller than a 64 bit pointer, so that's grand, if odd:-)
+ */
+int OSSL_HPKE_enc_evp(
+        OSSL_LIB_CTX *libctx,
+        unsigned int mode, hpke_suite_t suite,
+        char *pskid, size_t psklen, unsigned char *psk,
+        size_t publen, unsigned char *pub,
+        size_t authprivlen, unsigned char *authpriv, EVP_PKEY *authpriv_evp,
+        size_t clearlen, unsigned char *clear,
+        size_t aadlen, unsigned char *aad,
+        size_t infolen, unsigned char *info,
+        size_t seqlen, unsigned char *seq,
+        size_t senderpublen, unsigned char *senderpub, EVP_PKEY *senderpriv,
+        size_t *cipherlen, unsigned char *cipher
+#ifdef TESTVECTORS
+        , void *tv
+#endif
+        )
+{
+    if (libctx != NULL) hpke_setlibctx(libctx);
+    return hpke_enc_int(mode, suite,
+            pskid, psklen, psk,
+            publen, pub,
+            authprivlen, authpriv, authpriv_evp,
+            clearlen, clear,
+            aadlen, aad,
+            infolen, info,
+            seqlen, seq,
+            senderpublen, senderpub, senderpriv, 
+            0, NULL,
+            0, NULL,
+            cipherlen, cipher
+#ifdef TESTVECTORS
+            , tv
+#endif
+           );
+}
+
+/*
+ * @brief HPKE single-shot decryption function
+ *
+ * @param libctx is the context to use (normally NULL)
+ * @param mode is the HPKE mode
+ * @param suite is the ciphersuite to use
+ * @param pskid is the pskid string fpr a PSK mode (can be NULL)
+ * @param psklen is the psk length
+ * @param psk is the psk
+ * @param publen is the length of the public (authentication) key
+ * @param pub is the encoded public (authentication) key
+ * @param privlen is the length of the private key
+ * @param priv is the encoded private key
+ * @param evppriv is a pointer to an internal form of private key
+ * @param enclen is the length of the peer's public value
+ * @param enc is the peer's public value
+ * @param cipherlen is the length of the ciphertext
+ * @param cipher is the ciphertext
+ * @param aadlen is the length of the additional data
+ * @param aad is the encoded additional data
+ * @param infolen is the length of the info data (can be zero)
+ * @param info is the encoded info data (can be NULL)
+ * @param seqlen is the length of the sequence data (can be zero)
+ * @param seq is the encoded sequence data (can be NULL)
+ * @param clearlen length of the input buffer for cleartext
+ * @param clear is the encoded cleartext
+ * @return 1 for good (OpenSSL style), not-1 for error
+ */
+int OSSL_HPKE_dec(
+        OSSL_LIB_CTX *libctx,
+        unsigned int mode, hpke_suite_t suite,
+        char *pskid, size_t psklen, unsigned char *psk,
+        size_t publen, unsigned char *pub,
+        size_t privlen, unsigned char *priv,
+        EVP_PKEY *evppriv,
+        size_t enclen, unsigned char *enc,
+        size_t cipherlen, unsigned char *cipher,
+        size_t aadlen, unsigned char *aad,
+        size_t infolen, unsigned char *info,
+        size_t seqlen, unsigned char *seq,
+        size_t *clearlen, unsigned char *clear)
+{
+    if (libctx != NULL) hpke_setlibctx(libctx);
+    return(hpke_dec_int(mode, suite,
+                    pskid, psklen, psk,
+                    publen, pub,
+                    privlen, priv, evppriv,
+                    enclen, enc,
+                    cipherlen, cipher,
+                    aadlen, aad,
+                    infolen, info,
+                    seqlen, seq,
+                    clearlen, clear));
+}
+
+/*!
+ * @brief generate a key pair
+ * @param libctx is the context to use (normally NULL)
+ * @param mode is the mode (currently unused)
+ * @param suite is the ciphersuite (currently unused)
+ * @param publen is the size of the public key buffer (exact length on output)
+ * @param pub is the public value
+ * @param privlen is the size of the private key buffer (exact length on output)
+ * @param priv is the private key
+ * @return 1 for good (OpenSSL style), not-1 for error
+ */
+int OSSL_HPKE_kg(
+        OSSL_LIB_CTX *libctx,
+        unsigned int mode, hpke_suite_t suite,
+        size_t *publen, unsigned char *pub,
+        size_t *privlen, unsigned char *priv)
+{
+    if (libctx != NULL) hpke_setlibctx(libctx);
+    return(hpke_kg(mode, suite, publen, pub, privlen, priv));
+}
+
+/*!
+ * @brief generate a key pair but keep private inside API
+ * @param libctx is the context to use (normally NULL)
+ * @param mode is the mode (currently unused)
+ * @param suite is the ciphersuite (currently unused)
+ * @param publen is the size of the public key buffer (exact length on output)
+ * @param pub is the public value
+ * @param priv is the private key handle
+ * @return 1 for good (OpenSSL style), not-1 for error
+ */
+int OSSL_HPKE_kg_evp(
+        OSSL_LIB_CTX *libctx,
+        unsigned int mode, hpke_suite_t suite,
+        size_t *publen, unsigned char *pub,
+        EVP_PKEY **priv)
+{
+    if (libctx != NULL) hpke_setlibctx(libctx);
+    return(hpke_kg_evp(mode, suite, publen, pub, priv));
+}
+
+/**
+ * @brief check if a suite is supported locally
+ *
+ * @param libctx is the context to use (normally NULL)
+ * @param suite is the suite to check
+ * @return 1 for good/supported, not-1 otherwise
+ */
+int OSSL_HPKE_suite_check(
+        OSSL_LIB_CTX *libctx,
+        hpke_suite_t suite)
+{
+    if (libctx != NULL) hpke_setlibctx(libctx);
+    return(hpke_suite_check(suite));
+}
+
+/*!
+ * @brief: map a kem_id and a private key buffer into an EVP_PKEY
+ *
+ * @param libctx is the context to use (normally NULL)
+ * @param kem_id is what'd you'd expect (using the HPKE registry values)
+ * @param prbuf is the private key buffer
+ * @param prbuf_len is the length of that buffer
+ * @param pubuf is the public key buffer (if available)
+ * @param pubuf_len is the length of that buffer
+ * @param priv is a pointer to an EVP_PKEY * for the result
+ * @return 1 for success, otherwise failure
+ *
+ * Note that the buffer is expected to be some form of the PEM encoded
+ * private key, but could still have the PEM header or not, and might
+ * or might not be base64 encoded. We'll try handle all those options.
+ */
+int OSSL_HPKE_prbuf2evp(
+        OSSL_LIB_CTX *libctx,
+        unsigned int kem_id,
+        unsigned char *prbuf,
+        size_t prbuf_len,
+        unsigned char *pubuf,
+        size_t pubuf_len,
+        EVP_PKEY **priv)
+{
+    if (libctx != NULL) hpke_setlibctx(libctx);
+    return(hpke_prbuf2evp(kem_id,prbuf,prbuf_len,pubuf,pubuf_len,priv));
+}
+
+/*!
+ * @brief get a (possibly) random suite, public key and ciphertext for GREASErs
+ *
+ * As usual buffers are caller allocated and lengths on input are buffer size.
+ *
+ * @param libctx is the context to use (normally NULL)
+ * @param suite_in specifies the preferred suite or NULL for a random choice
+ * @param suite is the chosen or random suite
+ * @param pub a random value of the appropriate length for a sender public value
+ * @param pub_len is the length of pub (buffer size on input)
+ * @param cipher is a random value of the appropriate length for a ciphertext
+ * @param cipher_len is the length of cipher
+ * @return 1 for success, otherwise failure
+ */
+int OSSL_HPKE_good4grease(
+        OSSL_LIB_CTX *libctx,
+        hpke_suite_t *suite_in,
+        hpke_suite_t suite,
+        unsigned char *pub,
+        size_t *pub_len,
+        unsigned char *cipher,
+        size_t cipher_len)
+{
+    if (libctx != NULL) hpke_setlibctx(libctx);
+    return(hpke_good4grease(suite_in, suite, pub, pub_len, cipher, cipher_len));
+}
+
+/*!
+ * @brief map a string to a HPKE suite
+ *
+ * @param libctx is the context to use (normally NULL)
+ * @param str is the string value
+ * @param suite is the resulting suite
+ * @return 1 for success, otherwise failure
+ */
+int OSSL_HPKE_str2suite(
+        OSSL_LIB_CTX *libctx,
+        char *str, 
+        hpke_suite_t *suite)
+{
+    if (libctx != NULL) hpke_setlibctx(libctx);
+    return(hpke_str2suite(str, suite));
+}
+
+/*!
+ * @brief tell the caller how big the cipertext will be
+ *
+ * AEAD algorithms add a tag for data authentication.
+ * Those are almost always, but not always, 16 octets
+ * long, and who know what'll be true in the future.
+ * So this function allows a caller to find out how
+ * much data expansion they'll see with a given
+ * suite.
+ *
+ * @param libctx is the context to use (normally NULL)
+ * @param suite is the suite to be used
+ * @param clearlen is the length of plaintext
+ * @param cipherlen points to what'll be ciphertext length
+ * @return 1 for success, otherwise failure
+ */
+int OSSL_HPKE_expansion(
+        OSSL_LIB_CTX *libctx,
+        hpke_suite_t suite,
+        size_t clearlen,
+        size_t *cipherlen)
+{
+    if (libctx != NULL) hpke_setlibctx(libctx);
+    return(hpke_expansion(suite, clearlen, cipherlen));
+}

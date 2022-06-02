@@ -99,21 +99,21 @@ int main(int argc, char **argv)
 #define EVP
 #ifdef EVP
     EVP_PKEY *privevp=NULL;
-    int rv=hpke_kg_evp(
-        hpke_mode, hpke_suite,
+    int rv=OSSL_HPKE_kg_evp(
+        NULL, hpke_mode, hpke_suite,
         &publen, pub,
         &privevp);
     if (rv!=1) {
-        fprintf(stderr,"Error (%d) from hpke_kg\n",rv);
+        fprintf(stderr,"Error (%d) from OSSL_HPKE_kg\n",rv);
         exit(1);
     } 
 #else
-    int rv=hpke_kg(
-        hpke_mode, hpke_suite,
+    int rv=OSSL_HPKE_kg(
+        NULL, hpke_mode, hpke_suite,
         &publen, pub,
         &privlen, priv);
     if (rv!=1) {
-        fprintf(stderr,"Error (%d) from hpke_kg\n",rv);
+        fprintf(stderr,"Error (%d) from OSSL_HPKE_kg\n",rv);
         exit(1);
     } 
 #endif
@@ -175,7 +175,7 @@ int main(int argc, char **argv)
     /*
      * Call happykey decrypt
      */
-    rv=hpke_dec( hpke_mode, hpke_suite,
+    rv=OSSL_HPKE_dec( NULL, hpke_mode, hpke_suite,
             pskid, psklen, psk,
             0, NULL, // publen, pub,
 #ifdef EVP

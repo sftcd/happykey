@@ -8,8 +8,8 @@
 # An OpenSSL-based HPKE implementation following draft-irtf-cfrg-hpke
 #
 
-OSSL=../openssl
-INCL=../openssl/include
+OSSL=../openssl-hpke-pr
+INCL=${OSSL}/include
 
 # NSS 
 NSSL=../dist/Debug/lib
@@ -65,6 +65,10 @@ hpke.h-forlib: hpke.h
 forlibclean:
 	- rm -f hpke.h-forlib
 	- rm -f hpke.c-forlib
+
+copy2lib: forlib
+	- cp hpke.c-forlib ${OSSL}/crypto/hpke.c
+	- cp hpke.h-forlib ${INCL}/openssl/hpke.h
 
 # This is a round-trip test with NSS encrypting and my code decrypting
 # (no parameters for now)

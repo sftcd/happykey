@@ -86,24 +86,24 @@ int main(int argc, char **argv)
     memset(priv,MEMCHAR,privlen);
 
     EVP_PKEY *privevp=NULL;
-    int rv=hpke_kg_evp(
-        hpke_mode, hpke_suite,
+    int rv=OSSL_HPKE_kg_evp(
+        NULL, hpke_mode, hpke_suite,
         &publen, pub,
         &privevp);
     if (rv!=1) {
-        fprintf(stderr,"Error (%d) from hpke_kg (receiver)\n",rv);
+        fprintf(stderr,"Error (%d) from OSSL_HPKE_kg (receiver)\n",rv);
         exit(1);
     } 
     neod_pbuf("receiver pub",pub,publen);
 
     EVP_PKEY *senderpriv=NULL;
     size_t senderpublen=HPKE_MAXSIZE; unsigned char senderpub[HPKE_MAXSIZE];
-    rv=hpke_kg_evp(
-        hpke_mode, hpke_suite,
+    rv=OSSL_HPKE_kg_evp(
+        NULL, hpke_mode, hpke_suite,
         &senderpublen, senderpub,
         &senderpriv);
     if (rv!=1) {
-        fprintf(stderr,"Error (%d) from hpke_kg (sender)\n",rv);
+        fprintf(stderr,"Error (%d) from OSSL_HPKE_kg (sender)\n",rv);
         exit(1);
     } 
     neod_pbuf("sender pub",senderpub,senderpublen);
@@ -136,8 +136,8 @@ int main(int argc, char **argv)
     /*
      * Call EVP mode encrypt
      */
-    rv=hpke_enc_evp(
-        hpke_mode, hpke_suite,
+    rv=OSSL_HPKE_enc_evp(
+        NULL, hpke_mode, hpke_suite,
         pskid, psklen, psk,
         publen, pub,
         0, NULL, NULL,
@@ -162,8 +162,8 @@ int main(int argc, char **argv)
     /*
      * Call happykey decrypt
      */
-    rv=hpke_dec( 
-            hpke_mode, hpke_suite,
+    rv=OSSL_HPKE_dec( 
+            NULL, hpke_mode, hpke_suite,
             pskid, psklen, psk,
             0, NULL, // publen, pub,
             0, NULL, privevp,

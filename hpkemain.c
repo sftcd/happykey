@@ -95,6 +95,53 @@ static void usage(char *prog,char *errmsg)
     }
 }
 
+/*!
+ * @brief  Map ascii to binary - utility macro used in >1 place
+ */
+#define HPKE_A2B(__c__) ( __c__ >= '0' && __c__ <= '9' ? (__c__ -'0' ) :\
+                        ( __c__ >= 'A' && __c__ <= 'F' ? (__c__ -'A' + 10) :\
+                        ( __c__ >= 'a' && __c__ <= 'f' ? (__c__ -'a' + 10) : 0)))
+
+/*!
+ * @brief decode ascii hex to a binary buffer
+ *
+ * @param ahlen is the ascii hex string length
+ * @param ah is the ascii hex string
+ * @param blen is a pointer to the returned binary length
+ * @param buf is a pointer to the internally allocated binary buffer
+ * @return 1 for good otherwise bad
+ */
+static int ah_decode(
+        size_t ahlen, const char *ah,
+        size_t *blen, unsigned char **buf)
+{
+    size_t lblen = 0;
+    int i = 0;
+    int nibble = 0;
+    unsigned char *lbuf = NULL;
+    if (ahlen <= 0 || ah == NULL || blen == NULL || buf == NULL) {
+        return 0;
+    }
+    if (ahlen % 2 == 1) {
+        nibble = 1;
+    }
+    lblen = ahlen / 2 + nibble;
+    lbuf = OPENSSL_malloc(lblen);
+    if (lbuf == NULL) {
+        return 0;
+    }
+    for (i = ahlen - 1; i > nibble ; i -= 2) {
+        int j = i / 2;
+        lbuf[j] = HPKE_A2B(ah[i-1]) * 16 + HPKE_A2B(ah[i]);
+    }
+    if (nibble) {
+        lbuf[0] = HPKE_A2B(ah[0]);
+    }
+    *blen = lblen;
+    *buf = lbuf;
+    return 1;
+}
+
 /*
  * @brief strip out newlines from input
  *
@@ -181,7 +228,7 @@ static int map_input(const char *inp, size_t *outlen, unsigned char **outbuf, in
     if (strip) {
         if (toutlen<=strspn(tbuf,AH_alphabet)) {
             strip_newlines(&toutlen,tbuf);
-            int adr=hpke_ah_decode(toutlen,tbuf,outlen,outbuf);
+            int adr=ah_decode(toutlen,tbuf,outlen,outbuf);
             if (!adr) return(__LINE__);
             if (adr==1) {
 	            if (verbose) fprintf(stderr,"ah_decode worked for %s - going with that\n",tbuf);
@@ -579,10 +626,10 @@ int main(int argc, char **argv)
         unsigned char g_cipher[HPKE_MAXSIZE];
         size_t g_cipher_len=266;
 
-        if (hpke_good4grease(NULL,g_suite,g_pub,&g_pub_len,g_cipher,g_cipher_len)!=1) {
-            printf("hpke_good4grease failed, bummer\n");
+        if (OSSL_HPKE_good4grease(NULL,NULL,g_suite,g_pub,&g_pub_len,g_cipher,g_cipher_len)!=1) {
+            printf("OSSL_HPKE_good4grease failed, bummer\n");
         } else {
-            printf("hpke_good4grease worked, yay! (use debugger or SUPERVERBOSE to see what it does:-)\n");
+            printf("OSSL_HPKE_good4grease worked, yay! (use debugger or SUPERVERBOSE to see what it does:-)\n");
         }
         return(1);
     }
@@ -617,7 +664,7 @@ int main(int argc, char **argv)
     if (suitestr) {
         if (verbose) printf("Using ciphersuite %s\n",suitestr);
 
-        if (hpke_str2suite(suitestr,&hpke_suite)!=1) {
+        if (OSSL_HPKE_str2suite(NULL,suitestr,&hpke_suite)!=1) {
             usage(argv[0],"Bad ciphersuite string");
         }
 
@@ -709,12 +756,12 @@ int main(int argc, char **argv)
              */
             unsigned char *dec_pskid=NULL;
             size_t dec_pskidlen=0;
-            hpke_ah_decode(strlen(tv->psk_id),tv->psk_id,&dec_pskidlen,&dec_pskid);
+            ah_decode(strlen(tv->psk_id),tv->psk_id,&dec_pskidlen,&dec_pskid);
             pskid=OPENSSL_malloc(strlen(tv->psk_id)); /* too much but heh it's ok */
             memset(pskid,0,strlen(tv->psk_id));
             memcpy(pskid,dec_pskid,strlen(tv->psk_id)/2);
             OPENSSL_free(dec_pskid);
-            hpke_ah_decode(strlen(tv->psk),tv->psk,&psklen,&psk);
+            ah_decode(strlen(tv->psk),tv->psk,&psklen,&psk);
         }
     }
 #endif
@@ -725,12 +772,12 @@ int main(int argc, char **argv)
     if (generate) {
         size_t publen=HPKE_MAXSIZE; unsigned char pub[HPKE_MAXSIZE];
         size_t privlen=HPKE_MAXSIZE; unsigned char priv[HPKE_MAXSIZE];
-        int rv=hpke_kg(
-            hpke_mode, hpke_suite,
+        int rv=OSSL_HPKE_kg(
+            NULL, hpke_mode, hpke_suite,
             &publen, pub,
             &privlen, priv);
         if (rv!=1) {
-            fprintf(stderr,"Error (%d) from hpke_kg\n",rv);
+            fprintf(stderr,"Error (%d) from OSSL_HPKE_kg\n",rv);
             exit(3);
         }
         rv=hpkemain_write_keys(publen, pub, privlen, priv,
@@ -751,8 +798,8 @@ int main(int argc, char **argv)
             fprintf(stderr,"Error from malloc\n");
             overallreturn=101;
         } else {
-            rv=hpke_enc(
-                hpke_mode, hpke_suite,
+            rv=OSSL_HPKE_enc(
+                NULL, hpke_mode, hpke_suite,
                 pskid, psklen, psk,
                 publen, pub,
                 privlen, priv, NULL,
@@ -783,7 +830,7 @@ int main(int argc, char **argv)
                 unsigned char *bcipher=NULL;
                 size_t bcipherlen=0;
                 int goodres=1;
-                hpke_ah_decode( strlen(tv->encs[0].ciphertext),
+                ah_decode( strlen(tv->encs[0].ciphertext),
                             tv->encs[0].ciphertext,
                             &bcipherlen,
                             &bcipher);
@@ -841,7 +888,7 @@ int main(int argc, char **argv)
 #undef USEBUF2EVP
 #ifdef USEBUF2EVP
         EVP_PKEY *privevp=NULL;
-        rv=hpke_prbuf2evp(hpke_suite.kem_id,
+        rv=OSSL_HPKE_prbuf2evp(NULL, hpke_suite.kem_id,
                 priv, privlen,
                 NULL, 0,
                 &privevp);
@@ -851,7 +898,7 @@ int main(int argc, char **argv)
             OPENSSL_free(clear);
             exit(8);
         }
-        rv=hpke_dec( hpke_mode, hpke_suite,
+        rv=OSSL_HPKE_dec( NULL, hpke_mode, hpke_suite,
                 pskid, psklen, psk,
                 publen, pub,
                 0, NULL, privevp,
@@ -862,7 +909,7 @@ int main(int argc, char **argv)
                 0,NULL, /* seq */
                 &clearlen, clear); 
 #else
-        rv=hpke_dec( hpke_mode, hpke_suite,
+        rv=OSSL_HPKE_dec( NULL, hpke_mode, hpke_suite,
                 pskid, psklen, psk,
                 publen, pub,
                 privlen, priv, NULL,

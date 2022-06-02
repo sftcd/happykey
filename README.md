@@ -27,6 +27,10 @@ High level notes:
 
 ## Recent Changes
 
+- 20220603: changes to external API names e.g. from ``hpke_enc``
+  to ``OSSL_HPKE_enc`` for consistency with OpenSSL conventions.
+  Various other similar changes.
+
 - 20220602: A number of changes taking the "polyfill" approach and
   reacting to comments on the PR we've submitted for the OpenSSL library.
   (I've only partly handled those comments so far.)
