@@ -8,7 +8,7 @@
 # An OpenSSL-based HPKE implementation following draft-irtf-cfrg-hpke
 #
 
-OSSL=../openssl-hpke-pr
+OSSL=../openssl
 INCL=${OSSL}/include
 
 # NSS 
