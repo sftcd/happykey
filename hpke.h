@@ -27,7 +27,7 @@
 
 /** biggest/default buffer for keys and internal buffers we use */
 #ifndef HPKE_MAXSIZE
-#define HPKE_MAXSIZE 2*1024 /* 2k is enough for anyone (using this program:-) */
+# define HPKE_MAXSIZE 2*1024 /* 2k is enough for anyone (using this program:-) */
 #endif
 
 /*
@@ -97,104 +97,6 @@ typedef struct {
     { HPKE_KEM_ID_25519, HPKE_KDF_ID_HKDF_SHA256, HPKE_AEAD_ID_AES_GCM_128 }
 #define HPKE_SUITE_TURNITUPTO11 \
     { HPKE_KEM_ID_448, HPKE_KDF_ID_HKDF_SHA512, HPKE_AEAD_ID_CHACHA_POLY1305 }
-
-
-/**
- * @brief check if a suite is supported locally
- *
- * @param suite is the suite to check
- * @return 1 for good/supported, not-1 otherwise
- */
-int hpke_suite_check(hpke_suite_t suite);
-
-/*!
- * @brief: map a kem_id and a private key buffer into an EVP_PKEY
- *
- * @param kem_id is what'd you'd expect (using the HPKE registry values)
- * @param prbuf is the private key buffer
- * @param prbuf_len is the length of that buffer
- * @param pubuf is the public key buffer (if available)
- * @param pubuf_len is the length of that buffer
- * @param priv is a pointer to an EVP_PKEY * for the result
- * @return 1 for success, otherwise failure
- *
- * Note that the buffer is expected to be some form of the PEM encoded
- * private key, but could still have the PEM header or not, and might
- * or might not be base64 encoded. We'll try handle all those options.
- */
-int hpke_prbuf2evp(
-        unsigned int kem_id,
-        unsigned char *prbuf,
-        size_t prbuf_len,
-        unsigned char *pubuf,
-        size_t pubuf_len,
-        EVP_PKEY **priv);
-
-/*!
- * @brief get a (possibly) random suite, public key and ciphertext for GREASErs
- *
- * As usual buffers are caller allocated and lengths on input are buffer size.
- *
- * @param suite-in specifies the preferred suite or NULL for a random choice
- * @param suite is the chosen or random suite
- * @param pub a random value of the appropriate length for a sender public value
- * @param pub_len is the length of pub (buffer size on input)
- * @param cipher is a random value of the appropriate length for a ciphertext
- * @param cipher_len is the length of cipher
- * @return 1 for success, otherwise failure
- */
-int hpke_good4grease(
-        hpke_suite_t *suite_in,
-        hpke_suite_t suite,
-        unsigned char *pub,
-        size_t *pub_len,
-        unsigned char *cipher,
-        size_t cipher_len);
-
-/*!
- * @brief map a string to a HPKE suite
- *
- * @param str is the string value
- * @param suite is the resulting suite
- * @return 1 for success, otherwise failure
- */
-int hpke_str2suite(char *str, hpke_suite_t *suite);
-
-/*!
- * @brief tell the caller how big the cipertext will be
- *
- * AEAD algorithms add a tag for data authentication.
- * Those are almost always, but not always, 16 octets
- * long, and who know what'll be true in the future.
- * So this function allows a caller to find out how
- * much data expansion they'll see with a given
- * suite.
- *
- * @param suite is the suite to be used
- * @param clearlen is the length of plaintext
- * @param cipherlen points to what'll be ciphertext length
- * @return 1 for success, otherwise failure
- */
-int hpke_expansion(hpke_suite_t suite,
-        size_t clearlen,
-        size_t *cipherlen);
-
-/*!
- * @brief set a non-default OSSL_LIB_CTX if needed
- * @param ctx is the context to set
- * @return 1 for success, otherwise failure
- */
-int hpke_setlibctx(OSSL_LIB_CTX *libctx);
-
-/*
- * The same functions, but with "public" names that work for 
- * the OpenSSL project's naming conventions. Seems likely the
- * prototypes for these may change in discussion with project 
- * members, so initially, the implementations of these will be 
- * simple wrappers of the above. Once the prototypes seem ok, 
- * then we can zap the hpke_* variants and just go with the 
- * OSSL_HPKE_* ones.
- */
 
 /*
  * @brief HPKE single-shot encryption function

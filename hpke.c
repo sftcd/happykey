@@ -1340,6 +1340,201 @@ static int hpke_psk_check(
 }
 
 /*!
+ * @brief map a kem_id and a private key buffer into an EVP_PKEY
+ *
+ * Note that the buffer is expected to be some form of the encoded
+ * private key, and could still have the PEM header or not, and might
+ * or might not be base64 encoded. We'll try handle all those options.
+ *
+ * @param kem_id is what'd you'd expect (using the HPKE registry values)
+ * @param prbuf is the private key buffer
+ * @param prbuf_len is the length of that buffer
+ * @param pubuf is the public key buffer (if available)
+ * @param pubuf_len is the length of that buffer
+ * @param priv is a pointer to an EVP_PKEY * for the result
+ * @return 1 for success, otherwise failure
+ */
+static int hpke_prbuf2evp(
+        unsigned int kem_id,
+        unsigned char *prbuf,
+        size_t prbuf_len,
+        unsigned char *pubuf,
+        size_t pubuf_len,
+        EVP_PKEY **retpriv)
+{
+    int erv = 1;
+    EVP_PKEY *lpriv = NULL;
+    EVP_PKEY_CTX *ctx = NULL;
+    BIGNUM *priv = NULL;
+    const char *keytype = NULL;
+    const char *groupname = NULL;
+    OSSL_PARAM_BLD *param_bld = NULL;
+    OSSL_PARAM *params = NULL;
+
+    keytype = hpke_kem_tab[kem_id].keytype;
+    groupname = hpke_kem_tab[kem_id].groupname;
+#if defined(SUPERVERBOSE) || defined(TESTVECTORS)
+    printf("Called hpke_prbuf2evp with kem id: %04x\n", kem_id);
+    hpke_pbuf(stdout, "hpke_prbuf2evp priv input", prbuf, prbuf_len);
+    hpke_pbuf(stdout, "hpke_prbuf2evp pub input", pubuf, pubuf_len);
+#endif
+    if (prbuf == NULL || prbuf_len == 0 || retpriv == NULL) { HPKE_err; }
+    if (hpke_kem_id_check(kem_id) != 1) { HPKE_err; }
+    if (hpke_kem_tab[kem_id].Npriv == prbuf_len) {
+        if (!keytype) { HPKE_err; }
+        param_bld = OSSL_PARAM_BLD_new();
+        if (!param_bld) { HPKE_err; }
+        if (groupname != NULL &&
+            OSSL_PARAM_BLD_push_utf8_string(param_bld,
+                "group", groupname, 0) != 1) {
+            HPKE_err;
+        }
+        if (pubuf && pubuf_len > 0) {
+            if (OSSL_PARAM_BLD_push_octet_string(param_bld,
+                        "pub", pubuf, pubuf_len) != 1) {
+                HPKE_err;
+            }
+        }
+        if (strlen(keytype) == 2 && !strcmp(keytype, "EC")) {
+            priv = BN_bin2bn(prbuf, prbuf_len, NULL);
+            if (!priv) {
+                HPKE_err;
+            }
+            if (OSSL_PARAM_BLD_push_BN(param_bld, "priv", priv) != 1) {
+                HPKE_err;
+            }
+        } else {
+            if (OSSL_PARAM_BLD_push_octet_string(param_bld,
+                        "priv", prbuf, prbuf_len) != 1) {
+                HPKE_err;
+            }
+        }
+        params = OSSL_PARAM_BLD_to_param(param_bld);
+        if (!params) {
+            HPKE_err;
+        }
+        ctx = EVP_PKEY_CTX_new_from_name(hpke_libctx, keytype, NULL);
+        if (ctx == NULL) {
+            HPKE_err;
+        }
+        if (EVP_PKEY_fromdata_init(ctx) <= 0) {
+            HPKE_err;
+        }
+        if (EVP_PKEY_fromdata(ctx, &lpriv, EVP_PKEY_KEYPAIR, params) <= 0) {
+            HPKE_err;
+        }
+    }
+    if (!lpriv) {
+        /* check PEM decode - that might work :-) */
+        BIO *bfp = BIO_new(BIO_s_mem());
+        if (!bfp) { HPKE_err; }
+        BIO_write(bfp, prbuf, prbuf_len);
+        if (!PEM_read_bio_PrivateKey(bfp, &lpriv, NULL, NULL)) {
+            BIO_free_all(bfp); bfp = NULL;
+            HPKE_err;
+        }
+        if (bfp != NULL) {
+            BIO_free_all(bfp); bfp = NULL;
+        }
+        if (!lpriv) {
+            /* if not done, prepend/append PEM header/footer and try again */
+            unsigned char hf_prbuf[HPKE_MAXSIZE];
+            size_t hf_prbuf_len = 0;
+#define PEM_PRIVATEHEADER "-----BEGIN PRIVATE KEY-----\n"
+#define PEM_PRIVATEFOOTER "\n-----END PRIVATE KEY-----\n"
+            memcpy(hf_prbuf, PEM_PRIVATEHEADER, strlen(PEM_PRIVATEHEADER));
+            hf_prbuf_len += strlen(PEM_PRIVATEHEADER);
+            memcpy(hf_prbuf + hf_prbuf_len, prbuf, prbuf_len);
+            hf_prbuf_len += prbuf_len;
+            memcpy(hf_prbuf + hf_prbuf_len, PEM_PRIVATEFOOTER,
+                    strlen(PEM_PRIVATEFOOTER));
+            hf_prbuf_len += strlen(PEM_PRIVATEFOOTER);
+            bfp = BIO_new(BIO_s_mem());
+            if (!bfp) { HPKE_err; }
+            BIO_write(bfp, hf_prbuf, hf_prbuf_len);
+            if (!PEM_read_bio_PrivateKey(bfp, &lpriv, NULL, NULL)) {
+                BIO_free_all(bfp); bfp = NULL;
+                HPKE_err;
+            }
+            if (bfp != NULL) {
+                BIO_free_all(bfp); bfp = NULL;
+            }
+        }
+    }
+    if (!lpriv) { HPKE_err; }
+    *retpriv = lpriv;
+#if defined(SUPERVERBOSE) || defined(TESTVECTORS)
+    printf("hpke_prbuf2evp success\n");
+#endif
+    if (priv) BN_free(priv);
+    if (ctx) EVP_PKEY_CTX_free(ctx);
+    if (param_bld) OSSL_PARAM_BLD_free(param_bld);
+    if (params) OSSL_PARAM_free(params);
+    return(erv);
+
+err:
+#if defined(SUPERVERBOSE) || defined(TESTVECTORS)
+    printf("hpke_prbuf2evp FAILED at %d\n", erv);
+#endif
+    if (priv) BN_free(priv);
+    if (ctx) EVP_PKEY_CTX_free(ctx);
+    if (param_bld) OSSL_PARAM_BLD_free(param_bld);
+    if (params) OSSL_PARAM_free(params);
+    return(erv);
+}
+
+/**
+ * @brief check if a suite is supported locally
+ *
+ * @param suite is the suite to check
+ * @return 1 for good/supported, not 1 otherwise
+ */
+int hpke_suite_check(hpke_suite_t suite)
+{
+    /*
+     * Check that the fields of the suite are each
+     * implemented here
+     */
+    int kem_ok = 0;
+    int kdf_ok = 0;
+    int aead_ok = 0;
+    int ind = 0;
+    int nkems = sizeof(hpke_kem_tab) / sizeof(hpke_kem_info_t);
+    int nkdfs = sizeof(hpke_kdf_tab) / sizeof(hpke_kdf_info_t);
+    int naeads = sizeof(hpke_aead_tab) / sizeof(hpke_aead_info_t);
+
+    /* check KEM */
+    for (ind = 0; ind != nkems; ind++) {
+        if (suite.kem_id == hpke_kem_tab[ind].kem_id &&
+            hpke_kem_tab[ind].hash_init_func != NULL) {
+            kem_ok = 1;
+            break;
+        }
+    }
+
+    /* check kdf */
+    for (ind = 0; ind != nkdfs; ind++) {
+        if (suite.kdf_id == hpke_kdf_tab[ind].kdf_id &&
+            hpke_kdf_tab[ind].hash_init_func != NULL) {
+            kdf_ok = 1;
+            break;
+        }
+    }
+
+    /* check aead */
+    for (ind = 0; ind != naeads; ind++) {
+        if (suite.aead_id == hpke_aead_tab[ind].aead_id &&
+            hpke_aead_tab[ind].aead_init_func != NULL) {
+            aead_ok = 1;
+            break;
+        }
+    }
+
+    if (kem_ok == 1 && kdf_ok == 1 && aead_ok == 1) return(1);
+    return(__LINE__);
+}
+
+/*!
  * @brief Internal HPKE single-shot encryption function
  * @param mode is the HPKE mode
  * @param suite is the ciphersuite to use
@@ -2182,203 +2377,6 @@ err:
     return(erv);
 }
 
-/**
- * @brief check if a suite is supported locally
- *
- * @param suite is the suite to check
- * @return 1 for good/supported, not 1 otherwise
- */
-int hpke_suite_check(hpke_suite_t suite)
-{
-    /*
-     * Check that the fields of the suite are each
-     * implemented here
-     */
-    int kem_ok = 0;
-    int kdf_ok = 0;
-    int aead_ok = 0;
-    int ind = 0;
-    int nkems = sizeof(hpke_kem_tab) / sizeof(hpke_kem_info_t);
-    int nkdfs = sizeof(hpke_kdf_tab) / sizeof(hpke_kdf_info_t);
-    int naeads = sizeof(hpke_aead_tab) / sizeof(hpke_aead_info_t);
-
-    /* check KEM */
-    for (ind = 0; ind != nkems; ind++) {
-        if (suite.kem_id == hpke_kem_tab[ind].kem_id &&
-            hpke_kem_tab[ind].hash_init_func != NULL) {
-            kem_ok = 1;
-            break;
-        }
-    }
-
-    /* check kdf */
-    for (ind = 0; ind != nkdfs; ind++) {
-        if (suite.kdf_id == hpke_kdf_tab[ind].kdf_id &&
-            hpke_kdf_tab[ind].hash_init_func != NULL) {
-            kdf_ok = 1;
-            break;
-        }
-    }
-
-    /* check aead */
-    for (ind = 0; ind != naeads; ind++) {
-        if (suite.aead_id == hpke_aead_tab[ind].aead_id &&
-            hpke_aead_tab[ind].aead_init_func != NULL) {
-            aead_ok = 1;
-            break;
-        }
-    }
-
-    if (kem_ok == 1 && kdf_ok == 1 && aead_ok == 1) return(1);
-    return(__LINE__);
-}
-
-/*!
- * @brief map a kem_id and a private key buffer into an EVP_PKEY
- *
- * Note that the buffer is expected to be some form of the encoded
- * private key, and could still have the PEM header or not, and might
- * or might not be base64 encoded. We'll try handle all those options.
- *
- * @param kem_id is what'd you'd expect (using the HPKE registry values)
- * @param prbuf is the private key buffer
- * @param prbuf_len is the length of that buffer
- * @param pubuf is the public key buffer (if available)
- * @param pubuf_len is the length of that buffer
- * @param priv is a pointer to an EVP_PKEY * for the result
- * @return 1 for success, otherwise failure
- */
-int hpke_prbuf2evp(
-        unsigned int kem_id,
-        unsigned char *prbuf,
-        size_t prbuf_len,
-        unsigned char *pubuf,
-        size_t pubuf_len,
-        EVP_PKEY **retpriv)
-{
-    int erv = 1;
-    EVP_PKEY *lpriv = NULL;
-    EVP_PKEY_CTX *ctx = NULL;
-    BIGNUM *priv = NULL;
-    const char *keytype = NULL;
-    const char *groupname = NULL;
-    OSSL_PARAM_BLD *param_bld = NULL;
-    OSSL_PARAM *params = NULL;
-
-    keytype = hpke_kem_tab[kem_id].keytype;
-    groupname = hpke_kem_tab[kem_id].groupname;
-#if defined(SUPERVERBOSE) || defined(TESTVECTORS)
-    printf("Called hpke_prbuf2evp with kem id: %04x\n", kem_id);
-    hpke_pbuf(stdout, "hpke_prbuf2evp priv input", prbuf, prbuf_len);
-    hpke_pbuf(stdout, "hpke_prbuf2evp pub input", pubuf, pubuf_len);
-#endif
-    if (prbuf == NULL || prbuf_len == 0 || retpriv == NULL) { HPKE_err; }
-    if (hpke_kem_id_check(kem_id) != 1) { HPKE_err; }
-    if (hpke_kem_tab[kem_id].Npriv == prbuf_len) {
-        if (!keytype) { HPKE_err; }
-        param_bld = OSSL_PARAM_BLD_new();
-        if (!param_bld) { HPKE_err; }
-        if (groupname != NULL &&
-            OSSL_PARAM_BLD_push_utf8_string(param_bld,
-                "group", groupname, 0) != 1) {
-            HPKE_err;
-        }
-        if (pubuf && pubuf_len > 0) {
-            if (OSSL_PARAM_BLD_push_octet_string(param_bld,
-                        "pub", pubuf, pubuf_len) != 1) {
-                HPKE_err;
-            }
-        }
-        if (strlen(keytype) == 2 && !strcmp(keytype, "EC")) {
-            priv = BN_bin2bn(prbuf, prbuf_len, NULL);
-            if (!priv) {
-                HPKE_err;
-            }
-            if (OSSL_PARAM_BLD_push_BN(param_bld, "priv", priv) != 1) {
-                HPKE_err;
-            }
-        } else {
-            if (OSSL_PARAM_BLD_push_octet_string(param_bld,
-                        "priv", prbuf, prbuf_len) != 1) {
-                HPKE_err;
-            }
-        }
-        params = OSSL_PARAM_BLD_to_param(param_bld);
-        if (!params) {
-            HPKE_err;
-        }
-        ctx = EVP_PKEY_CTX_new_from_name(hpke_libctx, keytype, NULL);
-        if (ctx == NULL) {
-            HPKE_err;
-        }
-        if (EVP_PKEY_fromdata_init(ctx) <= 0) {
-            HPKE_err;
-        }
-        if (EVP_PKEY_fromdata(ctx, &lpriv, EVP_PKEY_KEYPAIR, params) <= 0) {
-            HPKE_err;
-        }
-    }
-
-    if (!lpriv) {
-        /* check PEM decode - that might work :-) */
-        BIO *bfp = BIO_new(BIO_s_mem());
-        if (!bfp) { HPKE_err; }
-        BIO_write(bfp, prbuf, prbuf_len);
-        if (!PEM_read_bio_PrivateKey(bfp, &lpriv, NULL, NULL)) {
-            BIO_free_all(bfp); bfp = NULL;
-            HPKE_err;
-        }
-        if (bfp != NULL) {
-            BIO_free_all(bfp); bfp = NULL;
-        }
-
-        if (!lpriv) {
-            /* if not done, prepend/append PEM header/footer and try again */
-            unsigned char hf_prbuf[HPKE_MAXSIZE];
-            size_t hf_prbuf_len = 0;
-#define PEM_PRIVATEHEADER "-----BEGIN PRIVATE KEY-----\n"
-#define PEM_PRIVATEFOOTER "\n-----END PRIVATE KEY-----\n"
-            memcpy(hf_prbuf, PEM_PRIVATEHEADER, strlen(PEM_PRIVATEHEADER));
-            hf_prbuf_len += strlen(PEM_PRIVATEHEADER);
-            memcpy(hf_prbuf + hf_prbuf_len, prbuf, prbuf_len);
-            hf_prbuf_len += prbuf_len;
-            memcpy(hf_prbuf + hf_prbuf_len, PEM_PRIVATEFOOTER,
-                    strlen(PEM_PRIVATEFOOTER));
-            hf_prbuf_len += strlen(PEM_PRIVATEFOOTER);
-            bfp = BIO_new(BIO_s_mem());
-            if (!bfp) { HPKE_err; }
-            BIO_write(bfp, hf_prbuf, hf_prbuf_len);
-            if (!PEM_read_bio_PrivateKey(bfp, &lpriv, NULL, NULL)) {
-                BIO_free_all(bfp); bfp = NULL;
-                HPKE_err;
-            }
-            if (bfp != NULL) {
-                BIO_free_all(bfp); bfp = NULL;
-            }
-        }
-    }
-    if (!lpriv) { HPKE_err; }
-    *retpriv = lpriv;
-#if defined(SUPERVERBOSE) || defined(TESTVECTORS)
-    printf("hpke_prbuf2evp success\n");
-#endif
-    if (priv) BN_free(priv);
-    if (ctx) EVP_PKEY_CTX_free(ctx);
-    if (param_bld) OSSL_PARAM_BLD_free(param_bld);
-    if (params) OSSL_PARAM_free(params);
-    return(erv);
-
-err:
-#if defined(SUPERVERBOSE) || defined(TESTVECTORS)
-    printf("hpke_prbuf2evp FAILED at %d\n", erv);
-#endif
-    if (priv) BN_free(priv);
-    if (ctx) EVP_PKEY_CTX_free(ctx);
-    if (param_bld) OSSL_PARAM_BLD_free(param_bld);
-    if (params) OSSL_PARAM_free(params);
-    return(erv);
-}
-
 /*!
  * @brief randomly pick a suite
  *
@@ -2431,7 +2429,7 @@ static int hpke_random_suite(hpke_suite_t *suite)
  * @param cipher_len is the length of cipher
  * @return 1 for success, otherwise failure
  */
-int hpke_good4grease(
+static int hpke_good4grease(
         hpke_suite_t *suite_in,
         hpke_suite_t suite,
         unsigned char *pub,
@@ -2495,7 +2493,7 @@ int hpke_good4grease(
  * @param suite is the resulting suite
  * @return 1 for success, otherwise failure
  */
-int hpke_str2suite(char *suitestr, hpke_suite_t *suite)
+static int hpke_str2suite(char *suitestr, hpke_suite_t *suite)
 {
     int erv = 0;
     uint16_t kem = 0, kdf = 0, aead = 0;
@@ -2570,7 +2568,7 @@ int hpke_str2suite(char *suitestr, hpke_suite_t *suite)
  * @param cipherlen points to what'll be ciphertext length
  * @return 1 for success, otherwise failure
  */
-int hpke_expansion(hpke_suite_t suite,
+static int hpke_expansion(hpke_suite_t suite,
         size_t clearlen,
         size_t *cipherlen)
 {
@@ -2588,7 +2586,7 @@ int hpke_expansion(hpke_suite_t suite,
  * @param ctx is the context to set
  * @return 1 for success, otherwise failure
  */
-int hpke_setlibctx(OSSL_LIB_CTX *libctx)
+static int hpke_setlibctx(OSSL_LIB_CTX *libctx)
 {
     /*
      * This use to call OSSL_LIB_CTX_set0_default() but that caused some
