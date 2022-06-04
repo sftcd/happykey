@@ -8,11 +8,11 @@
 # An OpenSSL-based HPKE implementation following draft-irtf-cfrg-hpke
 #
 
-OSSL=../openssl
+OSSL?=../openssl
 INCL=${OSSL}/include
 
 # NSS 
-NSSL=../dist/Debug/lib
+NSSL?=../dist/Debug/lib
 NINCL=  -I../nss/lib \
 		-I../nss/lib/nss \
 		-I../nss/lib/ssl \

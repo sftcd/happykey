@@ -17,7 +17,7 @@
 #include <stdio.h>
 #include <string.h>
 #include <openssl/ssl.h>
-#include <openssl/hpke.h>
+#include "hpke.h"
 
 int main()
 {
@@ -33,12 +33,12 @@ int main()
     size_t plainlen=HPKE_MAXSIZE; unsigned char plain[HPKE_MAXSIZE];
     size_t cipherlen=HPKE_MAXSIZE; unsigned char cipher[HPKE_MAXSIZE];
     size_t clearlen=HPKE_MAXSIZE; unsigned char clear[HPKE_MAXSIZE];
-    if (hpke_kg(hpke_mode, hpke_suite,&publen, pub,&privlen, priv)!=1)
+    if (OSSL_HPKE_kg(NULL,hpke_mode, hpke_suite,&publen, pub,&privlen, priv)!=1)
         goto err;
     memset(plain,0,HPKE_MAXSIZE);
     strcpy((char*)plain,"a message not in a bottle");
     plainlen=strlen((char*)plain);
-    if (hpke_enc(hpke_mode, hpke_suite,
+    if (OSSL_HPKE_enc(NULL,hpke_mode, hpke_suite,
                 NULL, 0, NULL, /* psk */
                 publen, pub,
                 0, NULL, NULL, /* priv */
@@ -53,7 +53,7 @@ int main()
 #endif
                 )!=1)
         goto err;
-    if (hpke_dec( hpke_mode, hpke_suite,
+    if (OSSL_HPKE_dec(NULL, hpke_mode, hpke_suite,
                 NULL, 0, NULL, /* psk */
                 0, NULL, /* authpub */
                 privlen, priv, NULL,
