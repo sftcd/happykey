@@ -27,6 +27,10 @@ High level notes:
 
 ## Recent Changes
 
+- 20220604: changed internal aead, kem and kdf tables to be packed
+  rather than sparse - that'll be better if/as larger IANA codepoints
+  are allocated
+
 - 20220603: changes to external API names e.g. from ``hpke_enc``
   to ``OSSL_HPKE_enc`` for consistency with OpenSSL conventions.
   Various other similar changes.
