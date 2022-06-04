@@ -39,7 +39,7 @@ CFLAGS=-g ${testvectors} -DHAPPYKEY
 
 CC=gcc
 
-all: hpkemain neod oeod test2evp osslplayground 
+all: hpkemain apitest neod oeod test2evp osslplayground 
 
 # hpke.c and hpke.h here incldue some additional tracing and test vector
 # support that's not desirable in the version we'd like to see merged
@@ -117,6 +117,12 @@ hpke.o: hpke.c hpke.h
 
 hpkemain.o: hpkemain.c hpke.h
 	${CC} ${CFLAGS} -I ${INCL} -c $<
+
+apitest.o: apitest.c hpke.h hpke.c
+	${CC} ${CFLAGS} -I ${INCL} -c $<
+
+apitest: apitest.o hpke.o
+	${CC} ${CFLAGS} -o $@ apitest.o hpke.o -L ${OSSL} -lssl -lcrypto
 
 ifdef testvectors
 hpketv.o: hpketv.c hpketv.h hpke.h

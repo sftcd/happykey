@@ -27,6 +27,10 @@ High level notes:
 
 ## Recent Changes
 
+- 20220604: added [``apitest.c``](apitest.c) which'll be moved into
+  openssl ``make test`` target (probably ``test/evp_extra_test.c``
+  as currently or maybe elsewhere)
+
 - 20220604: changed internal aead, kem and kdf tables to be packed
   rather than sparse - that'll be better if/as larger IANA codepoints
   are allocated
