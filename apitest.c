@@ -49,59 +49,118 @@ static void usage(char *prog,char *errmsg)
 static int test_hpke(void)
 {
     int testresult = 0;
-    /* we'll do a round-trip, generating a key, encrypting and decrypting */
-    int hpke_mode=HPKE_MODE_BASE;
+    int overallresult = 1;
+    /* 
+     * we'll do round-trips, generating a key, encrypting and decrypting 
+     * for each of the many types of thing
+     */
+    int hpke_mode_list[]={
+        HPKE_MODE_BASE,
+        HPKE_MODE_PSK,
+        HPKE_MODE_AUTH,
+        HPKE_MODE_PSKAUTH
+    };
+    int mind = 0; /* index into hpke_mode_list */ 
+    uint16_t hpke_kem_list[]={
+        HPKE_KEM_ID_P256,
+        HPKE_KEM_ID_P384,
+        HPKE_KEM_ID_P521,
+        HPKE_KEM_ID_25519,
+        HPKE_KEM_ID_448
+    };
+    int kemind = 0; /* index into hpke_kem_list */
+    uint16_t hpke_kdf_list[]={
+        HPKE_KDF_ID_HKDF_SHA256,
+        HPKE_KDF_ID_HKDF_SHA384,
+        HPKE_KDF_ID_HKDF_SHA512
+    };
+    int kdfind = 0; 
+
     hpke_suite_t hpke_suite = HPKE_SUITE_DEFAULT;
-    /* we'll alloc all these on the stack for simplicity */
-    size_t publen=HPKE_MAXSIZE; unsigned char pub[HPKE_MAXSIZE];
-    size_t privlen=HPKE_MAXSIZE; unsigned char priv[HPKE_MAXSIZE];
-    size_t senderpublen=HPKE_MAXSIZE; unsigned char senderpub[HPKE_MAXSIZE];
     size_t plainlen=HPKE_MAXSIZE; unsigned char plain[HPKE_MAXSIZE];
-    size_t cipherlen=HPKE_MAXSIZE; unsigned char cipher[HPKE_MAXSIZE];
-    size_t clearlen=HPKE_MAXSIZE; unsigned char clear[HPKE_MAXSIZE];
 
     memset(plain,0,HPKE_MAXSIZE);
     strcpy((char*)plain,"a message not in a bottle");
     plainlen=strlen((char*)plain);
 
-    if (OSSL_HPKE_kg(testctx, hpke_mode, hpke_suite,
-                &publen, pub, &privlen, priv)!=1)
-        goto err;
-    if (OSSL_HPKE_enc(testctx, hpke_mode, hpke_suite,
-                NULL, 0, NULL, /* psk */
-                publen, pub, 
-                0, NULL, NULL, /* auth priv */
-                plainlen, plain,
-                0, NULL, /* aad */
-                0, NULL, /* info */
-                0, NULL, /* seq */
-                &senderpublen, senderpub,
-                &cipherlen, cipher)!=1)
-        goto err;
+    /* iterate over different modes */
+    for (mind = 0; mind != (sizeof(hpke_mode_list)/sizeof(int)); mind++ ) {
+        int hpke_mode = hpke_mode_list[mind];
 
-    if (OSSL_HPKE_dec(testctx, hpke_mode, hpke_suite,
-                NULL, 0, NULL, /* psk */
-                0, NULL, /* auth pub */
-                privlen, priv, NULL,
-                senderpublen, senderpub,
-                cipherlen, cipher,
-                0, NULL, /* aad */
-                0, NULL, /* info */
-                0, NULL, /* seq */
-                &clearlen, clear)!=1)
-        goto err;
+        /* try with/without info, aad, seq */
+        /* iterate over the kems, kdfs and aeads */
+        for (kemind = 0; kemind != (sizeof(hpke_kem_list)/sizeof(uint16_t)); kemind++ ) {
+            uint16_t kem_id=hpke_kem_list[kemind];
 
-    /* check output */
-    if (clearlen!=plainlen)
-        goto err;
+            hpke_suite.kem_id=kem_id;
+            for (kdfind = 0; kdfind != (sizeof(hpke_kdf_list)/sizeof(uint16_t)); kdfind++ ) {
+                uint16_t kdf_id=hpke_kdf_list[kdfind];
 
-    if (memcmp(clear,plain,plainlen))
-        goto err;
+                size_t publen=HPKE_MAXSIZE; unsigned char pub[HPKE_MAXSIZE];
+                size_t privlen=HPKE_MAXSIZE; unsigned char priv[HPKE_MAXSIZE];
+                size_t senderpublen=HPKE_MAXSIZE; unsigned char senderpub[HPKE_MAXSIZE];
+
+                hpke_suite.kdf_id=kdf_id;
+
+                testresult=OSSL_HPKE_kg(testctx, hpke_mode, hpke_suite,
+                                &publen, pub, &privlen, priv);
+                if (testresult != 1) {
+                    printf("OSSL_HPKE_kg fail (%d) with mode=%d,kem=0x%02x,kdf=0x%02x\n",testresult,hpke_mode,kem_id,kdf_id);
+                    goto err;
+                }
+                size_t cipherlen=HPKE_MAXSIZE; unsigned char cipher[HPKE_MAXSIZE];
+                size_t clearlen=HPKE_MAXSIZE; unsigned char clear[HPKE_MAXSIZE];
+                testresult=OSSL_HPKE_enc(testctx, hpke_mode, hpke_suite,
+                    NULL, 0, NULL, /* psk */
+                    publen, pub, 
+                    0, NULL, NULL, /* auth priv */
+                    plainlen, plain,
+                    0, NULL, /* aad */
+                    0, NULL, /* info */
+                    0, NULL, /* seq */
+                    &senderpublen, senderpub,
+                    &cipherlen, cipher);
+                if (testresult != 1) {
+                    printf("OSSL_HPKE_enc fail (%d) with mode=%d,kem=0x%02x,kdf=0x%02x\n",testresult,hpke_mode,kem_id,kdf_id);
+                    goto err;
+                }
+                testresult=OSSL_HPKE_dec(testctx, hpke_mode, hpke_suite,
+                    NULL, 0, NULL, /* psk */
+                    0, NULL, /* auth pub */
+                    privlen, priv, NULL,
+                    senderpublen, senderpub,
+                    cipherlen, cipher,
+                    0, NULL, /* aad */
+                    0, NULL, /* info */
+                    0, NULL, /* seq */
+                    &clearlen, clear);
+                if (testresult != 1) {
+                    printf("OSSL_HPKE_dec fail (%d) with mode=%d,kem=0x%02x,kdf=0x%02x\n",testresult,hpke_mode,kem_id,kdf_id);
+                    goto err;
+                }
+                /* check output */
+                if (clearlen!=plainlen) {
+                    printf("clearlen!=plainlen fail (%d) with mode=%d,kem=0x%02x,kdf=0x%02x\n",testresult,hpke_mode,kem_id,kdf_id);
+                    goto err;
+                }
+                if (memcmp(clear,plain,plainlen)) {
+                    printf("mamcmp(clearlen,plainlen) fail (%d) with mode=%d,kem=0x%02x,kdf=0x%02x\n",testresult,hpke_mode,kem_id,kdf_id);
+                    goto err;
+                }
+                printf("test success with mode=%d,kem=0x%02x,kdf=0x%02x\n",hpke_mode,kem_id,kdf_id);
+                continue;
+err:
+                if (testresult != 1) {
+                    printf("test fail with mode=%d,kem=0x%02x,kdf=0x%02x\n",hpke_mode,kem_id,kdf_id);
+                    overallresult = 0;
+                }
+            }
+        }
+    }
 
     /* yay, success */
     testresult = 1;
-err:
-    return testresult;
+    return overallresult;
 }
 
 /*!
@@ -121,6 +180,15 @@ int main(int argc, char **argv)
                 usage(argv[0],"unknown arg");
         }
     }
+
+    /*
+     * Init OpenSSL stuff - copied from lighttpd
+     */
+    OPENSSL_init_ssl(OPENSSL_INIT_LOAD_SSL_STRINGS
+                    |OPENSSL_INIT_LOAD_CRYPTO_STRINGS,NULL);
+    OPENSSL_init_crypto(OPENSSL_INIT_ADD_ALL_CIPHERS
+                       |OPENSSL_INIT_ADD_ALL_DIGESTS
+                       |OPENSSL_INIT_LOAD_CONFIG, NULL);
 
     apires=test_hpke();
     if (apires==1) {
@@ -144,15 +212,6 @@ int main(int argc, char **argv)
         }
         return(1);
     }
-
-    /*
-     * Init OpenSSL stuff - copied from lighttpd
-     */
-    OPENSSL_init_ssl(OPENSSL_INIT_LOAD_SSL_STRINGS
-                    |OPENSSL_INIT_LOAD_CRYPTO_STRINGS,NULL);
-    OPENSSL_init_crypto(OPENSSL_INIT_ADD_ALL_CIPHERS
-                       |OPENSSL_INIT_ADD_ALL_DIGESTS
-                       |OPENSSL_INIT_LOAD_CONFIG, NULL);
 
     return(overallreturn);
 }
