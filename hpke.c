@@ -62,6 +62,9 @@
 #define HPKE_5869_MODE_KEM    1 /**< Abide by HPKE section 4.1 */
 #define HPKE_5869_MODE_FULL   2 /**< Abide by HPKE section 5.1 */
 
+/* An internal max size, based on the extenal */
+#define INT_MAXSIZE (4*HPKE_MAXSIZE)
+
 /* an error macro just to make things easier */
 #ifdef HAPPYKEY
 #define HPKE_err { erv = __LINE__; goto err; }
@@ -749,7 +752,7 @@ static int hpke_extract(
     OSSL_PARAM params[5], *p = params;
     int mode = EVP_PKEY_HKDEF_MODE_EXTRACT_ONLY;
     const char *mdname = NULL;
-    unsigned char labeled_ikmbuf[HPKE_MAXSIZE];
+    unsigned char labeled_ikmbuf[INT_MAXSIZE];
     unsigned char *labeled_ikm = labeled_ikmbuf;
     size_t labeled_ikmlen = 0;
     int erv = 1;
@@ -769,23 +772,23 @@ static int hpke_extract(
             concat_offset = 0;
             memcpy(labeled_ikm, HPKE_VERLABEL, strlen(HPKE_VERLABEL));
             concat_offset += strlen(HPKE_VERLABEL);
-            if (concat_offset >= HPKE_MAXSIZE) { HPKE_err; }
+            if (concat_offset >= INT_MAXSIZE) { HPKE_err; }
             memcpy(labeled_ikm + concat_offset,
                     HPKE_SEC41LABEL, strlen(HPKE_SEC41LABEL));
             concat_offset += strlen(HPKE_SEC41LABEL);
-            if (concat_offset >= HPKE_MAXSIZE) { HPKE_err; }
+            if (concat_offset >= INT_MAXSIZE) { HPKE_err; }
             labeled_ikm[concat_offset] = (suite.kem_id / 256) % 256;
             concat_offset += 1;
-            if (concat_offset >= HPKE_MAXSIZE) { HPKE_err; }
+            if (concat_offset >= INT_MAXSIZE) { HPKE_err; }
             labeled_ikm[concat_offset] = suite.kem_id % 256;
             concat_offset += 1;
-            if (concat_offset >= HPKE_MAXSIZE) { HPKE_err; }
+            if (concat_offset >= INT_MAXSIZE) { HPKE_err; }
             memcpy(labeled_ikm + concat_offset, label, labellen);
             concat_offset += labellen;
-            if (concat_offset >= HPKE_MAXSIZE) { HPKE_err; }
+            if (concat_offset >= INT_MAXSIZE) { HPKE_err; }
             memcpy(labeled_ikm + concat_offset, ikm, ikmlen);
             concat_offset += ikmlen;
-            if (concat_offset >= HPKE_MAXSIZE) { HPKE_err; }
+            if (concat_offset >= INT_MAXSIZE) { HPKE_err; }
             labeled_ikmlen = concat_offset;
             break;
 
@@ -793,36 +796,36 @@ static int hpke_extract(
             concat_offset = 0;
             memcpy(labeled_ikm, HPKE_VERLABEL, strlen(HPKE_VERLABEL));
             concat_offset += strlen(HPKE_VERLABEL);
-            if (concat_offset >= HPKE_MAXSIZE) { HPKE_err; }
+            if (concat_offset >= INT_MAXSIZE) { HPKE_err; }
             memcpy(labeled_ikm + concat_offset,
                     HPKE_SEC51LABEL, strlen(HPKE_SEC51LABEL));
             concat_offset += strlen(HPKE_SEC51LABEL);
-            if (concat_offset >= HPKE_MAXSIZE) { HPKE_err; }
+            if (concat_offset >= INT_MAXSIZE) { HPKE_err; }
             labeled_ikm[concat_offset] = (suite.kem_id / 256) % 256;
             concat_offset += 1;
-            if (concat_offset >= HPKE_MAXSIZE) { HPKE_err; }
+            if (concat_offset >= INT_MAXSIZE) { HPKE_err; }
             labeled_ikm[concat_offset] = suite.kem_id%256;
             concat_offset += 1;
-            if (concat_offset >= HPKE_MAXSIZE) { HPKE_err; }
+            if (concat_offset >= INT_MAXSIZE) { HPKE_err; }
             labeled_ikm[concat_offset] = (suite.kdf_id / 256) % 256;
             concat_offset += 1;
-            if (concat_offset >= HPKE_MAXSIZE) { HPKE_err; }
+            if (concat_offset >= INT_MAXSIZE) { HPKE_err; }
             labeled_ikm[concat_offset] = suite.kdf_id%256;
             concat_offset += 1;
-            if (concat_offset >= HPKE_MAXSIZE) { HPKE_err; }
+            if (concat_offset >= INT_MAXSIZE) { HPKE_err; }
             labeled_ikm[concat_offset] = (suite.aead_id / 256) % 256;
             concat_offset += 1;
-            if (concat_offset >= HPKE_MAXSIZE) { HPKE_err; }
+            if (concat_offset >= INT_MAXSIZE) { HPKE_err; }
             labeled_ikm[concat_offset] = suite.aead_id % 256;
             concat_offset += 1;
-            if (concat_offset >= HPKE_MAXSIZE) { HPKE_err; }
+            if (concat_offset >= INT_MAXSIZE) { HPKE_err; }
             memcpy(labeled_ikm + concat_offset, label, labellen);
             concat_offset += labellen;
-            if (concat_offset >= HPKE_MAXSIZE) { HPKE_err; }
+            if (concat_offset >= INT_MAXSIZE) { HPKE_err; }
             if (ikmlen > 0) /* added 'cause asan test */
             memcpy(labeled_ikm + concat_offset, ikm, ikmlen);
             concat_offset += ikmlen;
-            if (concat_offset >= HPKE_MAXSIZE) { HPKE_err; }
+            if (concat_offset >= INT_MAXSIZE) { HPKE_err; }
             labeled_ikmlen = concat_offset;
             break;
         default:
@@ -908,7 +911,7 @@ static int hpke_expand(
                 unsigned char *out, size_t *outlen)
 {
     int erv = 1;
-    unsigned char libuf[HPKE_MAXSIZE];
+    unsigned char libuf[INT_MAXSIZE];
     unsigned char *lip = libuf;
     size_t concat_offset = 0;
     size_t loutlen = L;
@@ -926,7 +929,7 @@ static int hpke_expand(
     /* Handle oddities of HPKE labels (or not) */
     switch (mode5869) {
         case HPKE_5869_MODE_PURE:
-            if ((labellen+infolen) >= HPKE_MAXSIZE) { HPKE_err;}
+            if ((labellen+infolen) >= INT_MAXSIZE) { HPKE_err;}
             memcpy(lip, label, labellen);
             memcpy(lip + labellen, info, infolen);
             concat_offset = labellen + infolen;
@@ -938,23 +941,23 @@ static int hpke_expand(
             concat_offset = 2;
             memcpy(lip + concat_offset, HPKE_VERLABEL, strlen(HPKE_VERLABEL));
             concat_offset += strlen(HPKE_VERLABEL);
-            if (concat_offset >= HPKE_MAXSIZE) { HPKE_err; }
+            if (concat_offset >= INT_MAXSIZE) { HPKE_err; }
             memcpy(lip + concat_offset, HPKE_SEC41LABEL,
                     strlen(HPKE_SEC41LABEL));
             concat_offset += strlen(HPKE_SEC41LABEL);
-            if (concat_offset >= HPKE_MAXSIZE) { HPKE_err; }
+            if (concat_offset >= INT_MAXSIZE) { HPKE_err; }
             lip[concat_offset] = (suite.kem_id / 256) % 256;
             concat_offset += 1;
-            if (concat_offset >= HPKE_MAXSIZE) { HPKE_err; }
+            if (concat_offset >= INT_MAXSIZE) { HPKE_err; }
             lip[concat_offset] = suite.kem_id % 256;
             concat_offset += 1;
-            if (concat_offset >= HPKE_MAXSIZE) { HPKE_err; }
+            if (concat_offset >= INT_MAXSIZE) { HPKE_err; }
             memcpy(lip + concat_offset, label, labellen);
             concat_offset += labellen;
-            if (concat_offset >= HPKE_MAXSIZE) { HPKE_err; }
+            if (concat_offset >= INT_MAXSIZE) { HPKE_err; }
             memcpy(lip + concat_offset, info, infolen);
             concat_offset += infolen;
-            if (concat_offset >= HPKE_MAXSIZE) { HPKE_err; }
+            if (concat_offset >= INT_MAXSIZE) { HPKE_err; }
             break;
 
         case HPKE_5869_MODE_FULL:
@@ -963,34 +966,34 @@ static int hpke_expand(
             concat_offset = 2;
             memcpy(lip + concat_offset, HPKE_VERLABEL, strlen(HPKE_VERLABEL));
             concat_offset += strlen(HPKE_VERLABEL);
-            if (concat_offset >= HPKE_MAXSIZE) { HPKE_err; }
+            if (concat_offset >= INT_MAXSIZE) { HPKE_err; }
             memcpy(lip + concat_offset, HPKE_SEC51LABEL,
                     strlen(HPKE_SEC51LABEL));
             concat_offset += strlen(HPKE_SEC51LABEL);
-            if (concat_offset >= HPKE_MAXSIZE) { HPKE_err; }
+            if (concat_offset >= INT_MAXSIZE) { HPKE_err; }
             lip[concat_offset] = (suite.kem_id / 256) % 256;
             concat_offset += 1;
-            if (concat_offset >= HPKE_MAXSIZE) { HPKE_err; }
+            if (concat_offset >= INT_MAXSIZE) { HPKE_err; }
             lip[concat_offset] = suite.kem_id % 256;
             concat_offset += 1;
-            if (concat_offset >= HPKE_MAXSIZE) { HPKE_err; }
+            if (concat_offset >= INT_MAXSIZE) { HPKE_err; }
             lip[concat_offset] = (suite.kdf_id / 256) % 256;
             concat_offset += 1;
-            if (concat_offset >= HPKE_MAXSIZE) { HPKE_err; }
+            if (concat_offset >= INT_MAXSIZE) { HPKE_err; }
             lip[concat_offset] = suite.kdf_id % 256;
             concat_offset += 1;
-            if (concat_offset >= HPKE_MAXSIZE) { HPKE_err; }
+            if (concat_offset >= INT_MAXSIZE) { HPKE_err; }
             lip[concat_offset] = (suite.aead_id / 256) % 256;
             concat_offset += 1;
-            if (concat_offset >= HPKE_MAXSIZE) { HPKE_err; }
+            if (concat_offset >= INT_MAXSIZE) { HPKE_err; }
             lip[concat_offset] = suite.aead_id % 256;
             concat_offset += 1;
             memcpy(lip + concat_offset, label, labellen);
             concat_offset += labellen;
-            if (concat_offset >= HPKE_MAXSIZE) { HPKE_err; }
+            if (concat_offset >= INT_MAXSIZE) { HPKE_err; }
             memcpy(lip + concat_offset, info, infolen);
             concat_offset += infolen;
-            if (concat_offset >= HPKE_MAXSIZE) { HPKE_err; }
+            if (concat_offset >= INT_MAXSIZE) { HPKE_err; }
             break;
 
         default:
@@ -2469,7 +2472,7 @@ static int hpke_random_suite(hpke_suite_t *suite)
     unsigned char rval = 0;
     int nkdfs = sizeof(hpke_kdf_tab) / sizeof(hpke_kdf_info_t) - 1;
     int naeads = sizeof(hpke_aead_tab) / sizeof(hpke_aead_info_t) - 1;
-    int nkems = sizeof(hpke_kem_tab) / sizeof(hpke_kem_info_t);
+    int nkems = sizeof(hpke_kem_tab) / sizeof(hpke_kem_info_t) - 1;
 
     /* random kem */
     if (RAND_bytes(&rval, sizeof(rval)) <= 0) return(__LINE__);
