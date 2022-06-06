@@ -130,7 +130,7 @@ typedef struct {
  * @param cipher is the input buffer for ciphertext
  * @return 1 for good (OpenSSL style), not-1 for error
  *
- * Oddity: we're passing an hpke_suit_t directly, but 48 bits is actually
+ * Oddity: we're passing an hpke_suite_t directly, but 48 bits is actually
  * smaller than a 64 bit pointer, so that's grand, if odd:-)
  */
 int OSSL_HPKE_enc(
@@ -181,7 +181,7 @@ int OSSL_HPKE_enc(
  * @param cipher is the input buffer for ciphertext
  * @return 1 for good (OpenSSL style), not-1 for error
  *
- * Oddity: we're passing an hpke_suit_t directly, but 48 bits is actually
+ * Oddity: we're passing an hpke_suite_t directly, but 48 bits is actually
  * smaller than a 64 bit pointer, so that's grand, if odd:-)
  */
 int OSSL_HPKE_enc_evp(
@@ -327,7 +327,7 @@ int OSSL_HPKE_prbuf2evp(
  */
 int OSSL_HPKE_good4grease(
         hpke_suite_t *suite_in,
-        hpke_suite_t suite,
+        hpke_suite_t *suite,
         unsigned char *pub,
         size_t *pub_len,
         unsigned char *cipher,

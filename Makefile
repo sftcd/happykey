@@ -1,4 +1,4 @@
-# Copyright 2019-201 Stephen Farrell. All Rights Reserved.
+# Copyright 2019-2022 Stephen Farrell. All Rights Reserved.
 #
 # Licensed under the OpenSSL license (the "License").  You may not use
 # this file except in compliance with the License.  You can obtain a copy

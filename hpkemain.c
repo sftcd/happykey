@@ -626,7 +626,7 @@ int main(int argc, char **argv)
         unsigned char g_cipher[HPKE_MAXSIZE];
         size_t g_cipher_len=266;
 
-        if (OSSL_HPKE_good4grease(NULL,g_suite,g_pub,&g_pub_len,g_cipher,g_cipher_len)!=1) {
+        if (OSSL_HPKE_good4grease(NULL,&g_suite,g_pub,&g_pub_len,g_cipher,g_cipher_len)!=1) {
             printf("OSSL_HPKE_good4grease failed, bummer\n");
         } else {
             printf("OSSL_HPKE_good4grease worked, yay! (use debugger or SUPERVERBOSE to see what it does:-)\n");

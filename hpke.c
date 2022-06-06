@@ -65,6 +65,9 @@
 /* An internal max size, based on the extenal */
 #define INT_MAXSIZE (4*HPKE_MAXSIZE)
 
+/* max string len we'll try map to a suite */
+#define HPKE_MAX_SUITESTR 38
+
 /* an error macro just to make things easier */
 #ifdef HAPPYKEY
 #define HPKE_err { erv = __LINE__; goto err; }
@@ -2501,7 +2504,7 @@ static int hpke_random_suite(hpke_suite_t *suite)
  */
 static int hpke_good4grease(
         hpke_suite_t *suite_in,
-        hpke_suite_t suite,
+        hpke_suite_t *suite,
         unsigned char *pub,
         size_t *pub_len,
         unsigned char *cipher,
@@ -2517,7 +2520,7 @@ static int hpke_good4grease(
     uint16_t kdf_ind = 0;
 #endif
 
-    if (!pub || !pub_len || !cipher || !cipher_len) return(__LINE__);
+    if (!pub || !pub_len || !cipher || !cipher_len || !suite) return(__LINE__);
     if (suite_in == NULL) {
         /* choose a random suite */
         crv = hpke_random_suite(&chosen);
@@ -2539,6 +2542,7 @@ static int hpke_good4grease(
                 hpke_aead_strtab[aead_ind], chosen.aead_id);
 #endif
     if ((crv = hpke_suite_check(chosen)) != 1) return(__LINE__);
+    *suite=chosen;
     /* publen */
     plen = hpke_kem_tab[kem_ind].Npk;
     if (plen > *pub_len) return(__LINE__);
@@ -2582,10 +2586,21 @@ static int hpke_str2suite(char *suitestr, hpke_suite_t *suite)
     int erv = 0;
     uint16_t kem = 0, kdf = 0, aead = 0;
     char *st = NULL;
-    if (!suite) return(__LINE__);
+    char *instrcp = NULL;
+    size_t inplen = 0;
+    int labels = 0;
+
+    if (!suitestr || !suite) return(__LINE__);
     /* See if it contains a mix of our strings and numbers  */
-    st = strtok(suitestr, ",");
-    if (!st) { erv = __LINE__; return erv; }
+
+    inplen = OPENSSL_strnlen(suitestr,HPKE_MAX_SUITESTR);
+    if (inplen >= HPKE_MAX_SUITESTR ) return(__LINE__);
+    instrcp = OPENSSL_strndup(suitestr,inplen);
+    st = strtok(instrcp, ",");
+    if (!st) { 
+        OPENSSL_free(instrcp);
+        erv = __LINE__; return erv; 
+    }
     while (st != NULL) {
         /* check if string is known or number and if so handle appropriately */
         if (kem == 0) {
@@ -2608,6 +2623,12 @@ static int hpke_str2suite(char *suitestr, hpke_suite_t *suite)
             if (HPKE_MSMATCH(st, HPKE_KDFSTR_256)) kdf = 1;
             if (HPKE_MSMATCH(st, HPKE_KDFSTR_384)) kdf = 2;
             if (HPKE_MSMATCH(st, HPKE_KDFSTR_512)) kdf = 3;
+            if (HPKE_MSMATCH(st, "0x01")) kdf = 1;
+            if (HPKE_MSMATCH(st, "0x02")) kdf = 2;
+            if (HPKE_MSMATCH(st, "0x03")) kdf = 3;
+            if (HPKE_MSMATCH(st, "0x1")) kdf = 1;
+            if (HPKE_MSMATCH(st, "0x2")) kdf = 2;
+            if (HPKE_MSMATCH(st, "0x3")) kdf = 3;
             if (HPKE_MSMATCH(st, "1")) kdf = 1;
             if (HPKE_MSMATCH(st, "2")) kdf = 2;
             if (HPKE_MSMATCH(st, "3")) kdf = 3;
@@ -2615,11 +2636,22 @@ static int hpke_str2suite(char *suitestr, hpke_suite_t *suite)
             if (HPKE_MSMATCH(st, HPKE_AEADSTR_AES128GCM)) aead = 1;
             if (HPKE_MSMATCH(st, HPKE_AEADSTR_AES256GCM)) aead = 2;
             if (HPKE_MSMATCH(st, HPKE_AEADSTR_CP)) aead = 3;
+            if (HPKE_MSMATCH(st, "0x01")) aead = 1;
+            if (HPKE_MSMATCH(st, "0x02")) aead = 2;
+            if (HPKE_MSMATCH(st, "0x03")) aead = 3;
+            if (HPKE_MSMATCH(st, "0x1")) aead = 1;
+            if (HPKE_MSMATCH(st, "0x2")) aead = 2;
+            if (HPKE_MSMATCH(st, "0x3")) aead = 3;
             if (HPKE_MSMATCH(st, "1")) aead = 1;
             if (HPKE_MSMATCH(st, "2")) aead = 2;
             if (HPKE_MSMATCH(st, "3")) aead = 3;
         }
         st = strtok(NULL, ",");
+        labels++;
+        if (labels > 3 ) {
+            OPENSSL_free(instrcp);
+            return(__LINE__);
+        }
     }
     if (kem == 0 || kdf == 0 || aead == 0) { erv = __LINE__; return erv; }
     suite->kem_id = kem;
@@ -2955,7 +2987,7 @@ int OSSL_HPKE_prbuf2evp(
  */
 int OSSL_HPKE_good4grease(
         hpke_suite_t *suite_in,
-        hpke_suite_t suite,
+        hpke_suite_t *suite,
         unsigned char *pub,
         size_t *pub_len,
         unsigned char *cipher,
