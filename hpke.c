@@ -553,10 +553,7 @@ static int hpke_aead_dec(
     if(1 != EVP_DecryptInit_ex(ctx, NULL, NULL, key, iv))  {
         HPKE_err;
     }
-    /* 
-     * Provide any AAD data. This can be called zero or more times as
-     * required
-     */
+    /* Provide AAD. Can be called zero or more times as required */
     if (aadlen != 0 && aad != NULL) {
         if(1 != EVP_DecryptUpdate(ctx, NULL, &len, aad, aadlen)) {
             HPKE_err;
@@ -2653,6 +2650,7 @@ static int hpke_str2suite(char *suitestr, hpke_suite_t *suite)
             return(__LINE__);
         }
     }
+    OPENSSL_free(instrcp);
     if (kem == 0 || kdf == 0 || aead == 0) { erv = __LINE__; return erv; }
     suite->kem_id = kem;
     suite->kdf_id = kdf;

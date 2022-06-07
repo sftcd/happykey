@@ -54,13 +54,16 @@ all: hpkemain apitest neod oeod test2evp osslplayground
 #
 # The "-x 1" below is just to get unifdef to return zero if the input
 # and output differ, which should be the case for us.
-forlib: hpke.c-forlib hpke.h-forlib
+forlib: hpke.c-forlib hpke.h-forlib test-evp-frag
 
 hpke.c-forlib: hpke.c
 	- unifdef -x 1 -UHAPPYKEY -USUPERVERBOSE -UTESTVECTORS hpke.c >hpke.c-forlib
 
 hpke.h-forlib: hpke.h
 	- unifdef -x 1 -UHAPPYKEY -USUPERVERBOSE -UTESTVECTORS hpke.h >hpke.h-forlib
+
+test-evp-frag:
+	- unifdef -x 1 -UHAPPYKEY -USUPERVERBOSE -UTESTVECTORS apitest.c >apitest.c-frag-forlib
 
 forlibclean:
 	- rm -f hpke.h-forlib
@@ -121,8 +124,13 @@ hpkemain.o: hpkemain.c hpke.h
 apitest.o: apitest.c hpke.h hpke.c
 	${CC} ${CFLAGS} -I ${INCL} -c $<
 
-apitest: apitest.o hpke.o
+ifdef uselibcrypto
+apitest: apitest.o ${OSSL}/libssl.so
+	${CC} ${CFLAGS} -o $@ apitest.o -L ${OSSL} -lssl -lcrypto
+else
+apitest: apitest.o
 	${CC} ${CFLAGS} -o $@ apitest.o hpke.o -L ${OSSL} -lssl -lcrypto
+endif
 
 ifdef testvectors
 hpketv.o: hpketv.c hpketv.h hpke.h
@@ -156,4 +164,5 @@ clean:
 	- rm -f osslplayground osslplayground.o
 	- rm -f test2evp test2evp.o
 	- rm -rf scratch/*
+	- rm -f apitest apitest.o
 

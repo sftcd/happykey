@@ -1,3 +1,4 @@
+#ifdef HAPPYKEY
 /*
  * Copyright 2019-2022 The OpenSSL Project Authors. All Rights Reserved.
  *
@@ -23,32 +24,53 @@
 #include <openssl/evp.h>
 #include <openssl/ssl.h>
 #include <openssl/rand.h>
-
 #include "hpke.h"
 
-#ifdef TESTVECTORS
-#include "hpketv.h"
-#endif
-
 static int verbose=0; ///< global var for verbosity
-
 static OSSL_LIB_CTX *testctx = NULL;
-
-static int test_true( char *file, int line, int res, char *str);
-
+/*
+ * @brief mimic OpenSSL test_true function
+ */
+static int test_true( char *file, int line, int res, char *str)
+{
+    if (res != 1) {
+        printf("Fail: %s at %s:%d, res: %d\n", str, file, line, res);
+    } else if (verbose) {
+        printf("Success: %s at %s:%d, res: %d\n", str, file, line, res);
+    }
+    return (res);
+}
+/*
+ * @brief mimic OpenSSL test_true function
+ */
+static int test_false( char *file, int line, int res, char *str)
+{
+    if (res == 1) {
+        printf("Unexpected success = Fail: %s at %s:%d, res: %d\n", str, file, line, res);
+    } else if (verbose) {
+        printf("Expected fail: %s at %s:%d, res: %d\n", str, file, line, res);
+    }
+    return (res);
+}
+#endif
+#ifdef HAPPYKEY
 /*
  * @brief mimic OpenSSL test_true macro
  */
-#define TEST_true(__x__, __str__) test_true(__FILE__, __LINE__, __x__, __str__)
-#define TEST_false(__x__, __str__) test_false(__FILE__, __LINE__, __x__, __str__)
+#define HPKE_TEST_true(__x__,__str__) test_true(__FILE__, __LINE__, __x__, __str__)
+#define HPKE_TEST_false(__x__,__str__) test_false(__FILE__, __LINE__, __x__, __str__)
+#else
+#define HPKE_TEST_true(__x__,__str__) TEST_true(__x__)
+#define HPKE_TEST_false(__x__,__str__) TEST_false(__x__)
+#endif
 
 /*
  * Randomly toss a coin
  */
 static unsigned char rb = 0;
-
 #define COIN_IS_HEADS (RAND_bytes(&rb,1) && rb%2)
 
+#ifdef HAPPYKEY
 static void usage(char *prog,char *errmsg) 
 {
     if (errmsg) printf("\nError! %s\n\n",errmsg);
@@ -62,35 +84,10 @@ static void usage(char *prog,char *errmsg)
     }
 }
 
-/*
- * @brief mimic OpenSSL test_true function
- */
-static int test_true( char *file, int line, int res, char *str)
-{
-    if (res != 1) {
-        printf("Fail: %s at %s:%d, res: %d\n", str, file, line, res);
-    } else if (verbose) {
-        printf("Success: %s at %s:%d, res: %d\n", str, file, line, res);
-    }
-    return (res);
-}
-
-/*
- * @brief mimic OpenSSL test_true function
- */
-static int test_false( char *file, int line, int res, char *str)
-{
-    if (res == 1) {
-        printf("Unexpected success = Fail: %s at %s:%d, res: %d\n", str, file, line, res);
-    } else if (verbose) {
-        printf("Expected fail: %s at %s:%d, res: %d\n", str, file, line, res);
-    }
-    return (res);
-}
+#endif
 
 static int test_hpke(void)
 {
-    int testresult = 0;
     int overallresult = 1;
     /* 
      * we'll do round-trips, generating a key, encrypting and decrypting 
@@ -123,8 +120,6 @@ static int test_hpke(void)
         HPKE_AEAD_ID_CHACHA_POLY1305
     };
     int aeadind = 0;
-    hpke_suite_t hpke_suite = HPKE_SUITE_DEFAULT;
-    size_t plainlen=HPKE_MAXSIZE; unsigned char plain[HPKE_MAXSIZE];
     /* we'll also test string to suite variations */
     char *suite_strs[] = {
 		"p256,hkdf-sha256,aes128gcm",
@@ -2297,11 +2292,7 @@ static int test_hpke(void)
         "bogus",
     };
 
-    memset(plain,0,HPKE_MAXSIZE);
-    strcpy((char*)plain,"a message not in a bottle");
-    plainlen=strlen((char*)plain);
-
-    /* iterate over different modes */
+    /* iterate over the different modes */
     for (mind = 0; mind != (sizeof(hpke_mode_list)/sizeof(int)); mind++ ) {
         int hpke_mode = hpke_mode_list[mind];
         size_t aadlen = HPKE_MAXSIZE; unsigned char aad[HPKE_MAXSIZE];
@@ -2314,46 +2305,66 @@ static int test_hpke(void)
         unsigned char *pskp = NULL;
         char pskid[HPKE_MAXSIZE]; char *pskidp = NULL;
         EVP_PKEY *privp = NULL;
+        hpke_suite_t hpke_suite = HPKE_SUITE_DEFAULT;
+        size_t plainlen=HPKE_MAXSIZE; unsigned char plain[HPKE_MAXSIZE];
+
+        memset(plain,0x00,HPKE_MAXSIZE);
+        strcpy((char*)plain,"a message not in a bottle");
+        plainlen=strlen((char*)plain);
 
         /* 
          * We randomly try with/without info, aad, seq. The justification is
          * that given the mode and suite combos, and this being run even a
-         * few times, we'll exercise all the code paths quickly.
+         * few times, we'll exercise many code paths fairly quickly.
          * We don't really care what the values are but it'll be easier to
          * debug if they're known, so we set 'em.
          */
         if (COIN_IS_HEADS) {
+#ifdef HAPPYKEY
             if (verbose) printf("adding aad,");
-            aadp = aad; memset(aad,aadlen,'a');
+#endif
+            aadp = aad; memset(aad,'a',aadlen);
         } else {
+#ifdef HAPPYKEY
             if (verbose) printf("not adding aad,");
+#endif
             aadlen = 0;
         } 
         if (COIN_IS_HEADS) {
+#ifdef HAPPYKEY
             if (verbose) printf("adding info,");
-            aadp = aad; memset(aad,aadlen,'a');
-            infop = info; memset(info,infolen,'i');
+#endif
+            aadp = aad; memset(aad,'a',aadlen);
+            infop = info; memset(info,'i',infolen);
         } else {
+#ifdef HAPPYKEY
             if (verbose) printf("not adding info,");
+#endif
             infolen = 0;
         } 
         if (COIN_IS_HEADS) {
+#ifdef HAPPYKEY
             if (verbose) printf("adding seq\n");
-            seqp = seq; memset(seq,seqlen,'s');
+#endif
+            seqp = seq; memset(seq,'s',seqlen);
         } else {
+#ifdef HAPPYKEY
             if (verbose) printf("not adding seq\n");
+#endif
             seqlen = 0;
         } 
 
         if ((hpke_mode == HPKE_MODE_PSK) || (hpke_mode == HPKE_MODE_PSKAUTH)){
-            pskp = psk; memset(psk, psklen, 'P');
-            pskidp = pskid; memset(pskid, HPKE_MAXSIZE-1, 'I'); pskid[HPKE_MAXSIZE-1]='\0';
+            pskp = psk; memset(psk, 'P', psklen);
+            pskidp = pskid; memset(pskid, 'I', HPKE_MAXSIZE-1); pskid[HPKE_MAXSIZE-1]='\0';
         } else {
             psklen = 0;
         }
 
         /* iterate over the kems, kdfs and aeads */
-        for (kemind = 0; kemind != (sizeof(hpke_kem_list)/sizeof(uint16_t)); kemind++ ) {
+        for (kemind = 0; 
+             overallresult == 1 && kemind != (sizeof(hpke_kem_list)/sizeof(uint16_t)); 
+             kemind++ ) {
             uint16_t kem_id=hpke_kem_list[kemind];
             size_t authpublen=HPKE_MAXSIZE; unsigned char authpub[HPKE_MAXSIZE];
             unsigned char *authpubp = NULL;
@@ -2364,9 +2375,9 @@ static int test_hpke(void)
 
             /* can only set AUTH key pair when we know KEM */
             if ((hpke_mode == HPKE_MODE_AUTH) || (hpke_mode == HPKE_MODE_PSKAUTH)){
-                if (TEST_true(OSSL_HPKE_kg(testctx, hpke_mode, hpke_suite,
+                if (HPKE_TEST_true(OSSL_HPKE_kg(testctx, hpke_mode, hpke_suite,
                             &authpublen, authpub, &authprivlen, authpriv),"OSS_HPKE_kg") != 1) {
-                    goto looperr;
+                    overallresult = 0;
                 }
                 authpubp = authpub;
                 authprivp = authpriv;
@@ -2375,12 +2386,16 @@ static int test_hpke(void)
                 authprivlen = 0;
             }
 
-            for (kdfind = 0; kdfind != (sizeof(hpke_kdf_list)/sizeof(uint16_t)); kdfind++ ) {
+            for (kdfind = 0; 
+                 overallresult == 1 && kdfind != (sizeof(hpke_kdf_list)/sizeof(uint16_t)); 
+                 kdfind++ ) {
                 uint16_t kdf_id=hpke_kdf_list[kdfind];
 
                 hpke_suite.kdf_id=kdf_id;
 
-                for (aeadind = 0; aeadind != (sizeof(hpke_aead_list)/sizeof(uint16_t)); aeadind++ ) {
+                for (aeadind = 0; 
+                     overallresult == 1 && aeadind != (sizeof(hpke_aead_list)/sizeof(uint16_t)); 
+                     aeadind++ ) {
                     uint16_t aead_id=hpke_aead_list[aeadind];
                     size_t publen=HPKE_MAXSIZE; unsigned char pub[HPKE_MAXSIZE];
                     size_t privlen=HPKE_MAXSIZE; unsigned char priv[HPKE_MAXSIZE];
@@ -2389,32 +2404,36 @@ static int test_hpke(void)
                     size_t clearlen=HPKE_MAXSIZE; unsigned char clear[HPKE_MAXSIZE];
 
                     hpke_suite.aead_id=aead_id;
+#ifdef HAPPYKEY
                     if (verbose) {
                         printf("mode=%d,kem=0x%02x,kdf=0x%02x,aead=0x%02x\n",
                             hpke_mode,kem_id,kdf_id,aead_id);
                     }
+#endif
                     /* toss a coin to decide to use EVP variant or not */
                     if (COIN_IS_HEADS) {
+#ifdef HAPPYKEY
                         if (verbose) printf("not using EVP variant\n");
-                        if (TEST_true(OSSL_HPKE_kg(testctx, hpke_mode, hpke_suite,
+#endif
+                        if (HPKE_TEST_true(OSSL_HPKE_kg(testctx, hpke_mode, hpke_suite,
                                 &publen, pub, &privlen, priv),"OSSL_HPKE_kg") != 1) {
-                            goto looperr;
+                            overallresult = 0;
                         }
-                        if (TEST_true(OSSL_HPKE_enc(testctx, hpke_mode, hpke_suite,
-                            pskp, psklen, pskidp, /* psk */
+                        if (HPKE_TEST_true(OSSL_HPKE_enc(testctx, hpke_mode, hpke_suite,
+                            pskidp, psklen, pskp,
                             publen, pub, 
-                            authprivlen, authprivp, NULL, /* auth priv */
+                            authprivlen, authprivp, NULL,
                             plainlen, plain,
-                            aadlen, aadp, /* aad */
-                            infolen, infop, /* info */
-                            seqlen, seqp, /* seq */
+                            aadlen, aadp,
+                            infolen, infop,
+                            seqlen, seqp,
                             &senderpublen, senderpub,
                             &cipherlen, cipher),"OSSL_HPKE_enc") != 1) {
-                                goto looperr;
+                                overallresult = 0;
                         }
-                        if (TEST_true(OSSL_HPKE_dec(testctx, hpke_mode, hpke_suite,
-                            pskp, psklen, pskidp, /* psk */
-                            authpublen, authpubp, /* auth pub */
+                        if (HPKE_TEST_true(OSSL_HPKE_dec(testctx, hpke_mode, hpke_suite,
+                            pskidp, psklen, pskp,
+                            authpublen, authpubp,
                             privlen, priv, NULL,
                             senderpublen, senderpub,
                             cipherlen, cipher,
@@ -2422,16 +2441,18 @@ static int test_hpke(void)
                             infolen, infop, /* info */
                             seqlen, seqp, /* seq */
                             &clearlen, clear),"OSSL_HPKE_dec") != 1) {
-                                goto looperr;
+                                overallresult = 0;
                         }
                     } else {
+#ifdef HAPPYKEY
                         if (verbose) printf("using EVP variant\n");
-                        if (TEST_true(OSSL_HPKE_kg_evp(testctx, hpke_mode, hpke_suite,
+#endif
+                        if (HPKE_TEST_true(OSSL_HPKE_kg_evp(testctx, hpke_mode, hpke_suite,
                                 &publen, pub, &privp),"OSSL_HPKE_kg_evp") != 1) {
-                            goto looperr;
+                                overallresult = 0;
                         }
-                        if (TEST_true(OSSL_HPKE_enc(testctx, hpke_mode, hpke_suite,
-                            pskp, psklen, pskidp, /* psk */
+                        if (HPKE_TEST_true(OSSL_HPKE_enc(testctx, hpke_mode, hpke_suite,
+                            pskidp, psklen, pskp,
                             publen, pub, 
                             authprivlen, authprivp, NULL, /* auth priv */
                             plainlen, plain,
@@ -2440,10 +2461,10 @@ static int test_hpke(void)
                             seqlen, seqp, /* seq */
                             &senderpublen, senderpub,
                             &cipherlen, cipher),"OSSL_HPKE_enc") != 1) {
-                                goto looperr;
+                                overallresult = 0;
                         }
-                        if (TEST_true(OSSL_HPKE_dec(testctx, hpke_mode, hpke_suite,
-                            pskp, psklen, pskidp, /* psk */
+                        if (HPKE_TEST_true(OSSL_HPKE_dec(testctx, hpke_mode, hpke_suite,
+                            pskidp, psklen, pskp,
                             authpublen, authpubp, /* auth pub */
                             0, NULL, privp,
                             senderpublen, senderpub,
@@ -2452,26 +2473,29 @@ static int test_hpke(void)
                             infolen, infop, /* info */
                             seqlen, seqp, /* seq */
                             &clearlen, clear),"OSSL_HPKE_dec") != 1) {
-                                goto looperr;
+                                overallresult = 0;
                         }
                         if (privp) { EVP_PKEY_free(privp); privp = NULL; }
                     }
                     /* check output */
                     if (clearlen!=plainlen) {
+#ifdef HAPPYKEY
                         printf("clearlen!=plainlen fail\n");
-                        goto looperr;
+#endif
+                        overallresult = 0;
                     }
                     if (memcmp(clear,plain,plainlen)) {
+#ifdef HAPPYKEY
                         printf("memcmp(clearlen,plainlen) fail\n");
-                        goto looperr;
+#endif
+                        overallresult = 0;
                     }
+#ifdef HAPPYKEY
                     if (verbose) {
                         printf("test success\n");
                     }
-                    continue;
-looperr:
+#endif
                     if (privp) { EVP_PKEY_free(privp); privp = NULL; }
-                    overallresult = 0;
                 }
             }
         }
@@ -2484,19 +2508,18 @@ looperr:
         for (sind = 0; sind != (sizeof(suite_strs)/sizeof(char *)); sind++ ) {
             char dstr[128];
             sprintf(dstr,"str2suite: %s",suite_strs[sind]);
-            if (TEST_true(OSSL_HPKE_str2suite(suite_strs[sind],&stirred),dstr)!=1) {
-                goto enderr;
+            if (HPKE_TEST_true(OSSL_HPKE_str2suite(suite_strs[sind],&stirred),dstr)!=1) {
+                overallresult = 0;
             }
         }
 
         for (sind = 0; sind != (sizeof(bogus_suite_strs)/sizeof(char *)); sind++ ) {
             char dstr[128];
             sprintf(dstr,"str2suite: %s",bogus_suite_strs[sind]);
-            if (TEST_false(OSSL_HPKE_str2suite(bogus_suite_strs[sind],&stirred),dstr)==1) {
-                goto enderr;
+            if (HPKE_TEST_false(OSSL_HPKE_str2suite(bogus_suite_strs[sind],&stirred),dstr)==1) {
+                overallresult = 0;
             }
         }
-
     }
 
     if (overallresult == 1) {
@@ -2511,26 +2534,152 @@ looperr:
 
         memset(&g_suite,0,sizeof(hpke_suite_t));
         /* GREASEing */
-        if (TEST_true(OSSL_HPKE_good4grease(NULL,&g_suite,g_pub,&g_pub_len,g_cipher,g_cipher_len),"good4grease")!=1) {
-            goto enderr;
+        if (HPKE_TEST_true(OSSL_HPKE_good4grease(NULL,&g_suite,g_pub,&g_pub_len,g_cipher,g_cipher_len),"good4grease")!=1) {
+            overallresult = 0;
         }
         /* expansion */
-        if (TEST_true(OSSL_HPKE_expansion(g_suite,clearlen,&expanded),"expansion")!=1) {
-            goto enderr;
+        if (HPKE_TEST_true(OSSL_HPKE_expansion(g_suite,clearlen,&expanded),"expansion")!=1) {
+            overallresult = 0;
         }
         if (expanded <= clearlen ) {
+#ifdef HAPPYKEY
             printf("expanded<=clearlen fail\n");
-            goto enderr;
+#endif
+            overallresult = 0;
         }
     }
-    /* yay, success */
-    return overallresult;
-enderr:
-    /* bummer */
-    overallresult=0;
+
+    /* try some fuzzy kg, enc & dec calls */
+    if (overallresult == 1) {
+        int hpke_mode = HPKE_MODE_BASE;
+        hpke_suite_t hpke_suite = HPKE_SUITE_DEFAULT;
+        unsigned char buf1[HPKE_MAXSIZE];
+        unsigned char buf2[HPKE_MAXSIZE];
+        size_t aadlen = 0; unsigned char *aadp = NULL;
+        size_t infolen= 0; unsigned char *infop = NULL;
+        size_t seqlen = 0; unsigned char *seqp = NULL;
+        size_t psklen= 0; unsigned char *pskp = NULL; char *pskidp = NULL;
+        size_t publen= 0; unsigned char *pub = NULL;
+        size_t privlen= 0; unsigned char *priv = NULL;
+        size_t senderpublen= 0; unsigned char *senderpub = NULL;
+        size_t plainlen= 0; unsigned char *plain = NULL;
+        size_t cipherlen= 0; unsigned char *cipher = NULL;
+        size_t clearlen= 0; unsigned char *clear = NULL;
+        size_t authpublen= 0; unsigned char *authpubp = NULL;
+        size_t authprivlen= 0; unsigned char *authprivp = NULL;
+
+        if (HPKE_TEST_false(OSSL_HPKE_kg(testctx, hpke_mode, hpke_suite,
+                &publen, pub, &privlen, priv),"OSSL_HPKE_kg") == 1) {
+            overallresult = 0;
+        }
+        if (HPKE_TEST_false(OSSL_HPKE_enc(testctx, hpke_mode, hpke_suite,
+            pskidp, psklen, pskp,
+            publen, pub, 
+            authprivlen, authprivp, NULL,
+            plainlen, plain,
+            aadlen, aadp,
+            infolen, infop,
+            seqlen, seqp,
+            &senderpublen, senderpub,
+            &cipherlen, cipher),"OSSL_HPKE_enc") == 1) {
+                overallresult = 0;
+        }
+        if (HPKE_TEST_false(OSSL_HPKE_dec(testctx, hpke_mode, hpke_suite,
+            pskidp, psklen, pskp,
+            authpublen, authpubp, /* auth pub */
+            privlen, priv, NULL,
+            senderpublen, senderpub,
+            cipherlen, cipher,
+            aadlen, aadp, /* aad */
+            infolen, infop, /* info */
+            seqlen, seqp, /* seq */
+            &clearlen, clear),"OSSL_HPKE_dec") == 1) {
+                overallresult = 0;
+        }
+        /*
+         * gen a key pair to use in enc/dec fails 
+         */
+        pub = buf1; priv = buf2; publen = privlen = HPKE_MAXSIZE;
+        if (HPKE_TEST_true(OSSL_HPKE_kg(testctx, hpke_mode, hpke_suite,
+                &publen, pub, &privlen, priv),"OSSL_HPKE_kg") != 1) {
+            overallresult = 0;
+        }
+        if (HPKE_TEST_false(OSSL_HPKE_enc(testctx, hpke_mode, hpke_suite,
+             pskidp, psklen, pskp,
+            publen, pub, 
+            authprivlen, authprivp, NULL,
+            plainlen, plain,
+            aadlen, aadp,
+            infolen, infop,
+            seqlen, seqp,
+            &senderpublen, senderpub,
+            &cipherlen, cipher),"OSSL_HPKE_enc") == 1) {
+                overallresult = 0;
+        }
+
+    }
+
+    /*
+     * I'm not sure what we want below - calls like these makes
+     * no real sense (two output buffers at the same place in 
+     * memory) but I'm not sure we should prevent it as we'll
+     * never be able to check for all possible overlapping bits
+     * of RAM I guess. (And I'd be surprised if anyone does such
+     * checks.)
+     * Will leave this here for now in the hope of broader input.
+     */
+    if (overallresult == 1) {
+        int hpke_mode = HPKE_MODE_BASE;
+        hpke_suite_t hpke_suite = HPKE_SUITE_DEFAULT;
+        unsigned char buf1[HPKE_MAXSIZE];
+        unsigned char buf2[HPKE_MAXSIZE];
+        unsigned char buf3[HPKE_MAXSIZE];
+        unsigned char buf4[HPKE_MAXSIZE];
+        size_t aadlen = 0; unsigned char *aadp = NULL;
+        size_t infolen= 0; unsigned char *infop = NULL;
+        size_t seqlen = 0; unsigned char *seqp = NULL;
+        size_t psklen= 0; unsigned char *pskp = NULL; char *pskidp = NULL;
+        size_t publen= 0; unsigned char *pub = NULL;
+        size_t privlen= 0; unsigned char *priv = NULL;
+        size_t senderpublen= 0; unsigned char *senderpub = NULL;
+        size_t plainlen= 0; unsigned char *plain = NULL;
+        size_t cipherlen= 0; unsigned char *cipher = NULL;
+        size_t authprivlen= 0; unsigned char *authprivp = NULL;
+
+        /* same pub & priv buffers won't make for happiness */
+        pub = priv = buf1; publen = privlen = HPKE_MAXSIZE;
+        if (HPKE_TEST_true(OSSL_HPKE_kg(testctx, hpke_mode, hpke_suite,
+                &publen, pub, &privlen, priv),"OSSL_HPKE_kg") != 1) {
+            overallresult = 0;
+        }
+        /* gen a usuable key pair to use in the enc/dec call below */
+        pub = buf1; priv = buf2; publen = privlen = HPKE_MAXSIZE;
+        if (HPKE_TEST_true(OSSL_HPKE_kg(testctx, hpke_mode, hpke_suite,
+                &publen, pub, &privlen, priv),"OSSL_HPKE_kg") != 1) {
+            overallresult = 0;
+        }
+        plain = buf3; plainlen = 30;
+        /* cipher and senderpub as same buffer is.. silly, but "works" */
+        cipher = buf4; cipherlen = HPKE_MAXSIZE;
+        senderpub = buf4; senderpublen = HPKE_MAXSIZE;
+        if (HPKE_TEST_true(OSSL_HPKE_enc(testctx, hpke_mode, hpke_suite,
+             pskidp, psklen, pskp,
+            publen, pub, 
+            authprivlen, authprivp, NULL,
+            plainlen, plain,
+            aadlen, aadp,
+            infolen, infop,
+            seqlen, seqp,
+            &senderpublen, senderpub,
+            &cipherlen, cipher),"OSSL_HPKE_enc") != 1) {
+                overallresult = 0;
+        }
+    }
+
     return overallresult;
 }
 
+#ifdef HAPPYKEY
 /*!
  * @brief hey it's main()
  */
@@ -2565,4 +2714,4 @@ int main(int argc, char **argv)
 
     return(apires);
 }
-
+#endif
