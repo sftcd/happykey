@@ -68,7 +68,7 @@ static int test_false( char *file, int line, int res, char *str)
  * Randomly toss a coin
  */
 static unsigned char rb = 0;
-#define COIN_IS_HEADS (RAND_bytes(&rb,1) && rb%2)
+#define COIN_IS_HEADS (RAND_bytes_ex(testctx,&rb,1,10) && rb%2)
 
 #ifdef HAPPYKEY
 static void usage(char *prog,char *errmsg) 
@@ -2534,11 +2534,13 @@ static int test_hpke(void)
 
         memset(&g_suite,0,sizeof(hpke_suite_t));
         /* GREASEing */
-        if (HPKE_TEST_true(OSSL_HPKE_good4grease(NULL,&g_suite,g_pub,&g_pub_len,g_cipher,g_cipher_len),"good4grease")!=1) {
+        if (HPKE_TEST_true(OSSL_HPKE_good4grease(testctx,NULL,&g_suite,
+                g_pub,&g_pub_len,g_cipher,g_cipher_len),"good4grease")!=1) {
             overallresult = 0;
         }
         /* expansion */
-        if (HPKE_TEST_true(OSSL_HPKE_expansion(g_suite,clearlen,&expanded),"expansion")!=1) {
+        if (HPKE_TEST_true(OSSL_HPKE_expansion(g_suite,clearlen,&expanded),
+                "expansion")!=1) {
             overallresult = 0;
         }
         if (expanded <= clearlen ) {

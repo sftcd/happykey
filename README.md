@@ -27,9 +27,10 @@ High level notes:
 
 ## Recent Changes
 
-- 20220606: expanded apitest.c significantly, ok locally but still
+- 20220608: expanded apitest.c significantly, ok locally but still
   an integration problem incorporating that into the OpenSSL ``make test``
-  target (TBC...)
+  target (progressing, but a bit more TBD...)
+    - update and check HPKE-PR branch
 
 - 20220604: added [``apitest.c``](apitest.c) which'll be moved into
   openssl ``make test`` target (probably ``test/evp_extra_test.c``
