@@ -8,7 +8,7 @@
  */
 
 /**
- * @file 
+ * @file
  * An OpenSSL-based HPKE implementation of RFC9180
  */
 
@@ -30,7 +30,7 @@
  */
 #include "hpke.h"
 /*
- * Define this if you want LOADS of printing of intermediate cryptographic values
+ * Define this for LOADS of printing of intermediate cryptographic values
  * Really only needed when new crypto added (hopefully)
  */
 #undef SUPERVERBOSE
@@ -98,8 +98,8 @@ static const char *hpke_mode_strtab[] = {
  * @brief  Map ascii to binary - utility macro used in >1 place
  */
 #define HPKE_A2B(__c__) ( __c__ >= '0' && __c__ <= '9' ? (__c__ -'0' ) :\
-                        ( __c__ >= 'A' && __c__ <= 'F' ? (__c__ -'A' + 10) :\
-                        ( __c__ >= 'a' && __c__ <= 'f' ? (__c__ -'a' + 10) : 0)))
+                   ( __c__ >= 'A' && __c__ <= 'F' ? (__c__ -'A' + 10) :\
+                   ( __c__ >= 'a' && __c__ <= 'f' ? (__c__ -'a' + 10) : 0)))
 #endif
 /*!
  * @brief info about an AEAD
@@ -181,7 +181,7 @@ static hpke_kem_info_t hpke_kem_tab[] = {
  * Note: This also need blanks
  */
 const char *hpke_kem_strtab[] = {
-    NULL, 
+    NULL,
     HPKE_KEMSTR_P256,
     HPKE_KEMSTR_P384,
     HPKE_KEMSTR_P521,
@@ -568,7 +568,7 @@ static int hpke_aead_dec(
             HPKE_err;
         }
     }
-    /* 
+    /*
      * Provide the message to be decrypted, and obtain cleartext output.
      * EVP_DecryptUpdate can be called multiple times if necessary
      */
@@ -671,7 +671,7 @@ static int hpke_aead_enc(
     if(1 != EVP_EncryptInit_ex(ctx, NULL, NULL, key, iv))  {
         HPKE_err;
     }
-    /* 
+    /*
      * Provide any AAD data. This can be called zero or more times as
      * required
      */
@@ -680,7 +680,7 @@ static int hpke_aead_enc(
             HPKE_err;
         }
     }
-    /* 
+    /*
      * Provide the message to be encrypted, and obtain the encrypted output.
      * EVP_EncryptUpdate can be called multiple times if necessary
      */
@@ -688,7 +688,7 @@ static int hpke_aead_enc(
         HPKE_err;
     }
     ciphertextlen = len;
-    /* 
+    /*
      * Finalise the encryption. Normally ciphertext bytes may be written at
      * this stage, but this does not occur in GCM mode
      */
@@ -1744,8 +1744,8 @@ static int hpke_enc_int(
     if (kem_ind == 0 ) { HPKE_err; }
     if (hpke_kem_id_nist_curve(suite.kem_id) == 1) {
         pkR = hpke_EVP_PKEY_new_raw_nist_public_key(libctx,
-                hpke_kem_tab[kem_ind].groupid, 
-                hpke_kem_tab[kem_ind].groupname, 
+                hpke_kem_tab[kem_ind].groupid,
+                hpke_kem_tab[kem_ind].groupname,
                 pub, publen);
     } else {
         pkR = EVP_PKEY_new_raw_public_key_ex(libctx,
@@ -2129,8 +2129,8 @@ static int hpke_dec_int(
     /* step 0. Initialise peer's key(s) from string(s) */
     if (hpke_kem_id_nist_curve(suite.kem_id) == 1) {
         pkE = hpke_EVP_PKEY_new_raw_nist_public_key(libctx,
-                hpke_kem_tab[kem_ind].groupid, 
-                hpke_kem_tab[kem_ind].groupname, 
+                hpke_kem_tab[kem_ind].groupid,
+                hpke_kem_tab[kem_ind].groupname,
                 enc, enclen);
     } else {
         pkE = EVP_PKEY_new_raw_public_key_ex(libctx,
@@ -2142,8 +2142,8 @@ static int hpke_dec_int(
     if (authpublen != 0 && authpub != NULL) {
         if (hpke_kem_id_nist_curve(suite.kem_id) == 1) {
             pkI = hpke_EVP_PKEY_new_raw_nist_public_key(libctx,
-                    hpke_kem_tab[kem_ind].groupid, 
-                    hpke_kem_tab[kem_ind].groupname, 
+                    hpke_kem_tab[kem_ind].groupid,
+                    hpke_kem_tab[kem_ind].groupname,
                     authpub, authpublen);
         } else {
             pkI = EVP_PKEY_new_raw_public_key_ex(libctx,
@@ -2157,7 +2157,8 @@ static int hpke_dec_int(
 
     /* step 1. load decryptors private key */
     if (!evppriv) {
-        erv = hpke_prbuf2evp(libctx, suite.kem_id, priv, privlen, NULL, 0, &skR);
+        erv = hpke_prbuf2evp(libctx, suite.kem_id, priv, privlen,
+                NULL, 0, &skR);
         if (erv != 1) goto err;
         if (!skR) {
             erv = __LINE__;goto err;
@@ -2493,17 +2494,17 @@ static int hpke_random_suite(OSSL_LIB_CTX *libctx, hpke_suite_t *suite)
     int nkems = sizeof(hpke_kem_tab) / sizeof(hpke_kem_info_t) - 1;
 
     /* random kem */
-    if (RAND_bytes_ex(libctx, &rval, sizeof(rval), HPKE_RSTRENGTH) <= 0) 
+    if (RAND_bytes_ex(libctx, &rval, sizeof(rval), HPKE_RSTRENGTH) <= 0)
         return(__LINE__);
     suite->kem_id = hpke_kem_tab[(rval % nkems + 1)].kem_id;
 
     /* random kdf */
-    if (RAND_bytes_ex(libctx, &rval, sizeof(rval), HPKE_RSTRENGTH) <= 0) 
+    if (RAND_bytes_ex(libctx, &rval, sizeof(rval), HPKE_RSTRENGTH) <= 0)
         return(__LINE__);
     suite->kdf_id = hpke_kdf_tab[(rval % nkdfs + 1)].kdf_id;
 
     /* random aead */
-    if (RAND_bytes_ex(libctx, &rval, sizeof(rval), HPKE_RSTRENGTH) <= 0) 
+    if (RAND_bytes_ex(libctx, &rval, sizeof(rval), HPKE_RSTRENGTH) <= 0)
         return(__LINE__);
     suite->aead_id = hpke_aead_tab[(rval % naeads + 1)].aead_id;
     return 1;
@@ -2566,10 +2567,10 @@ static int hpke_good4grease(
     /* publen */
     plen = hpke_kem_tab[kem_ind].Npk;
     if (plen > *pub_len) return(__LINE__);
-    if (RAND_bytes_ex(libctx, pub, plen, HPKE_RSTRENGTH) <= 0) 
+    if (RAND_bytes_ex(libctx, pub, plen, HPKE_RSTRENGTH) <= 0)
         return(__LINE__);
     *pub_len = plen;
-    if (RAND_bytes_ex(libctx, cipher, cipher_len, HPKE_RSTRENGTH) <= 0) 
+    if (RAND_bytes_ex(libctx, cipher, cipher_len, HPKE_RSTRENGTH) <= 0)
         return(__LINE__);
 #ifdef SUPERVERBOSE
     printf("GREASEy suite:\n\tkem: %s (%d), kdf: %s (%d), aead: %s (%d)\n",
@@ -2619,9 +2620,9 @@ static int hpke_str2suite(char *suitestr, hpke_suite_t *suite)
     if (inplen >= HPKE_MAX_SUITESTR ) return(__LINE__);
     instrcp = OPENSSL_strndup(suitestr,inplen);
     st = strtok(instrcp, ",");
-    if (!st) { 
+    if (!st) {
         OPENSSL_free(instrcp);
-        erv = __LINE__; return erv; 
+        erv = __LINE__; return erv;
     }
     while (st != NULL) {
         /* check if string is known or number and if so handle appropriately */
@@ -2851,7 +2852,7 @@ int OSSL_HPKE_enc_evp(
             aadlen, aad,
             infolen, info,
             seqlen, seq,
-            senderpublen, senderpub, senderpriv, 
+            senderpublen, senderpub, senderpriv,
             0, NULL,
             0, NULL,
             cipherlen, cipher
@@ -3018,7 +3019,8 @@ int OSSL_HPKE_good4grease(
         unsigned char *cipher,
         size_t cipher_len)
 {
-    return(hpke_good4grease(libctx,suite_in, suite, pub, pub_len, cipher, cipher_len));
+    return(hpke_good4grease(libctx,suite_in, suite,
+                pub, pub_len, cipher, cipher_len));
 }
 
 /*!
@@ -3029,7 +3031,7 @@ int OSSL_HPKE_good4grease(
  * @return 1 for success, otherwise failure
  */
 int OSSL_HPKE_str2suite(
-        char *str, 
+        char *str,
         hpke_suite_t *suite)
 {
     return(hpke_str2suite(str, suite));
