@@ -2648,6 +2648,10 @@ static int test_hpke(void)
         size_t cipherlen= 0; unsigned char *cipher = NULL;
         size_t authprivlen= 0; unsigned char *authprivp = NULL;
 
+        memset(buf1,0x01,HPKE_MAXSIZE);
+        memset(buf2,0x02,HPKE_MAXSIZE);
+        memset(buf3,0x03,HPKE_MAXSIZE);
+        memset(buf4,0x04,HPKE_MAXSIZE);
         /* same pub & priv buffers won't make for happiness */
         pub = priv = buf1; publen = privlen = HPKE_MAXSIZE;
         if (HPKE_TEST_true(OSSL_HPKE_kg(testctx, hpke_mode, hpke_suite,
