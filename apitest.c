@@ -2284,7 +2284,7 @@ static int test_hpke(void)
 		"33,3,3"
     };
     char *bogus_suite_strs[] = {
-		"3,33,3"
+		"3,33,3",
         "bogus,bogus,bogus",
         "bogus,33,3,1,bogus",
         "bogus,33,3,1",
