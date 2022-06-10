@@ -60,26 +60,29 @@
  * ``OSSL_HPKE_suite_check()`` can be used to determine if
  * an HPKE suite is supported or not.
  *
- * ``OSSL_HPKE_str2suite()`` maps from comma-separated strings
- * (e.g. "x25519,hkdf-sha256,aes128gcm"), to an ``hpke_suite_t``.
+ * ``OSSL_HPKE_str2suite()`` maps from comma-separated strings,
+ * e.g. "x25519,hkdf-sha256,aes128gcm", to an ``hpke_suite_t``.
  *
  * So-called GREASEing (see RFC8701) is a protocol mechanism
  * where phoney values are sent in order to make it less likely
- * that (especially) middleboxes aren't deployed that only know
+ * that (especially) middleboxes are deployed that only know
  * about "current" protocol options. Protocols using HPKE (such
  * as ECH) make use of this mechanism, but in that case need to
- * produce realistic-looking, but still phoney, values. The
+ * produce realistic-looking, though still phoney, values. The
  * ``OSSL_HPKE_good4grease()`` API can be used to generate such
  * values.
  *
  * As HPKE encryption uses an AEAD cipher, there is the usual
  * expansion of ciphertext due to the authentication tag. 
  * Applications/protocols needing to know the degree of such
- * expansion can use the ``OSSL_HPKE_expansion()`` API.
+ * expansion (whether for GREASEing or memory management) can 
+ * use the ``OSSL_HPKE_expansion()`` API.
  *
  * Many of the APIs defined here also take an ``OSSL_LIB_CTX``
  * pointer as input for cases where the default library context
- * is not in use.
+ * is not in use. Return values are always 1 in the case 
+ * of success, or something else otherwise - note that non-zero
+ * failure return values will be seen by callers.
  */
 
 #ifndef HPKE_H_INCLUDED
