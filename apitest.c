@@ -76,8 +76,8 @@ static void usage(char *prog, char *errmsg)
 # define HPKE_TEST_false(__x__, __str__) \
     test_false(__FILE__, __LINE__, __x__, __str__)
 #else
-#define HPKE_TEST_true(__x__, __str__) TEST_true(__x__)
-#define HPKE_TEST_false(__x__, __str__) TEST_false(__x__)
+# define HPKE_TEST_true(__x__, __str__) TEST_true(__x__)
+# define HPKE_TEST_false(__x__, __str__) TEST_false(__x__)
 #endif
 
 /*
@@ -2321,9 +2321,9 @@ static int test_hpke_modes_suites(void)
         strcpy((char *)plain, "a message not in a bottle");
         plainlen = strlen((char *)plain);
         /*
-         * Randomly try with/without info, aad, seq. Given mode and suite 
-         * combos, and this being run even a few times, we'll exercise many 
-         * code paths fairly quickly. We don't really care what the values 
+         * Randomly try with/without info, aad, seq. Given mode and suite
+         * combos, and this being run even a few times, we'll exercise many
+         * code paths fairly quickly. We don't really care what the values
          * are but it'll be easier to debug if they're known, so we set 'em.
          */
         if (COIN_IS_HEADS) {
@@ -2441,21 +2441,34 @@ static int test_hpke_modes_suites(void)
                                            "OSSL_HPKE_kg") != 1) {
                             overallresult = 0;
                         }
-                        if (HPKE_TEST_true(OSSL_HPKE_enc(testctx, hpke_mode,
-                                                         hpke_suite, pskidp,
-                                                         psklen, pskp, publen,
-                                                         pub, authprivlen,
-                                                         authprivp, NULL,
-                                                         plainlen, plain,
-                                                         aadlen, aadp,
-                                                         infolen, infop,
-                                                         seqlen, seqp,
-                                                         &senderpublen,
-                                                         senderpub,
-                                                         &cipherlen, cipher),
-                                           "OSSL_HPKE_enc") != 1) {
+                    } else {
+#ifdef HAPPYKEY
+                        if (verbose) { printf("using EVP variant\n"); }
+#endif
+                        if (HPKE_TEST_true(OSSL_HPKE_kg_evp(testctx, hpke_mode,
+                                                            hpke_suite, &publen,
+                                                            pub, &privp),
+                                           "OSSL_HPKE_kg_evp") != 1) {
                             overallresult = 0;
                         }
+                    }
+
+                    if (HPKE_TEST_true(OSSL_HPKE_enc(testctx, hpke_mode,
+                                                     hpke_suite, pskidp,
+                                                     psklen, pskp, publen,
+                                                     pub, authprivlen,
+                                                     authprivp, NULL,
+                                                     plainlen, plain,
+                                                     aadlen, aadp,
+                                                     infolen, infop,
+                                                     seqlen, seqp,
+                                                     &senderpublen, senderpub,
+                                                     &cipherlen, cipher),
+                                       "OSSL_HPKE_enc") != 1) {
+                        overallresult = 0;
+                    }
+
+                    if (privp == NULL) { /* non-EVP variant */
                         if (HPKE_TEST_true(OSSL_HPKE_dec(testctx, hpke_mode,
                                                          hpke_suite, pskidp,
                                                          psklen, pskp,
@@ -2471,32 +2484,7 @@ static int test_hpke_modes_suites(void)
                                            "OSSL_HPKE_dec") != 1) {
                             overallresult = 0;
                         }
-                    } else {
-#ifdef HAPPYKEY
-                        if (verbose) { printf("using EVP variant\n"); }
-#endif
-                        if (HPKE_TEST_true(OSSL_HPKE_kg_evp(testctx, hpke_mode,
-                                                            hpke_suite, &publen,
-                                                            pub, &privp),
-                                           "OSSL_HPKE_kg_evp") != 1) {
-                            overallresult = 0;
-                        }
-                        if (HPKE_TEST_true(OSSL_HPKE_enc(testctx, hpke_mode,
-                                                         hpke_suite, pskidp,
-                                                         psklen, pskp,
-                                                         publen, pub,
-                                                         authprivlen,
-                                                         authprivp, NULL,
-                                                         plainlen, plain,
-                                                         aadlen, aadp,
-                                                         infolen, infop,
-                                                         seqlen, seqp,
-                                                         &senderpublen,
-                                                         senderpub,
-                                                         &cipherlen, cipher),
-                                           "OSSL_HPKE_enc") != 1) {
-                            overallresult = 0;
-                        }
+                    } else { /* EVP variant */
                         if (HPKE_TEST_true(OSSL_HPKE_dec(testctx, hpke_mode,
                                                          hpke_suite, pskidp,
                                                          psklen, pskp,
@@ -2512,10 +2500,8 @@ static int test_hpke_modes_suites(void)
                                            "OSSL_HPKE_dec") != 1) {
                             overallresult = 0;
                         }
-                        if (privp) {
-                            EVP_PKEY_free(privp);
-                            privp = NULL;
-                        }
+                        EVP_PKEY_free(privp);
+                        privp = NULL;
                     }
                     /* check output */
                     if (clearlen != plainlen) {

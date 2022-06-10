@@ -27,6 +27,9 @@ High level notes:
 
 ## Recent Changes
 
+- 20220610: many tweaks to make the OpenSSL ``util/check-format.pl`` script
+  happy with the code that's intended for inclusion inside the library
+
 - 20220608: expanded apitest.c significantly, and integrated that into
   the OpenSSL ``make test`` target which resulted in some internal
   changes due to evolution of upstream APIs (and a pair of bug fixes

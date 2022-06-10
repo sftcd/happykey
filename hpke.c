@@ -1730,7 +1730,6 @@ static int hpke_enc_int(OSSL_LIB_CTX *libctx,
 #if defined(TESTVECTORS)
     hpke_tv_t *ltv = (hpke_tv_t *)tv;
 #endif
-    /* declare vars - done early so goto err works ok */
     EVP_PKEY_CTX *pctx = NULL;
     EVP_PKEY *pkR = NULL;
     EVP_PKEY *pkE = NULL;
@@ -1765,14 +1764,13 @@ static int hpke_enc_int(OSSL_LIB_CTX *libctx,
     if ((erv = hpke_suite_check(suite)) != 1) { HPKE_err; }
     /*
      * Depending on who called us, we may want to generate this key pair
-     * or we may have had it handed to us via extsender* inputs
+     * or we may have had it handed to us via extsender inputs
      */
     if (extsenderpublen > 0 && extsenderpub != NULL && extsenderpriv != NULL) {
         evpcaller = 1;
     }
-    if (extsenderpublen > 0 && extsenderpub != NULL &&
-        extsenderpriv == NULL && rawsenderprivlen > 0 &&
-        rawsenderpriv != NULL) {
+    if (extsenderpublen > 0 && extsenderpub != NULL && extsenderpriv == NULL &&
+        rawsenderprivlen > 0 && rawsenderpriv != NULL) {
         rawcaller = 1;
     }
     if (!evpcaller && !rawcaller &&
@@ -1796,7 +1794,6 @@ static int hpke_enc_int(OSSL_LIB_CTX *libctx,
 #if defined(SUPERVERBOSE) || defined(TESTVECTORS)
     printf("Encrypting:\n");
 #endif
-
     /*
      * The plan:
      * 0. Initialise peer's key from string
@@ -1815,8 +1812,7 @@ static int hpke_enc_int(OSSL_LIB_CTX *libctx,
                                                     hpke_kem_tab[kem_ind].
                                                     groupid,
                                                     hpke_kem_tab[kem_ind].
-                                                    groupname,
-                                                    pub, publen);
+                                                    groupname, pub, publen);
     } else {
         pkR = EVP_PKEY_new_raw_public_key_ex(libctx,
                                              hpke_kem_tab[kem_ind].keytype,
@@ -1913,8 +1909,7 @@ static int hpke_enc_int(OSSL_LIB_CTX *libctx,
         mypub = NULL;
     }
 
-    /* step 3. create context buffer */
-    /* key_schedule_context */
+    /* step 3. create context buffer starting with key_schedule_context */
     memset(ks_context, 0, HPKE_MAXSIZE);
     ks_context[0] = (unsigned char)(mode % 256);
     ks_contextlen--;
@@ -1939,12 +1934,10 @@ static int hpke_enc_int(OSSL_LIB_CTX *libctx,
 #ifdef TESTVECTORS
     hpke_test_expand_extract();
 #endif
-    /* Extract secret and Expand variously...  */
     erv = hpke_extract(libctx, suite, HPKE_5869_MODE_FULL,
                        (const unsigned char *)"", 0,
                        HPKE_PSK_HASH_LABEL, strlen(HPKE_PSK_HASH_LABEL),
-                       psk, psklen,
-                       psk_hash, &psk_hashlen);
+                       psk, psklen, psk_hash, &psk_hashlen);
     if (erv != 1) { HPKE_err; }
 #if defined(SUPERVERBOSE) || defined(TESTVECTORS)
     hpke_pbuf(stdout, "\tpsk_hash", psk_hash, psk_hashlen);
@@ -1961,15 +1954,12 @@ static int hpke_enc_int(OSSL_LIB_CTX *libctx,
     aead_ind = aead_iana2index(suite.aead_id);
     if (aead_ind == 0) { HPKE_err; }
     noncelen = hpke_aead_tab[aead_ind].Nn;
-    erv = hpke_expand(libctx, suite, HPKE_5869_MODE_FULL,
-                      secret, secretlen,
+    erv = hpke_expand(libctx, suite, HPKE_5869_MODE_FULL, secret, secretlen,
                       HPKE_NONCE_LABEL, strlen(HPKE_NONCE_LABEL),
-                      ks_context, ks_contextlen,
-                      noncelen, nonce, &noncelen);
+                      ks_context, ks_contextlen, noncelen, nonce, &noncelen);
     if (erv != 1) { HPKE_err; }
     if (noncelen != hpke_aead_tab[aead_ind].Nn) { HPKE_err; }
-    /* XOR sequence with nonce as needed */
-    if (seq != NULL && seqlen > 0) {
+    if (seq != NULL && seqlen > 0) { /* XOR sequence with nonce as needed */
         size_t sind;
         unsigned char cv;
 
@@ -1986,29 +1976,20 @@ static int hpke_enc_int(OSSL_LIB_CTX *libctx,
     }
     keylen = hpke_aead_tab[aead_ind].Nk;
     erv = hpke_expand(libctx, suite, HPKE_5869_MODE_FULL,
-                      secret, secretlen,
-                      HPKE_KEY_LABEL, strlen(HPKE_KEY_LABEL),
-                      ks_context, ks_contextlen,
-                      keylen, key, &keylen);
+                      secret, secretlen, HPKE_KEY_LABEL, strlen(HPKE_KEY_LABEL),
+                      ks_context, ks_contextlen, keylen, key, &keylen);
     if (erv != 1) { HPKE_err; }
     exporterlen = hpke_kdf_tab[kdf_ind].Nh;
-    erv = hpke_expand(libctx, suite, HPKE_5869_MODE_FULL,
-                      secret, secretlen,
-                      HPKE_EXP_LABEL, strlen(HPKE_EXP_LABEL),
-                      ks_context, ks_contextlen,
-                      exporterlen, exporter, &exporterlen);
+    erv = hpke_expand(libctx, suite, HPKE_5869_MODE_FULL, secret, secretlen,
+                      HPKE_EXP_LABEL, strlen(HPKE_EXP_LABEL), ks_context,
+                      ks_contextlen, exporterlen, exporter, &exporterlen);
     if (erv != 1) { HPKE_err; }
 
     /* step 5. call the AEAD */
-    erv = hpke_aead_enc(libctx, suite,
-                        key, keylen,
-                        nonce, noncelen,
-                        aad, aadlen,
-                        clear, clearlen,
-                        cipher, cipherlen);
+    erv = hpke_aead_enc(libctx, suite, key, keylen, nonce, noncelen,
+                        aad, aadlen, clear, clearlen, cipher, cipherlen);
     if (erv != 1) { HPKE_err; }
-    /* finish up */
-    if (!evpcaller && !rawcaller) {
+    if (!evpcaller && !rawcaller) { /* finish up */
         if (enclen > *senderpublen) { HPKE_err; }
         memcpy(senderpub, enc, enclen);
         *senderpublen = enclen;
@@ -2017,8 +1998,7 @@ static int hpke_enc_int(OSSL_LIB_CTX *libctx,
 err:
 #if defined(SUPERVERBOSE) || defined(TESTVECTORS)
     printf("\tmode: %s (%d), kem: %s (%d), kdf: %s (%d), aead: %s (%d)\n",
-           hpke_mode_strtab[mode], mode,
-           hpke_kem_strtab[kem_ind], suite.kem_id,
+           hpke_mode_strtab[mode], mode, hpke_kem_strtab[kem_ind], suite.kem_id,
            hpke_kdf_strtab[kdf_ind], suite.kdf_id,
            hpke_aead_strtab[aead_ind], suite.aead_id);
     if (pkE) {
