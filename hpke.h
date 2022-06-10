@@ -9,7 +9,77 @@
 
 /**
  * @file
- * Data structures/prototypes for HPKE (RFC9180)
+ * APIs and data structures for HPKE (RFC9180).
+ *
+ * There is only one significant data structure defined here
+ * (hpke_suite_t) to represent the KEM, KDF and AEAD algs
+ * used. Otherwise, the approach taken is to provide all the
+ * API inputs using existing types (buffers, lengths and a few
+ * cases of strings or EVP_PKEY pointers.
+ *
+ * HPKE key generation functions (``OSSL_HPKE_kg()`` and 
+ * ``OSSL_HPKE_kg_evp()``) require a KEM as input and return 
+ * public and private components of the key.
+ *
+ * HPKE encryption supports various "modes" that can optionally
+ * bind a pre-shared key (PSK) and/or an authenticatng private
+ * value, also generared via ``OSSL_HPKE_kg()``, to the 
+ * encryption operation - ``HPKE_MODE_BASE`` is the basic mode
+ * with neither, while ``HPKE_MODE_PSKAUTH`` requires both.
+ *
+ * An ``info`` value, known to both encryptor and decryptor
+ * can be combined into the key agreement operation.  Similarly, 
+ * additional authenticated data (``aad``) can be combined into 
+ * the AEAD operation. Applications/protocols using HPKE can
+ * use these to authenticate information that won't be part of
+ * the encryption.  
+ *
+ * Where the same public value is used for more than one 
+ * encryption operation, a sequence number (``seq``) may also 
+ * be mixed into the key agreement operation.
+ *
+ * Single-shot encryption (``OSSL_HPKE_enc()``) requires the 
+ * mode, suite, public value and cleartext inputs and produces
+ * the ciphertext output. The other optional inputs are as
+ * described above. 
+ *
+ * An ``OSSL_HPKE_enc_evp()`` variant allows the encryptor to 
+ * re-use its Diffie-Hellman public and private values used in a 
+ * previous call. The ``seq`` option is likely also needed 
+ * in such cases, e.g. as part of some protocol re-try such as
+ * the TLS HelloRetryRequest (HRR) case for Encrypted Client
+ * Hello.
+ *
+ * ``OSSL_HPKE_dec()`` supports the decryption operation and
+ * takes the same kinds of inputs as for encryption with the
+ * obvious role-swaps of public and private values.
+ *
+ * ``OSSL_HPKE_prbuf2evp()`` converts a buffer containing a
+ * private value into an EVP_PKEY * pointer.
+ *
+ * ``OSSL_HPKE_suite_check()`` can be used to determine if
+ * an HPKE suite is supported or not.
+ *
+ * ``OSSL_HPKE_str2suite()`` maps from comma-separated strings
+ * (e.g. "x25519,hkdf-sha256,aes128gcm"), to an ``hpke_suite_t``.
+ *
+ * So-called GREASEing (see RFC8701) is a protocol mechanism
+ * where phoney values are sent in order to make it less likely
+ * that (especially) middleboxes aren't deployed that only know
+ * about "current" protocol options. Protocols using HPKE (such
+ * as ECH) make use of this mechanism, but in that case need to
+ * produce realistic-looking, but still phoney, values. The
+ * ``OSSL_HPKE_good4grease()`` API can be used to generate such
+ * values.
+ *
+ * As HPKE encryption uses an AEAD cipher, there is the usual
+ * expansion of ciphertext due to the authentication tag. 
+ * Applications/protocols needing to know the degree of such
+ * expansion can use the ``OSSL_HPKE_expansion()`` API.
+ *
+ * Many of the APIs defined here also take an ``OSSL_LIB_CTX``
+ * pointer as input for cases where the default library context
+ * is not in use.
  */
 
 #ifndef HPKE_H_INCLUDED
@@ -77,7 +147,7 @@
 # define HPKE_AEADSTR_AES256GCM  "aes256gcm"         /**< AEAD id 2 */
 # define HPKE_AEADSTR_CP         "chachapoly1305"    /**< AEAD id 3 */
 
-/*
+/**
  * @brief ciphersuite combination
  */
 typedef struct {
@@ -86,7 +156,7 @@ typedef struct {
     uint16_t    aead_id; /**< AEAD alg id */
 } hpke_suite_t;
 
-/*
+/**
  * Suite constants, use this like:
  *          hpke_suite_t myvar = HPKE_SUITE_DEFAULT;
  */
@@ -97,7 +167,7 @@ typedef struct {
         HPKE_AEAD_ID_AES_GCM_128 \
     }
 
-/*
+/**
  * If you like your crypto turned up...
  */
 # define HPKE_SUITE_TURNITUPTO11 \
@@ -107,12 +177,12 @@ typedef struct {
         HPKE_AEAD_ID_CHACHA_POLY1305 \
     }
 
-/*
+/**
  * @brief HPKE single-shot encryption function
  *
  * This function generates an ephemeral ECDH value internally and
- * provides the public component as an output.
- *
+ * provides the public component as an output that can be sent to
+ * the relevant private key holder along with the ciphertext.
  *
  * @param libctx is the context to use (normally NULL)
  * @param mode is the HPKE mode
@@ -138,9 +208,6 @@ typedef struct {
  * @param cipherlen is the length of the input buffer for ciphertext
  * @param cipher is the input buffer for ciphertext
  * @return 1 for good (OpenSSL style), not-1 for error
- *
- * Oddity: we're passing an hpke_suite_t directly, but 48 bits is actually
- * smaller than a 64 bit pointer, so that's grand, if odd:-)
  */
 # ifdef TESTVECTORS
 int OSSL_HPKE_enc(OSSL_LIB_CTX *libctx,
@@ -171,11 +238,13 @@ int OSSL_HPKE_enc(OSSL_LIB_CTX *libctx,
                   size_t *cipherlen, unsigned char *cipher);
 # endif
 
-/*
- * @brief HPKE single-shot encryption function
+/**
+ * @brief HPKE multi-shot encryption function
  *
- * This function generates an ephemeral ECDH value internally and
- * provides the public component as an output.
+ * This function generates a non-ephemeral ECDH value internally and
+ * provides the public and private components as outputs. The public
+ * part can be sent to the relevant private key holder along with the 
+ * ciphertext. The private part can be re-used in subequent calls.
  *
  * @param libctx is the context to use (normally NULL)
  * @param mode is the HPKE mode
@@ -198,12 +267,10 @@ int OSSL_HPKE_enc(OSSL_LIB_CTX *libctx,
  * @param seq is the encoded sequence data (can be NULL)
  * @param senderpublen length of the input buffer for sender's public key
  * @param senderpub is the input buffer for sender public key
+ * @param senderpriv is the EVP_PKEY* form of sender key pair
  * @param cipherlen is the length of the input buffer for ciphertext
  * @param cipher is the input buffer for ciphertext
  * @return 1 for good (OpenSSL style), not-1 for error
- *
- * Oddity: we're passing an hpke_suite_t directly, but 48 bits is actually
- * smaller than a 64 bit pointer, so that's grand, if odd:-)
  */
 # ifdef TESTVECTORS
 int OSSL_HPKE_enc_evp(OSSL_LIB_CTX *libctx,
@@ -236,7 +303,7 @@ int OSSL_HPKE_enc_evp(OSSL_LIB_CTX *libctx,
                       size_t *cipherlen, unsigned char *cipher);
 # endif
 
-/*
+/**
  * @brief HPKE single-shot decryption function
  *
  * @param libctx is the context to use (normally NULL)
@@ -277,8 +344,16 @@ int OSSL_HPKE_dec(OSSL_LIB_CTX *libctx,
                   size_t seqlen, unsigned char *seq,
                   size_t *clearlen, unsigned char *clear);
 
-/*
+/**
  * @brief generate a key pair
+ *
+ * Used for entities that will later receive HPKE values to
+ * decrypt. Only the KEM from the suite is significant here.
+ * The ``pub` output will typically be published so that
+ * others can encrypt to the private key holder using HPKE.
+ * The ``priv`` output contains the raw private value and
+ * hence is sensitive.
+ *
  * @param libctx is the context to use (normally NULL)
  * @param mode is the mode (currently unused)
  * @param suite is the ciphersuite (currently unused)
@@ -293,8 +368,16 @@ int OSSL_HPKE_kg(OSSL_LIB_CTX *libctx,
                  size_t *publen, unsigned char *pub,
                  size_t *privlen, unsigned char *priv);
 
-/*
+/**
  * @brief generate a key pair but keep private inside API
+ *
+ * Used for entities that will later receive HPKE values to
+ * decrypt. Only the KEM from the suite is significant here.
+ * The ``pub`` output will typically be published so that
+ * others can encrypt to the private key holder using HPKE.
+ * The ``priv`` output here is in the form of an EVP_PKEY and
+ * so the raw private value need not be exposed to the
+ * application.
  *
  * @param libctx is the context to use (normally NULL)
  * @param mode is the mode (currently unused)
@@ -309,7 +392,7 @@ int OSSL_HPKE_kg_evp(OSSL_LIB_CTX *libctx,
                      size_t *publen, unsigned char *pub,
                      EVP_PKEY **priv);
 
-/*
+/**
  * @brief check if a suite is supported locally
  *
  * @param suite is the suite to check
@@ -317,7 +400,7 @@ int OSSL_HPKE_kg_evp(OSSL_LIB_CTX *libctx,
  */
 int OSSL_HPKE_suite_check(hpke_suite_t suite);
 
-/*
+/**
  * @brief: map a kem_id and a private key buffer into an EVP_PKEY
  *
  * @param libctx is the context to use (normally NULL)
@@ -341,10 +424,8 @@ int OSSL_HPKE_prbuf2evp(OSSL_LIB_CTX *libctx,
                         size_t pubuf_len,
                         EVP_PKEY **priv);
 
-/*
+/**
  * @brief get a (possibly) random suite, public key and ciphertext for GREASErs
- *
- * As usual buffers are caller allocated and lengths on input are buffer size.
  *
  * @param libctx is the context to use (normally NULL)
  * @param suite_in specifies the preferred suite or NULL for a random choice
@@ -363,8 +444,15 @@ int OSSL_HPKE_good4grease(OSSL_LIB_CTX *libctx,
                           unsigned char *cipher,
                           size_t cipher_len);
 
-/*
+/**
  * @brief map a string to a HPKE suite
+ *
+ * An example good string is "x25519,hkdf-sha256,aes128gcm"
+ * Symbols are #define'd for the relevant labels, e.g. 
+ * HPKE_KEMSTR_X25519. Numeric (decimal or hex) values with
+ * the relevant IANA codepoint valus may also be used, 
+ * e.g., "0x20,1,1" represents the same suite as the first 
+ * example.
  *
  * @param str is the string value
  * @param suite is the resulting suite
@@ -373,15 +461,8 @@ int OSSL_HPKE_good4grease(OSSL_LIB_CTX *libctx,
 int OSSL_HPKE_str2suite(char *str,
                         hpke_suite_t *suite);
 
-/*
+/**
  * @brief tell the caller how big the cipertext will be
- *
- * AEAD algorithms add a tag for data authentication.
- * Those are almost always, but not always, 16 octets
- * long, and who know what'll be true in the future.
- * So this function allows a caller to find out how
- * much data expansion they'll see with a given
- * suite.
  *
  * @param suite is the suite to be used
  * @param clearlen is the length of plaintext

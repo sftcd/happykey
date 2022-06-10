@@ -150,7 +150,7 @@ hpkemain: hpkemain.o hpke.o
 endif
 endif
 
-doc: hpke.c hpke.h hpketv.h hpketv.c
+doc: hpke.c hpke.h hpketv.h hpketv.c apitest.c
 	doxygen hpke.doxy
 	(cd doxy/latex; make; mv refman.pdf ../../hpke-api.pdf )
 

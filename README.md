@@ -27,6 +27,9 @@ High level notes:
 
 ## Recent Changes
 
+- 20220610: improved the doxygen documentation some - the [PDF](hpke-api.pdf)
+  should now actually be useful:-)
+
 - 20220610: many tweaks to make the OpenSSL ``util/check-format.pl`` script
   happy with the code that's intended for inclusion inside the library
 

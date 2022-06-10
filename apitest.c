@@ -2283,9 +2283,15 @@ static char *bogus_suite_strs[] = {
     "bogus",
 };
 
-/*
- * we'll do round-trips, generating a key, encrypting and decrypting
- * for each of the many types of thing
+/**
+ * @brief round-trips, generating keys, encrypt and decrypt
+ *
+ * This iterates over all mode and ciphersuite options trying
+ * a key gen, encrypt and decrypt for each. The aad, info, and
+ * seq inputs are randomly set or omitted each time. EVP and
+ * non-EVP key generation are randomly selected.
+ *
+ * @return 1 for success, other otherwise
  */
 static int test_hpke_modes_suites(void)
 {
@@ -2530,8 +2536,9 @@ static int test_hpke_modes_suites(void)
     return (overallresult);
 }
 
-/*
- * Check mapping from strings to HPKE suites
+/**
+ * @brief Check mapping from strings to HPKE suites
+ * @return 1 for success, other otherwise
  */
 static int test_hpke_suite_strs(void)
 {
@@ -2563,7 +2570,10 @@ static int test_hpke_suite_strs(void)
     return (overallresult);
 }
 
-/* try the various ancilliary APIs */
+/**
+ * @brief try the various GREASEy APIs
+ * @return 1 for success, other otherwise
+ */
 static int test_hpke_grease(void)
 {
     int overallresult = 1;
@@ -2597,7 +2607,10 @@ static int test_hpke_grease(void)
     return (overallresult);
 }
 
-/* try some fuzzy-ish kg, enc & dec calls */
+/**
+ * @brief try some fuzzy-ish kg, enc & dec calls 
+ * @return 1 for success, other otherwise
+ */
 static int test_hpke_badcalls(void)
 {
     int overallresult = 1;
