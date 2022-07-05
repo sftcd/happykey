@@ -39,7 +39,12 @@ CFLAGS=-g ${testvectors} -DHAPPYKEY
 
 CC=gcc
 
+# testvectors isn't compatible with apitest
+ifdef testvectors
+all: hpkemain neod oeod test2evp osslplayground 
+else
 all: hpkemain apitest neod oeod test2evp osslplayground 
+endif
 
 # hpke.c and hpke.h here incldue some additional tracing and test vector
 # support that's not desirable in the version we'd like to see merged

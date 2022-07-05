@@ -66,7 +66,7 @@
  * an HPKE suite is supported or not.
  *
  * ``OSSL_HPKE_str2suite()`` maps from comma-separated strings,
- * e.g. "x25519,hkdf-sha256,aes128gcm", to an ``hpke_suite_t``.
+ * e.g. "x25519,hkdf-sha256,aes-128-gcm", to an ``hpke_suite_t``.
  *
  * So-called GREASEing (see RFC8701) is a protocol mechanism
  * where phoney values are sent in order to make it less likely
@@ -88,6 +88,48 @@
  * is not in use. Return values are always 1 in the case
  * of success, or something else otherwise - note that non-zero
  * failure return values will be seen by callers.
+ *
+ * ## Some Uses of HPKE
+ *
+ * ### Encrypted Client Hello (ECH)
+ *
+ * Based on implementing
+ * [ECH](https://datatracker.ietf.org/doc/draft-ietf-tls-esni/)
+ * using this API, the following APIs are used for ECH:
+ * the EVP flavour of key generation is used on the cilent,
+ * the multi-shot variant of encryption on the client, using both
+ * info and AAD, and the BASE mode (so no PSK or AUTH). In the event
+ * of HRR, the seq input is also used. The AAD is mainly used to bind
+ * the outer ClientHello to the ciphertext form of the inner
+ * ClientHello.  ECH client-side GREASEing uses both GREASE-related
+ * APIs. On the server-side the non-EVP key generation funcction is
+ * used by a command line tool. Public keys are exported to the DNS
+ * and private/public pairs are read (from files) by the server
+ * with the private keys mapped to EVP_PKEY pointers using the
+ * prbuf2evp API. HPKE decryption is used as one would expect.
+ *
+ * ## Message Layer Security (MLS)
+ *
+ * Based on a reading of the
+ * [MLS](https://datatracker.ietf.org/doc/html/draft-ietf-mls-protocol)
+ * specifiation draft, the following HPKE APIs would seem to be
+ * required: key generation likely requires export to storage of
+ * the private key (so the non-EVP key generation variant). MLS
+ * also requires the deterministic DeriveKeyPair() operation
+ * (implementation still *TBD*). Encryption again uses the info
+ * and AAD parameters. The context.export API (from RFC9180, and
+ * also still *TBD*) is used.
+ *
+ * ## COSE + HPKE
+ *
+ * A [COSE](https://datatracker.ietf.org/doc/html/draft-ietf-cose-hpke-01)
+ * draft (less mature than ECH or MLS) defines a way to use HPKE
+ * with COSE (RFC8152). The SealBase API is used and maps to our HPKE single
+ * shot encryption API.
+ */
+
+/**
+ * @file APIs and data structures for HPKE (RFC9180).
  */
 
 #ifndef HPKE_H_INCLUDED
@@ -151,9 +193,9 @@
 # define HPKE_KDFSTR_256         "hkdf-sha256"       /**< KDF id 1 */
 # define HPKE_KDFSTR_384         "hkdf-sha384"       /**< KDF id 2 */
 # define HPKE_KDFSTR_512         "hkdf-sha512"       /**< KDF id 3 */
-# define HPKE_AEADSTR_AES128GCM  "aes128gcm"         /**< AEAD id 1 */
-# define HPKE_AEADSTR_AES256GCM  "aes256gcm"         /**< AEAD id 2 */
-# define HPKE_AEADSTR_CP         "chachapoly1305"    /**< AEAD id 3 */
+# define HPKE_AEADSTR_AES128GCM  LN_aes_128_gcm      /**< AEAD id 1 */
+# define HPKE_AEADSTR_AES256GCM  LN_aes_256_gcm      /**< AEAD id 2 */
+# define HPKE_AEADSTR_CP         LN_chacha20_poly1305   /**< AEAD id 3 */
 
 /**
  * @brief ciphersuite combination
@@ -381,6 +423,8 @@ int OSSL_HPKE_dec(OSSL_LIB_CTX *libctx,
  */
 int OSSL_HPKE_kg(OSSL_LIB_CTX *libctx,
                  unsigned int mode, hpke_suite_t suite,
+                 // need to add this
+                 // size_t ikmlen, unsigned char *ikm,
                  size_t *publen, unsigned char *pub,
                  size_t *privlen, unsigned char *priv);
 
@@ -464,7 +508,7 @@ int OSSL_HPKE_good4grease(OSSL_LIB_CTX *libctx,
 /**
  * @brief map a string to a HPKE suite
  *
- * An example good string is "x25519,hkdf-sha256,aes128gcm"
+ * An example good string is "x25519,hkdf-sha256,aes-128-gcm"
  * Symbols are #define'd for the relevant labels, e.g.
  * HPKE_KEMSTR_X25519. Numeric (decimal or hex) values with
  * the relevant IANA codepoint valus may also be used,
