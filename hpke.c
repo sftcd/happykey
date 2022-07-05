@@ -156,7 +156,7 @@ typedef struct {
     const char     *keytype; /**< string form of algtype "EC"/"X25519"/"X448" */
     const char     *groupname; /**< string form of EC group for NIST curves  */
     int            groupid; /**< NID of KEM */
-    const EVP_MD * (*hash_init_func)(void); /**< hash alg for the HKDF */
+    const char     *mdname; /**< hash alg name for the HKDF */
     size_t         Nsecret; /**< size of secrets */
     size_t         Nenc; /**< length of encapsulated key */
     size_t         Npk; /**< length of public key */
@@ -168,16 +168,16 @@ typedef struct {
  */
 static hpke_kem_info_t hpke_kem_tab[] = {
     { 0, NULL, NULL, 0, NULL, 0, 0, 0 }, /* treat 0 as error so nowt here */
-    { HPKE_KEM_ID_P256, "EC", "P-256", NID_X9_62_prime256v1, EVP_sha256,
-      32, 65, 65, 32 }, /* maybe "prime256v1" instead of P-256? */
-    { HPKE_KEM_ID_P384, "EC", "P-384", NID_secp384r1, EVP_sha384,
-      48, 97, 97, 48 },
-    { HPKE_KEM_ID_P521, "EC", "P-521", NID_secp521r1, EVP_sha512,
-      64, 133, 133, 66 },
-    { HPKE_KEM_ID_25519, "X25519", NULL, EVP_PKEY_X25519, EVP_sha256,
-      32, 32, 32, 32 },
-    { HPKE_KEM_ID_448, "X448", NULL, EVP_PKEY_X448, EVP_sha512,
-      64, 56, 56, 56 }
+    { HPKE_KEM_ID_P256, "EC", "P-256", NID_X9_62_prime256v1,
+      LN_sha256, 32, 65, 65, 32 }, /* maybe "prime256v1" instead of P-256? */
+    { HPKE_KEM_ID_P384, "EC", "P-384", NID_secp384r1,
+      LN_sha384, 48, 97, 97, 48 },
+    { HPKE_KEM_ID_P521, "EC", "P-521", NID_secp521r1,
+      LN_sha512, 64, 133, 133, 66 },
+    { HPKE_KEM_ID_25519, "X25519", NULL, EVP_PKEY_X25519,
+      LN_sha256, 32, 32, 32, 32 },
+    { HPKE_KEM_ID_448, "X448", NULL, EVP_PKEY_X448,
+      LN_sha512, 64, 56, 56, 56 }
 };
 #if defined(SUPERVERBOSE) || defined(TESTVECTORS)
 /*
@@ -199,7 +199,7 @@ const char *hpke_kem_strtab[] = {
  */
 typedef struct {
     uint16_t       kdf_id; /**< code point for KDF */
-    const EVP_MD * (*hash_init_func)(void); /**< the hash alg we're using */
+    const char     *mdname; /**< hash alg name for the HKDF */
     size_t         Nh; /**< length of hash/extract output */
 } hpke_kdf_info_t;
 
@@ -208,9 +208,9 @@ typedef struct {
  */
 static hpke_kdf_info_t hpke_kdf_tab[] = {
     { 0, NULL, 0 }, /* keep indexing correct */
-    { HPKE_KDF_ID_HKDF_SHA256, EVP_sha256, 32 },
-    { HPKE_KDF_ID_HKDF_SHA384, EVP_sha384, 48 },
-    { HPKE_KDF_ID_HKDF_SHA512, EVP_sha512, 64 }
+    { HPKE_KDF_ID_HKDF_SHA256, LN_sha256, 32 },
+    { HPKE_KDF_ID_HKDF_SHA384, LN_sha384, 48 },
+    { HPKE_KDF_ID_HKDF_SHA512, LN_sha512, 64 }
 };
 #if defined(SUPERVERBOSE) || defined(TESTVECTORS)
 /*
@@ -882,12 +882,12 @@ static int hpke_extract(OSSL_LIB_CTX *libctx,
     if (mode5869 == HPKE_5869_MODE_KEM) {
         kem_ind = kem_iana2index(suite.kem_id);
         if (kem_ind == 0) { HPKE_err; }
-        mdname = EVP_MD_get0_name(hpke_kem_tab[kem_ind].hash_init_func());
+        mdname = hpke_kem_tab[kem_ind].mdname;
         if (!mdname) { HPKE_err; }
     } else {
         kdf_ind = kdf_iana2index(suite.kdf_id);
         if (kdf_ind == 0) { HPKE_err; }
-        mdname = EVP_MD_get0_name(hpke_kdf_tab[kdf_ind].hash_init_func());
+        mdname = hpke_kdf_tab[kdf_ind].mdname;
         if (!mdname) { HPKE_err; }
     }
     *p++ = OSSL_PARAM_construct_utf8_string(OSSL_KDF_PARAM_DIGEST,
@@ -1052,12 +1052,12 @@ static int hpke_expand(OSSL_LIB_CTX *libctx,
     if (mode5869 == HPKE_5869_MODE_KEM) {
         kem_ind = kem_iana2index(suite.kem_id);
         if (kem_ind == 0) { HPKE_err; }
-        mdname = EVP_MD_get0_name(hpke_kem_tab[kem_ind].hash_init_func());
+        mdname = hpke_kem_tab[kem_ind].mdname;
         if (!mdname) { HPKE_err; }
     } else {
         kdf_ind = kdf_iana2index(suite.kdf_id);
         if (kdf_ind == 0) { HPKE_err; }
-        mdname = EVP_MD_get0_name(hpke_kdf_tab[kdf_ind].hash_init_func());
+        mdname = hpke_kdf_tab[kdf_ind].mdname;
         if (!mdname) { HPKE_err; }
     }
     *p++ = OSSL_PARAM_construct_utf8_string(OSSL_KDF_PARAM_DIGEST,
@@ -1626,8 +1626,7 @@ static int hpke_suite_check(hpke_suite_t suite)
 
     /* check KEM */
     for (ind = 0; ind != nkems; ind++) {
-        if (suite.kem_id == hpke_kem_tab[ind].kem_id &&
-            hpke_kem_tab[ind].hash_init_func != NULL) {
+        if (suite.kem_id == hpke_kem_tab[ind].kem_id) {
             kem_ok = 1;
             break;
         }
@@ -1635,8 +1634,7 @@ static int hpke_suite_check(hpke_suite_t suite)
 
     /* check kdf */
     for (ind = 0; ind != nkdfs; ind++) {
-        if (suite.kdf_id == hpke_kdf_tab[ind].kdf_id &&
-            hpke_kdf_tab[ind].hash_init_func != NULL) {
+        if (suite.kdf_id == hpke_kdf_tab[ind].kdf_id) {
             kdf_ok = 1;
             break;
         }
