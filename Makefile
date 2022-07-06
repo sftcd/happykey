@@ -77,6 +77,7 @@ forlibclean:
 copy2lib: forlib
 	- cp hpke.c-forlib ${OSSL}/crypto/hpke.c
 	- cp hpke.h-forlib ${INCL}/openssl/hpke.h
+	- ./dosub.sh ${OSSL}/test/evp_extra_test.c
 
 # This is a round-trip test with NSS encrypting and my code decrypting
 # (no parameters for now)

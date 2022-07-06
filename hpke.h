@@ -184,17 +184,17 @@
 # define HPKE_MODESTR_AUTH       "auth"    /**< auth (3) with sender-key pair */
 # define HPKE_MODESTR_PSKAUTH    "pskauth" /**< psk+sender-key pair (4) */
 
-/* strings for suites */
-# define HPKE_KEMSTR_P256        "p256"              /**< KEM id 0x10 */
-# define HPKE_KEMSTR_P384        "p384"              /**< KEM id 0x11 */
-# define HPKE_KEMSTR_P521        "p521"              /**< KEM id 0x12 */
-# define HPKE_KEMSTR_X25519      "x25519"            /**< KEM id 0x20 */
-# define HPKE_KEMSTR_X448        "x448"              /**< KEM id 0x21 */
-# define HPKE_KDFSTR_256         "hkdf-sha256"       /**< KDF id 1 */
-# define HPKE_KDFSTR_384         "hkdf-sha384"       /**< KDF id 2 */
-# define HPKE_KDFSTR_512         "hkdf-sha512"       /**< KDF id 3 */
-# define HPKE_AEADSTR_AES128GCM  LN_aes_128_gcm      /**< AEAD id 1 */
-# define HPKE_AEADSTR_AES256GCM  LN_aes_256_gcm      /**< AEAD id 2 */
+/* strings for suite components - ideally these'd be defined elsewhere */
+# define HPKE_KEMSTR_P256        "P-256"                /**< KEM id 0x10 */
+# define HPKE_KEMSTR_P384        "P-384"                /**< KEM id 0x11 */
+# define HPKE_KEMSTR_P521        "P-521"                /**< KEM id 0x12 */
+# define HPKE_KEMSTR_X25519      SN_X25519              /**< KEM id 0x20 */
+# define HPKE_KEMSTR_X448        SN_X448                /**< KEM id 0x21 */
+# define HPKE_KDFSTR_256         "hkdf-sha256"          /**< KDF id 1 */
+# define HPKE_KDFSTR_384         "hkdf-sha384"          /**< KDF id 2 */
+# define HPKE_KDFSTR_512         "hkdf-sha512"          /**< KDF id 3 */
+# define HPKE_AEADSTR_AES128GCM  LN_aes_128_gcm         /**< AEAD id 1 */
+# define HPKE_AEADSTR_AES256GCM  LN_aes_256_gcm         /**< AEAD id 2 */
 # define HPKE_AEADSTR_CP         LN_chacha20_poly1305   /**< AEAD id 3 */
 
 /**
