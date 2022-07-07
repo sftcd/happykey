@@ -1777,22 +1777,14 @@ static int hpke_prbuf2evp(OSSL_LIB_CTX *libctx,
     }
     *retpriv = lpriv;
 #if defined(SUPERVERBOSE) || defined(TESTVECTORS)
-    printf("hpke_prbuf2evp success\n");
+    if (erv == 1) {
+        printf("hpke_prbuf2evp success\n");
+    } else {
+        printf("hpke_prbuf2evp FAILED at %d\n", erv);
+    }
 #endif
-    if (priv)
-        BN_free(priv);
-    if (ctx)
-        EVP_PKEY_CTX_free(ctx);
-    if (param_bld)
-        OSSL_PARAM_BLD_free(param_bld);
-    if (params)
-        OSSL_PARAM_free(params);
-    return (erv);
 
 err:
-#if defined(SUPERVERBOSE) || defined(TESTVECTORS)
-    printf("hpke_prbuf2evp FAILED at %d\n", erv);
-#endif
     if (priv)
         BN_free(priv);
     if (ctx)
