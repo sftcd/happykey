@@ -73,7 +73,7 @@
 
 #define HPKE_err \
     { \
-        if (erv == 1) { erv = __LINE__; } \
+        if (erv == 1) { erv = -__LINE__; } \
         ERR_raise(ERR_LIB_SSL, ERR_R_INTERNAL_ERROR); \
     }
 /* an error macro just to make things easier */
@@ -81,7 +81,7 @@
 # undef HPKE_err
 # define HPKE_err \
     { \
-        if (erv == 1) { erv = __LINE__; } \
+        if (erv == 1) { erv = -__LINE__; } \
     }
 #endif
 #if defined(SUPERVERBOSE) || defined(TESTVECTORS)
@@ -417,7 +417,7 @@ static int hpke_kem_id_check(uint16_t kem_id)
     case HPKE_KEM_ID_448:
         break;
     default:
-        return (__LINE__);
+        return (-__LINE__);
     }
     return (1);
 }
@@ -430,7 +430,7 @@ static int hpke_kem_id_check(uint16_t kem_id)
 static int hpke_kem_id_nist_curve(uint16_t kem_id)
 {
     if (hpke_kem_id_check(kem_id) != 1)
-        return (__LINE__);
+        return (-__LINE__);
     if (kem_id >= 0x10 && kem_id < 0x20)
         return (1);
     return (0);
@@ -1570,7 +1570,7 @@ static int hpke_mode_check(unsigned int mode)
     case HPKE_MODE_PSKAUTH:
         break;
     default:
-        return (__LINE__);
+        return (-__LINE__);
     }
     return (1);
 }
@@ -1594,11 +1594,11 @@ static int hpke_psk_check(unsigned int mode,
     if (mode == HPKE_MODE_BASE || mode == HPKE_MODE_AUTH)
         return (1);
     if (pskid == NULL)
-        return (__LINE__);
+        return (-__LINE__);
     if (psklen == 0)
-        return (__LINE__);
+        return (-__LINE__);
     if (psk == NULL)
-        return (__LINE__);
+        return (-__LINE__);
     return (1);
 }
 
@@ -1845,7 +1845,7 @@ static int hpke_suite_check(hpke_suite_t suite)
 
     if (kem_ok == 1 && kdf_ok == 1 && aead_ok == 1)
         return (1);
-    return (__LINE__);
+    return (-__LINE__);
 }
 
 /*
@@ -2755,9 +2755,9 @@ static int hpke_kg_evp(OSSL_LIB_CTX *libctx,
     uint16_t kem_ind = 0;
 
     if (hpke_suite_check(suite) != 1)
-        return (__LINE__);
+        return (-__LINE__);
     if (pub == NULL || priv == NULL)
-        return (__LINE__);
+        return (-__LINE__);
     kem_ind = kem_iana2index(suite.kem_id);
     if (kem_ind == 0) {
         HPKE_err;
@@ -2858,9 +2858,9 @@ static int hpke_kg(OSSL_LIB_CTX *libctx,
     size_t lprivlen = 0;
 
     if (hpke_suite_check(suite) != 1)
-        return (__LINE__);
+        return (-__LINE__);
     if (pub == NULL || priv == NULL)
-        return (__LINE__);
+        return (-__LINE__);
     erv = hpke_kg_evp(libctx, mode, suite, publen, pub, &skR);
     if (erv != 1) {
         return (erv);
@@ -2913,17 +2913,17 @@ static int hpke_random_suite(OSSL_LIB_CTX *libctx, hpke_suite_t *suite)
 
     /* random kem */
     if (RAND_bytes_ex(libctx, &rval, sizeof(rval), HPKE_RSTRENGTH) <= 0)
-        return (__LINE__);
+        return (-__LINE__);
     suite->kem_id = hpke_kem_tab[(rval % nkems + 1)].kem_id;
 
     /* random kdf */
     if (RAND_bytes_ex(libctx, &rval, sizeof(rval), HPKE_RSTRENGTH) <= 0)
-        return (__LINE__);
+        return (-__LINE__);
     suite->kdf_id = hpke_kdf_tab[(rval % nkdfs + 1)].kdf_id;
 
     /* random aead */
     if (RAND_bytes_ex(libctx, &rval, sizeof(rval), HPKE_RSTRENGTH) <= 0)
-        return (__LINE__);
+        return (-__LINE__);
     suite->aead_id = hpke_aead_tab[(rval % naeads + 1)].aead_id;
     return 1;
 }
@@ -2960,7 +2960,7 @@ static int hpke_good4grease(OSSL_LIB_CTX *libctx,
 
     if (pub == NULL || !pub_len ||
         cipher == NULL || !cipher_len || suite == NULL)
-        return (__LINE__);
+        return (-__LINE__);
     if (suite_in == NULL) {
         /* choose a random suite */
         crv = hpke_random_suite(libctx, &chosen);
@@ -2992,17 +2992,17 @@ static int hpke_good4grease(OSSL_LIB_CTX *libctx,
            hpke_aead_strtab[aead_ind], chosen.aead_id);
 #endif
     if ((crv = hpke_suite_check(chosen)) != 1)
-        return (__LINE__);
+        return (-__LINE__);
     *suite = chosen;
     /* publen */
     plen = hpke_kem_tab[kem_ind].Npk;
     if (plen > *pub_len)
-        return (__LINE__);
+        return (-__LINE__);
     if (RAND_bytes_ex(libctx, pub, plen, HPKE_RSTRENGTH) <= 0)
-        return (__LINE__);
+        return (-__LINE__);
     *pub_len = plen;
     if (RAND_bytes_ex(libctx, cipher, cipher_len, HPKE_RSTRENGTH) <= 0)
-        return (__LINE__);
+        return (-__LINE__);
 #ifdef SUPERVERBOSE
     printf("GREASEy suite:\n\tkem: %s (%d), kdf: %s (%d), aead: %s (%d)\n",
            hpke_kem_strtab[kem_ind], chosen.kem_id,
@@ -3044,16 +3044,16 @@ static int hpke_str2suite(char *suitestr, hpke_suite_t *suite)
     int labels = 0;
 
     if (suitestr == NULL || suite == NULL)
-        return (__LINE__);
+        return (-__LINE__);
     /* See if it contains a mix of our strings and numbers  */
     inplen = OPENSSL_strnlen(suitestr, HPKE_MAX_SUITESTR);
     if (inplen >= HPKE_MAX_SUITESTR)
-        return (__LINE__);
+        return (-__LINE__);
     instrcp = OPENSSL_strndup(suitestr, inplen);
     st = strtok(instrcp, ",");
     if (st == NULL) {
         OPENSSL_free(instrcp);
-        erv = __LINE__;
+        erv = -__LINE__;
         return erv;
     }
     while (st != NULL) {
@@ -3107,12 +3107,12 @@ static int hpke_str2suite(char *suitestr, hpke_suite_t *suite)
         labels++;
         if (labels > 3) {
             OPENSSL_free(instrcp);
-            return (__LINE__);
+            return (-__LINE__);
         }
     }
     OPENSSL_free(instrcp);
     if (kem == 0 || kdf == 0 || aead == 0) {
-        erv = __LINE__;
+        erv = -__LINE__;
         return erv;
     }
     suite->kem_id = kem;
