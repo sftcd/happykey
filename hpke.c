@@ -486,8 +486,7 @@ static EVP_PKEY * hpke_EVP_PKEY_new_raw_nist_public_key(OSSL_LIB_CTX *libctx,
         goto err;
     }
     if (EVP_PKEY_set1_encoded_public_key(ret, buf, buflen) != 1) {
-        if (ret)
-            EVP_PKEY_free(ret);
+        EVP_PKEY_free(ret);
         ret = NULL;
         HPKE_err;
         goto err;
@@ -497,11 +496,9 @@ err:
 #if defined(SUPERVERBOSE) || defined(TESTVECTORS)
     pblen = EVP_PKEY_get1_encoded_public_key(ret, &pbuf);
     hpke_pbuf(stdout, "EARLY public", pbuf, pblen);
-    if (pblen)
-        OPENSSL_free(pbuf);
+    OPENSSL_free(pbuf);
 #endif
-    if (cctx)
-        EVP_PKEY_CTX_free(cctx);
+    EVP_PKEY_CTX_free(cctx);
     if (erv == 1)
         return (ret);
     else
@@ -630,12 +627,9 @@ static int hpke_aead_dec(OSSL_LIB_CTX *libctx,
     memcpy(plain, plaintext, plaintextlen);
 
 err:
-    if (ctx)
-        EVP_CIPHER_CTX_free(ctx);
-    if (enc)
-        EVP_CIPHER_free(enc);
-    if (plaintext != NULL)
-        OPENSSL_free(plaintext);
+    EVP_CIPHER_CTX_free(ctx);
+    EVP_CIPHER_free(enc);
+    OPENSSL_free(plaintext);
     return erv;
 }
 
@@ -768,12 +762,9 @@ static int hpke_aead_enc(OSSL_LIB_CTX *libctx,
     memcpy(cipher, ciphertext, ciphertextlen);
 
 err:
-    if (ctx)
-        EVP_CIPHER_CTX_free(ctx);
-    if (enc)
-        EVP_CIPHER_free(enc);
-    if (ciphertext != NULL)
-        OPENSSL_free(ciphertext);
+    EVP_CIPHER_CTX_free(ctx);
+    EVP_CIPHER_free(enc);
+    OPENSSL_free(ciphertext);
     return erv;
 }
 
@@ -1005,8 +996,8 @@ static int hpke_extract(OSSL_LIB_CTX *libctx,
     *secretlen = lsecretlen;
 
 err:
-    if (kdf != NULL) { EVP_KDF_free(kdf); }
-    if (kctx != NULL) { EVP_KDF_CTX_free(kctx); }
+    EVP_KDF_free(kdf);
+    EVP_KDF_CTX_free(kctx);
     memset(labeled_ikmbuf, 0, HPKE_MAXSIZE);
     return erv;
 }
@@ -1224,10 +1215,8 @@ static int hpke_expand(OSSL_LIB_CTX *libctx,
     *outlen = loutlen;
 
 err:
-    if (kdf != NULL)
-        EVP_KDF_free(kdf);
-    if (kctx != NULL)
-        EVP_KDF_CTX_free(kctx);
+    EVP_KDF_free(kdf);
+    EVP_KDF_CTX_free(kctx);
     memset(libuf, 0, HPKE_MAXSIZE);
     return erv;
 }
@@ -1554,8 +1543,7 @@ static int hpke_do_kem(OSSL_LIB_CTX *libctx,
     *sslen = lsslen;
 
 err:
-    if (pctx != NULL)
-        EVP_PKEY_CTX_free(pctx);
+    EVP_PKEY_CTX_free(pctx);
     return erv;
 }
 
@@ -1761,10 +1749,8 @@ static int hpke_prbuf2evp(OSSL_LIB_CTX *libctx,
                 HPKE_err;
                 goto err;
             }
-            if (bfp != NULL) {
-                BIO_free_all(bfp);
-                bfp = NULL;
-            }
+            BIO_free_all(bfp);
+            bfp = NULL;
         }
     }
     if (lpriv == NULL) {
@@ -1781,14 +1767,10 @@ static int hpke_prbuf2evp(OSSL_LIB_CTX *libctx,
 #endif
 
 err:
-    if (priv)
-        BN_free(priv);
-    if (ctx)
-        EVP_PKEY_CTX_free(ctx);
-    if (param_bld)
-        OSSL_PARAM_BLD_free(param_bld);
-    if (params)
-        OSSL_PARAM_free(params);
+    BN_free(priv);
+    EVP_PKEY_CTX_free(ctx);
+    OSSL_PARAM_BLD_free(param_bld);
+    OSSL_PARAM_free(params);
     return (erv);
 }
 
@@ -2163,10 +2145,8 @@ static int hpke_enc_int(OSSL_LIB_CTX *libctx,
         HPKE_err;
         goto err;
     }
-    if (mypub != NULL) {
-        OPENSSL_free(mypub);
-        mypub = NULL;
-    }
+    OPENSSL_free(mypub);
+    mypub = NULL;
 
     /* step 3. create context buffer starting with key_schedule_context */
     memset(ks_context, 0, HPKE_MAXSIZE);
@@ -2305,24 +2285,21 @@ err:
     if (pkE) {
         pblen = EVP_PKEY_get1_encoded_public_key(pkE, &pbuf);
         hpke_pbuf(stdout, "\tpkE", pbuf, pblen);
-        if (pblen)
-            OPENSSL_free(pbuf);
+        OPENSSL_free(pbuf);
     } else {
         fprintf(stdout, "\tpkE is NULL\n");
     }
     if (pkR) {
         pblen = EVP_PKEY_get1_encoded_public_key(pkR, &pbuf);
         hpke_pbuf(stdout, "\tpkR", pbuf, pblen);
-        if (pblen)
-            OPENSSL_free(pbuf);
+        OPENSSL_free(pbuf);
     } else {
         fprintf(stdout, "\tpkR is NULL\n");
     }
     if (skI) {
         pblen = EVP_PKEY_get1_encoded_public_key(skI, &pbuf);
         hpke_pbuf(stdout, "\tskI", pbuf, pblen);
-        if (pblen)
-            OPENSSL_free(pbuf);
+        OPENSSL_free(pbuf);
     } else {
         fprintf(stdout, "\tskI is NULL\n");
     }
@@ -2342,14 +2319,14 @@ err:
         hpke_pbuf(stdout, "\tpsk", psk, psklen);
     }
 #endif
-    if (mypub != NULL) { OPENSSL_free(mypub); }
-    if (bfp != NULL) { BIO_free_all(bfp); }
-    if (pkR != NULL) { EVP_PKEY_free(pkR); }
-    if (!evpcaller && pkE != NULL) { EVP_PKEY_free(pkE); }
-    if (skI != NULL) { EVP_PKEY_free(skI); }
-    if (pctx != NULL) { EVP_PKEY_CTX_free(pctx); }
-    if (shared_secret != NULL) { OPENSSL_free(shared_secret); }
-    if (enc != NULL) { OPENSSL_free(enc); }
+    OPENSSL_free(mypub);
+    BIO_free_all(bfp);
+    EVP_PKEY_free(pkR);
+    if (!evpcaller) { EVP_PKEY_free(pkE); }
+    EVP_PKEY_free(skI);
+    EVP_PKEY_CTX_free(pctx);
+    OPENSSL_free(shared_secret);
+    OPENSSL_free(enc);
     return erv;
 }
 
@@ -2679,21 +2656,21 @@ err:
     if (pkE) {
         pblen = EVP_PKEY_get1_encoded_public_key(pkE, &pbuf);
         hpke_pbuf(stdout, "\tpkE", pbuf, pblen);
-        if (pblen) { OPENSSL_free(pbuf); }
+        OPENSSL_free(pbuf);
     } else {
         fprintf(stdout, "\tpkE is NULL\n");
     }
     if (skR) {
         pblen = EVP_PKEY_get1_encoded_public_key(skR, &pbuf);
         hpke_pbuf(stdout, "\tpkR", pbuf, pblen);
-        if (pblen) { OPENSSL_free(pbuf); }
+        OPENSSL_free(pbuf);
     } else {
         fprintf(stdout, "\tpkR is NULL\n");
     }
     if (pkI) {
         pblen = EVP_PKEY_get1_encoded_public_key(pkI, &pbuf);
         hpke_pbuf(stdout, "\tpkI", pbuf, pblen);
-        if (pblen) { OPENSSL_free(pbuf); }
+        OPENSSL_free(pbuf);
     } else {
         fprintf(stdout, "\tskI is NULL\n");
     }
@@ -2715,13 +2692,13 @@ err:
     else
         printf("clearlen is HPKE_MAXSIZE, so decryption probably failed\n");
 #endif
-    if (bfp != NULL) { BIO_free_all(bfp); }
-    if (skR != NULL && evppriv == NULL) { EVP_PKEY_free(skR); }
-    if (pkE != NULL) { EVP_PKEY_free(pkE); }
-    if (pkI != NULL) { EVP_PKEY_free(pkI); }
-    if (pctx != NULL) { EVP_PKEY_CTX_free(pctx); }
-    if (shared_secret != NULL) { OPENSSL_free(shared_secret); }
-    if (mypub != NULL) { OPENSSL_free(mypub); }
+    BIO_free_all(bfp);
+    if (evppriv == NULL) { EVP_PKEY_free(skR); }
+    EVP_PKEY_free(pkE);
+    EVP_PKEY_free(pkI);
+    EVP_PKEY_CTX_free(pctx);
+    OPENSSL_free(shared_secret);
+    OPENSSL_free(mypub);
     return erv;
 }
 
@@ -2812,19 +2789,14 @@ static int hpke_kg_evp(OSSL_LIB_CTX *libctx,
     OPENSSL_free(lpub);
     lpub = NULL;
     *priv = skR;
-    if (pctx != NULL)
-        EVP_PKEY_CTX_free(pctx);
-    if (lpub != NULL)
-        OPENSSL_free(lpub);
+    EVP_PKEY_CTX_free(pctx);
+    OPENSSL_free(lpub);
     return (erv);
 
 err:
-    if (skR != NULL)
-        EVP_PKEY_free(skR);
-    if (pctx != NULL)
-        EVP_PKEY_CTX_free(pctx);
-    if (lpub != NULL)
-        OPENSSL_free(lpub);
+    EVP_PKEY_free(skR);
+    EVP_PKEY_CTX_free(pctx);
+    OPENSSL_free(lpub);
     return (erv);
 }
 
@@ -2881,10 +2853,8 @@ static int hpke_kg(OSSL_LIB_CTX *libctx,
     memcpy(priv, lpriv, lprivlen);
 
 err:
-    if (skR != NULL)
-        EVP_PKEY_free(skR);
-    if (bfp != NULL)
-        BIO_free_all(bfp);
+    EVP_PKEY_free(skR);
+    BIO_free_all(bfp);
     return (erv);
 }
 
