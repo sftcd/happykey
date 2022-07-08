@@ -81,7 +81,7 @@
 #define HPKE_err \
     { \
         if (erv == 1) { erv = - __LINE__; } \
-        ERR_raise(ERR_LIB_SSL, ERR_R_INTERNAL_ERROR); \
+        ERR_raise(ERR_LIB_CRYPTO, ERR_R_INTERNAL_ERROR); \
     }
 /* an error macro just to make things easier */
 #ifdef HAPPYKEY
@@ -1002,8 +1002,6 @@ static int hpke_extract(OSSL_LIB_CTX *libctx,
         HPKE_err;
         goto err;
     }
-    EVP_KDF_CTX_free(kctx);
-    kctx = NULL;
     *secretlen = lsecretlen;
 
 err:
@@ -1223,8 +1221,6 @@ static int hpke_expand(OSSL_LIB_CTX *libctx,
         HPKE_err;
         goto err;
     }
-    EVP_KDF_CTX_free(kctx);
-    kctx = NULL;
     *outlen = loutlen;
 
 err:
@@ -1673,9 +1669,9 @@ static int hpke_prbuf2evp(OSSL_LIB_CTX *libctx,
             HPKE_err;
             goto err;
         }
-        if (groupname != NULL &&
-            OSSL_PARAM_BLD_push_utf8_string(param_bld, "group", groupname,
-                                            0) != 1) {
+        if (groupname != NULL
+            && OSSL_PARAM_BLD_push_utf8_string(param_bld, "group",
+                                               groupname, 0) != 1) {
             HPKE_err;
             goto err;
         }
@@ -1965,38 +1961,39 @@ static int hpke_enc_int(OSSL_LIB_CTX *libctx,
     if (extsenderpublen > 0 && extsenderpub != NULL && extsenderpriv != NULL) {
         evpcaller = 1;
     }
-    if (extsenderpublen > 0 && extsenderpub != NULL && extsenderpriv == NULL &&
-        rawsenderprivlen > 0 && rawsenderpriv != NULL) {
+    if (extsenderpublen > 0 && extsenderpub != NULL && extsenderpriv == NULL
+        && rawsenderprivlen > 0 && rawsenderpriv != NULL) {
         rawcaller = 1;
     }
-    if (evpcaller == 0 && rawcaller == 0 &&
-        (pub == NULL || clear == NULL ||
-         senderpublen == NULL || senderpub == NULL ||
-         cipherlen == NULL || cipher == NULL)) {
+    if (evpcaller == 0 && rawcaller == 0
+        && (pub == NULL || clear == NULL
+            || senderpublen == NULL || senderpub == NULL
+            || cipherlen == NULL || cipher == NULL)) {
         HPKE_err;
         goto err;
     }
-    if (evpcaller &&
-        (pub == NULL || clear == NULL ||
-         !extsenderpublen || extsenderpub == NULL ||
-         extsenderpriv == NULL || !cipherlen || cipher == NULL)) {
+    if (evpcaller
+        && (pub == NULL || clear == NULL
+            || !extsenderpublen || extsenderpub == NULL
+            || extsenderpriv == NULL || !cipherlen || cipher == NULL)) {
         HPKE_err;
         goto err;
     }
-    if (rawcaller &&
-        (pub == NULL || clear == NULL ||
-         !extsenderpublen || extsenderpub == NULL ||
-         rawsenderpriv == NULL || !cipherlen || cipher == NULL)) {
+    if (rawcaller
+        && (pub == NULL || clear == NULL
+            || !extsenderpublen || extsenderpub == NULL
+            || rawsenderpriv == NULL || !cipherlen || cipher == NULL)) {
         HPKE_err;
         goto err;
     }
-    if ((mode == HPKE_MODE_AUTH || mode == HPKE_MODE_PSKAUTH) &&
+    if ((mode == HPKE_MODE_AUTH || mode == HPKE_MODE_PSKAUTH)
+        &&
         ((authpriv == NULL || authprivlen == 0) && (authpriv_evp == NULL))) {
         HPKE_err;
         goto err;
     }
-    if ((mode == HPKE_MODE_PSK || mode == HPKE_MODE_PSKAUTH) &&
-        (psk == NULL || !psklen || pskid == NULL)) {
+    if ((mode == HPKE_MODE_PSK || mode == HPKE_MODE_PSKAUTH)
+        && (psk == NULL || !psklen || pskid == NULL)) {
         HPKE_err;
         goto err;
     }
@@ -2437,18 +2434,18 @@ static int hpke_dec_int(OSSL_LIB_CTX *libctx,
         HPKE_err;
         goto err;
     }
-    if ((priv == NULL && evppriv == NULL) ||
-        !clearlen || clear == NULL || cipher == NULL) {
+    if ((priv == NULL && evppriv == NULL)
+        || !clearlen || clear == NULL || cipher == NULL) {
         HPKE_err;
         goto err;
     }
-    if ((mode == HPKE_MODE_AUTH || mode == HPKE_MODE_PSKAUTH) &&
-        (!authpub || authpublen == 0)) {
+    if ((mode == HPKE_MODE_AUTH || mode == HPKE_MODE_PSKAUTH)
+        && (!authpub || authpublen == 0)) {
         HPKE_err;
         goto err;
     }
-    if ((mode == HPKE_MODE_PSK || mode == HPKE_MODE_PSKAUTH) &&
-        (psk == NULL || !psklen || pskid == NULL)) {
+    if ((mode == HPKE_MODE_PSK || mode == HPKE_MODE_PSKAUTH)
+        && (psk == NULL || !psklen || pskid == NULL)) {
         HPKE_err;
         goto err;
     }
@@ -2955,8 +2952,8 @@ static int hpke_good4grease(OSSL_LIB_CTX *libctx,
     uint16_t kdf_ind = 0;
 #endif
 
-    if (pub == NULL || !pub_len ||
-        cipher == NULL || !cipher_len || suite == NULL)
+    if (pub == NULL || !pub_len
+        || cipher == NULL || !cipher_len || suite == NULL)
         return (- __LINE__);
     if (suite_in == NULL) {
         /* choose a random suite */
