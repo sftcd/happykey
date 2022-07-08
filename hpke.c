@@ -24,6 +24,14 @@
 #include <openssl/param_build.h>
 #include <openssl/core_names.h>
 #ifdef HAPPYKEY
+/* if you don't have an openssl development tree you may need this */
+#ifndef OSSL_NELEM
+# define OSSL_NELEM(x)    (sizeof(x)/sizeof((x)[0]))
+#endif
+#else
+#include <internal/common.h>
+#endif
+#ifdef HAPPYKEY
 /*
  * If we're building standalone (from github.com/sftcd/happykey) then
  * include the local header.
@@ -236,11 +244,11 @@ const char *hpke_kdf_strtab[] = {
  */
 static uint16_t aead_iana2index(uint16_t codepoint)
 {
-    uint16_t naeads = sizeof(hpke_aead_tab) / sizeof(hpke_aead_info_t);
+    uint16_t naeads = OSSL_NELEM(hpke_aead_tab);
     uint16_t i = 0;
 
     /* why not be paranoid:-) */
-    if ((sizeof(hpke_aead_tab) / sizeof(hpke_aead_info_t)) > 65536) {
+    if (naeads > 65536) {
         return (0);
     }
     for (i = 0; i != naeads; i++) {
@@ -259,11 +267,11 @@ static uint16_t aead_iana2index(uint16_t codepoint)
  */
 static uint16_t kem_iana2index(uint16_t codepoint)
 {
-    uint16_t nkems = sizeof(hpke_kem_tab) / sizeof(hpke_kem_info_t);
+    uint16_t nkems = OSSL_NELEM(hpke_kem_tab);
     uint16_t i = 0;
 
     /* why not be paranoid:-) */
-    if ((sizeof(hpke_kem_tab) / sizeof(hpke_kem_info_t)) > 65536) {
+    if (nkems > 65536) {
         return (0);
     }
     for (i = 0; i != nkems; i++) {
@@ -282,11 +290,11 @@ static uint16_t kem_iana2index(uint16_t codepoint)
  */
 static uint16_t kdf_iana2index(uint16_t codepoint)
 {
-    uint16_t nkdfs = sizeof(hpke_kdf_tab) / sizeof(hpke_kdf_info_t);
+    uint16_t nkdfs = OSSL_NELEM(hpke_kdf_tab);
     uint16_t i = 0;
 
     /* why not be paranoid:-) */
-    if ((sizeof(hpke_kdf_tab) / sizeof(hpke_kdf_info_t)) > 65536) {
+    if (nkdfs > 65536) {
         return (0);
     }
     for (i = 0; i != nkdfs; i++) {
@@ -1580,7 +1588,7 @@ static int hpke_mode_check(unsigned int mode)
 static int hpke_psk_check(unsigned int mode,
                           char *pskid,
                           size_t psklen,
-                          unsigned char *psk)
+                          const unsigned char *psk)
 {
     if (mode == HPKE_MODE_BASE || mode == HPKE_MODE_AUTH)
         return (1);
@@ -1790,9 +1798,9 @@ static int hpke_suite_check(hpke_suite_t suite)
     int kdf_ok = 0;
     int aead_ok = 0;
     int ind = 0;
-    int nkems = sizeof(hpke_kem_tab) / sizeof(hpke_kem_info_t);
-    int nkdfs = sizeof(hpke_kdf_tab) / sizeof(hpke_kdf_info_t);
-    int naeads = sizeof(hpke_aead_tab) / sizeof(hpke_aead_info_t);
+    int nkems = OSSL_NELEM(hpke_kem_tab);
+    int nkdfs = OSSL_NELEM(hpke_kdf_tab);
+    int naeads = OSSL_NELEM(hpke_aead_tab);
 
     /* check KEM */
     for (ind = 0; ind != nkems; ind++) {
@@ -2786,15 +2794,10 @@ static int hpke_kg_evp(OSSL_LIB_CTX *libctx,
     }
     *publen = lpublen;
     memcpy(pub, lpub, lpublen);
-    OPENSSL_free(lpub);
-    lpub = NULL;
     *priv = skR;
-    EVP_PKEY_CTX_free(pctx);
-    OPENSSL_free(lpub);
-    return (erv);
 
 err:
-    EVP_PKEY_free(skR);
+    if (erv != 1) { EVP_PKEY_free(skR); }
     EVP_PKEY_CTX_free(pctx);
     OPENSSL_free(lpub);
     return (erv);
@@ -2871,9 +2874,9 @@ err:
 static int hpke_random_suite(OSSL_LIB_CTX *libctx, hpke_suite_t *suite)
 {
     unsigned char rval = 0;
-    int nkdfs = sizeof(hpke_kdf_tab) / sizeof(hpke_kdf_info_t) - 1;
-    int naeads = sizeof(hpke_aead_tab) / sizeof(hpke_aead_info_t) - 1;
-    int nkems = sizeof(hpke_kem_tab) / sizeof(hpke_kem_info_t) - 1;
+    int nkdfs = OSSL_NELEM(hpke_kdf_tab)-1;
+    int naeads = OSSL_NELEM(hpke_aead_tab)-1;
+    int nkems = OSSL_NELEM(hpke_kem_tab)-1;
 
     /* random kem */
     if (RAND_bytes_ex(libctx, &rval, sizeof(rval), HPKE_RSTRENGTH) <= 0)
@@ -3000,7 +3003,6 @@ err:
  */
 static int hpke_str2suite(char *suitestr, hpke_suite_t *suite)
 {
-    int erv = 0;
     uint16_t kem = 0, kdf = 0, aead = 0;
     char *st = NULL;
     char *instrcp = NULL;
@@ -3017,10 +3019,9 @@ static int hpke_str2suite(char *suitestr, hpke_suite_t *suite)
     st = strtok(instrcp, ",");
     if (st == NULL) {
         OPENSSL_free(instrcp);
-        erv = - __LINE__;
-        return erv;
+        return (- __LINE__);
     }
-    while (st != NULL) {
+    while (st != NULL && ++labels <= 3) {
         /* check if string is known or number and if so handle appropriately */
         if (kem == 0) {
             if (HPKE_MSMATCH(st, HPKE_KEMSTR_P256)) { kem = HPKE_KEM_ID_P256; }
@@ -3068,16 +3069,10 @@ static int hpke_str2suite(char *suitestr, hpke_suite_t *suite)
             if (HPKE_MSMATCH(st, "3")) { aead = 3; }
         }
         st = strtok(NULL, ",");
-        labels++;
-        if (labels > 3) {
-            OPENSSL_free(instrcp);
-            return (- __LINE__);
-        }
     }
     OPENSSL_free(instrcp);
-    if (kem == 0 || kdf == 0 || aead == 0) {
-        erv = - __LINE__;
-        return erv;
+    if ((st != NULL && labels > 3) || kem == 0 || kdf == 0 || aead == 0) {
+        return (- __LINE__);
     }
     suite->kem_id = kem;
     suite->kdf_id = kdf;

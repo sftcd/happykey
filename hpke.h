@@ -241,7 +241,7 @@ typedef struct {
  * @param libctx is the context to use (normally NULL)
  * @param mode is the HPKE mode
  * @param suite is the ciphersuite to use
- * @param pskid is the pskid string fpr a PSK mode (can be NULL)
+ * @param pskid is the pskid string for a PSK mode (can be NULL)
  * @param psklen is the psk length
  * @param psk is the psk
  * @param publen is the length of the public key
@@ -307,7 +307,7 @@ int OSSL_HPKE_enc(OSSL_LIB_CTX *libctx,
  * @param libctx is the context to use (normally NULL)
  * @param mode is the HPKE mode
  * @param suite is the ciphersuite to use
- * @param pskid is the pskid string fpr a PSK mode (can be NULL)
+ * @param pskid is the pskid string for a PSK mode (can be NULL)
  * @param psklen is the psk length
  * @param psk is the psk
  * @param publen is the length of the public key
@@ -367,7 +367,7 @@ int OSSL_HPKE_enc_evp(OSSL_LIB_CTX *libctx,
  * @param libctx is the context to use (normally NULL)
  * @param mode is the HPKE mode
  * @param suite is the ciphersuite to use
- * @param pskid is the pskid string fpr a PSK mode (can be NULL)
+ * @param pskid is the pskid string for a PSK mode (can be NULL)
  * @param psklen is the psk length
  * @param psk is the psk
  * @param publen is the length of the public (authentication) key
