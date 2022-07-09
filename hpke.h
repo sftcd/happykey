@@ -12,7 +12,7 @@
  * APIs and data structures for HPKE (RFC9180).
  *
  * There is only one significant data structure defined here
- * (hpke_suite_t) to represent the KEM, KDF and AEAD algs
+ * (ossl_hpke_suite_st) to represent the KEM, KDF and AEAD algs
  * used. Otherwise, the approach taken is to provide all the
  * API inputs using existing types (buffers, lengths and a few
  * cases of strings or EVP_PKEY pointers.
@@ -26,8 +26,8 @@
  * ``mode`` that can optionally bind a pre-shared key (PSK)
  * and/or an authenticating private value, also generared via
  * ``OSSL_HPKE_kg()``, to the encryption operation -
- * ``HPKE_MODE_BASE`` is the basic mode with neither, while
- * ``HPKE_MODE_PSKAUTH`` calls for both.
+ * ``OSSL_HPKE_MODE_BASE`` is the basic mode with neither, while
+ * ``OSSL_HPKE_MODE_PSKAUTH`` calls for both.
  *
  * An ``info`` value, known to both encryptor and decryptor
  * can be combined into the key agreement operation.  Similarly,
@@ -66,7 +66,7 @@
  * an HPKE suite is supported or not.
  *
  * ``OSSL_HPKE_str2suite()`` maps from comma-separated strings,
- * e.g. "x25519,hkdf-sha256,aes-128-gcm", to an ``hpke_suite_t``.
+ * e.g. "x25519,hkdf-sha256,aes-128-gcm", to an ``ossl_hpke_suite_st``.
  *
  * So-called GREASEing (see RFC8701) is a protocol mechanism
  * where phoney values are sent in order to make it less likely
@@ -132,70 +132,70 @@
  * @file APIs and data structures for HPKE (RFC9180).
  */
 
-#ifndef HPKE_H_INCLUDED
-# define HPKE_H_INCLUDED
+#ifndef OSSL_HPKE_H_INCLUDED
+# define OSSL_HPKE_H_INCLUDED
 
 # include <openssl/ssl.h>
 
 # ifdef HAPPYKEY
 /** default plaintext/ciphertext buffer size e.g. if processing stdin */
-#  ifndef HPKE_DEFSIZE
-#   define HPKE_DEFSIZE (40 * 1024)
+#  ifndef OSSL_HPKE_DEFSIZE
+#   define OSSL_HPKE_DEFSIZE (40 * 1024)
 #  endif
 # endif
 /** biggest/default buffer for keys and internal buffers we use */
-# ifndef HPKE_MAXSIZE
-#  define HPKE_MAXSIZE (2 * 1024) /* 2k: enough for anyone :-) */
+# ifndef OSSL_HPKE_MAXSIZE
+#  define OSSL_HPKE_MAXSIZE (2 * 1024) /* 2k: enough for anyone :-) */
 # endif
 
 /*
  * The HPKE modes
  */
-# define HPKE_MODE_BASE              0 /**< Base mode  */
-# define HPKE_MODE_PSK               1 /**< Pre-shared key mode */
-# define HPKE_MODE_AUTH              2 /**< Authenticated mode */
-# define HPKE_MODE_PSKAUTH           3 /**< PSK+authenticated mode */
+# define OSSL_HPKE_MODE_BASE              0 /**< Base mode  */
+# define OSSL_HPKE_MODE_PSK               1 /**< Pre-shared key mode */
+# define OSSL_HPKE_MODE_AUTH              2 /**< Authenticated mode */
+# define OSSL_HPKE_MODE_PSKAUTH           3 /**< PSK+authenticated mode */
 
 /*
  * The (16bit) HPKE algorithn IDs
  */
-# define HPKE_KEM_ID_RESERVED         0x0000 /**< not used */
-# define HPKE_KEM_ID_P256             0x0010 /**< NIST P-256 */
-# define HPKE_KEM_ID_P384             0x0011 /**< NIST P-256 */
-# define HPKE_KEM_ID_P521             0x0012 /**< NIST P-521 */
-# define HPKE_KEM_ID_25519            0x0020 /**< Curve25519 */
-# define HPKE_KEM_ID_448              0x0021 /**< Curve448 */
+# define OSSL_HPKE_KEM_ID_RESERVED         0x0000 /**< not used */
+# define OSSL_HPKE_KEM_ID_P256             0x0010 /**< NIST P-256 */
+# define OSSL_HPKE_KEM_ID_P384             0x0011 /**< NIST P-256 */
+# define OSSL_HPKE_KEM_ID_P521             0x0012 /**< NIST P-521 */
+# define OSSL_HPKE_KEM_ID_25519            0x0020 /**< Curve25519 */
+# define OSSL_HPKE_KEM_ID_448              0x0021 /**< Curve448 */
 
-# define HPKE_KDF_ID_RESERVED         0x0000 /**< not used */
-# define HPKE_KDF_ID_HKDF_SHA256      0x0001 /**< HKDF-SHA256 */
-# define HPKE_KDF_ID_HKDF_SHA384      0x0002 /**< HKDF-SHA512 */
-# define HPKE_KDF_ID_HKDF_SHA512      0x0003 /**< HKDF-SHA512 */
-# define HPKE_KDF_ID_MAX              0x0003 /**< HKDF-SHA512 */
+# define OSSL_HPKE_KDF_ID_RESERVED         0x0000 /**< not used */
+# define OSSL_HPKE_KDF_ID_HKDF_SHA256      0x0001 /**< HKDF-SHA256 */
+# define OSSL_HPKE_KDF_ID_HKDF_SHA384      0x0002 /**< HKDF-SHA512 */
+# define OSSL_HPKE_KDF_ID_HKDF_SHA512      0x0003 /**< HKDF-SHA512 */
+# define OSSL_HPKE_KDF_ID_MAX              0x0003 /**< HKDF-SHA512 */
 
-# define HPKE_AEAD_ID_RESERVED        0x0000 /**< not used */
-# define HPKE_AEAD_ID_AES_GCM_128     0x0001 /**< AES-GCM-128 */
-# define HPKE_AEAD_ID_AES_GCM_256     0x0002 /**< AES-GCM-256 */
-# define HPKE_AEAD_ID_CHACHA_POLY1305 0x0003 /**< Chacha20-Poly1305 */
-# define HPKE_AEAD_ID_MAX             0x0003 /**< Chacha20-Poly1305 */
+# define OSSL_HPKE_AEAD_ID_RESERVED        0x0000 /**< not used */
+# define OSSL_HPKE_AEAD_ID_AES_GCM_128     0x0001 /**< AES-GCM-128 */
+# define OSSL_HPKE_AEAD_ID_AES_GCM_256     0x0002 /**< AES-GCM-256 */
+# define OSSL_HPKE_AEAD_ID_CHACHA_POLY1305 0x0003 /**< Chacha20-Poly1305 */
+# define OSSL_HPKE_AEAD_ID_MAX             0x0003 /**< Chacha20-Poly1305 */
 
 /* strings for modes */
-# define HPKE_MODESTR_BASE       "base"    /**< base mode (1), no sender auth */
-# define HPKE_MODESTR_PSK        "psk"     /**< psk mode (2) */
-# define HPKE_MODESTR_AUTH       "auth"    /**< auth (3) with sender-key pair */
-# define HPKE_MODESTR_PSKAUTH    "pskauth" /**< psk+sender-key pair (4) */
+# define OSSL_HPKE_MODESTR_BASE       "base"    /**< base mode (1) */
+# define OSSL_HPKE_MODESTR_PSK        "psk"     /**< psk mode (2) */
+# define OSSL_HPKE_MODESTR_AUTH       "auth"    /**< sender-key pair auth (3) */
+# define OSSL_HPKE_MODESTR_PSKAUTH    "pskauth" /**< psk+sender-key pair (4) */
 
 /* strings for suite components - ideally these'd be defined elsewhere */
-# define HPKE_KEMSTR_P256        "P-256"                /**< KEM id 0x10 */
-# define HPKE_KEMSTR_P384        "P-384"                /**< KEM id 0x11 */
-# define HPKE_KEMSTR_P521        "P-521"                /**< KEM id 0x12 */
-# define HPKE_KEMSTR_X25519      SN_X25519              /**< KEM id 0x20 */
-# define HPKE_KEMSTR_X448        SN_X448                /**< KEM id 0x21 */
-# define HPKE_KDFSTR_256         "hkdf-sha256"          /**< KDF id 1 */
-# define HPKE_KDFSTR_384         "hkdf-sha384"          /**< KDF id 2 */
-# define HPKE_KDFSTR_512         "hkdf-sha512"          /**< KDF id 3 */
-# define HPKE_AEADSTR_AES128GCM  LN_aes_128_gcm         /**< AEAD id 1 */
-# define HPKE_AEADSTR_AES256GCM  LN_aes_256_gcm         /**< AEAD id 2 */
-# define HPKE_AEADSTR_CP         LN_chacha20_poly1305   /**< AEAD id 3 */
+# define OSSL_HPKE_KEMSTR_P256        "P-256"                /**< KEM id 0x10 */
+# define OSSL_HPKE_KEMSTR_P384        "P-384"                /**< KEM id 0x11 */
+# define OSSL_HPKE_KEMSTR_P521        "P-521"                /**< KEM id 0x12 */
+# define OSSL_HPKE_KEMSTR_X25519      SN_X25519              /**< KEM id 0x20 */
+# define OSSL_HPKE_KEMSTR_X448        SN_X448                /**< KEM id 0x21 */
+# define OSSL_HPKE_KDFSTR_256         "hkdf-sha256"          /**< KDF id 1 */
+# define OSSL_HPKE_KDFSTR_384         "hkdf-sha384"          /**< KDF id 2 */
+# define OSSL_HPKE_KDFSTR_512         "hkdf-sha512"          /**< KDF id 3 */
+# define OSSL_HPKE_AEADSTR_AES128GCM  LN_aes_128_gcm         /**< AEAD id 1 */
+# define OSSL_HPKE_AEADSTR_AES256GCM  LN_aes_256_gcm         /**< AEAD id 2 */
+# define OSSL_HPKE_AEADSTR_CP         LN_chacha20_poly1305   /**< AEAD id 3 */
 
 /**
  * @brief ciphersuite combination
@@ -204,27 +204,27 @@ typedef struct {
     uint16_t    kem_id; /**< Key Encryption Method id */
     uint16_t    kdf_id; /**< Key Derivation Function id */
     uint16_t    aead_id; /**< AEAD alg id */
-} hpke_suite_t;
+} ossl_hpke_suite_st;
 
 /**
  * Suite constants, use this like:
- *          hpke_suite_t myvar = HPKE_SUITE_DEFAULT;
+ *          ossl_hpke_suite_st myvar = OSSL_HPKE_SUITE_DEFAULT;
  */
-# define HPKE_SUITE_DEFAULT \
+# define OSSL_HPKE_SUITE_DEFAULT \
     {\
-        HPKE_KEM_ID_25519, \
-        HPKE_KDF_ID_HKDF_SHA256, \
-        HPKE_AEAD_ID_AES_GCM_128 \
+        OSSL_HPKE_KEM_ID_25519, \
+        OSSL_HPKE_KDF_ID_HKDF_SHA256, \
+        OSSL_HPKE_AEAD_ID_AES_GCM_128 \
     }
 
 /**
  * If you like your crypto turned up...
  */
-# define HPKE_SUITE_TURNITUPTO11 \
+# define OSSL_HPKE_SUITE_TURNITUPTO11 \
     { \
-        HPKE_KEM_ID_448, \
-        HPKE_KDF_ID_HKDF_SHA512, \
-        HPKE_AEAD_ID_CHACHA_POLY1305 \
+        OSSL_HPKE_KEM_ID_448, \
+        OSSL_HPKE_KDF_ID_HKDF_SHA512, \
+        OSSL_HPKE_AEAD_ID_CHACHA_POLY1305 \
     }
 
 /**
@@ -265,7 +265,7 @@ typedef struct {
  */
 # ifdef TESTVECTORS
 int OSSL_HPKE_enc(OSSL_LIB_CTX *libctx,
-                  unsigned int mode, hpke_suite_t suite,
+                  unsigned int mode, ossl_hpke_suite_st suite,
                   char *pskid, size_t psklen, unsigned char *psk,
                   size_t publen, unsigned char *pub,
                   size_t authprivlen, unsigned char *authpriv,
@@ -279,7 +279,7 @@ int OSSL_HPKE_enc(OSSL_LIB_CTX *libctx,
                   void *tv);
 # else
 int OSSL_HPKE_enc(OSSL_LIB_CTX *libctx,
-                  unsigned int mode, hpke_suite_t suite,
+                  unsigned int mode, ossl_hpke_suite_st suite,
                   char *pskid, size_t psklen, unsigned char *psk,
                   size_t publen, unsigned char *pub,
                   size_t authprivlen, unsigned char *authpriv,
@@ -332,7 +332,7 @@ int OSSL_HPKE_enc(OSSL_LIB_CTX *libctx,
  */
 # ifdef TESTVECTORS
 int OSSL_HPKE_enc_evp(OSSL_LIB_CTX *libctx,
-                      unsigned int mode, hpke_suite_t suite,
+                      unsigned int mode, ossl_hpke_suite_st suite,
                       char *pskid, size_t psklen, unsigned char *psk,
                       size_t publen, unsigned char *pub,
                       size_t authprivlen, unsigned char *authpriv,
@@ -347,7 +347,7 @@ int OSSL_HPKE_enc_evp(OSSL_LIB_CTX *libctx,
                       void *tv);
 # else
 int OSSL_HPKE_enc_evp(OSSL_LIB_CTX *libctx,
-                      unsigned int mode, hpke_suite_t suite,
+                      unsigned int mode, ossl_hpke_suite_st suite,
                       char *pskid, size_t psklen, unsigned char *psk,
                       size_t publen, unsigned char *pub,
                       size_t authprivlen, unsigned char *authpriv,
@@ -390,7 +390,7 @@ int OSSL_HPKE_enc_evp(OSSL_LIB_CTX *libctx,
  * @return 1 for success, other for error (error returns can be non-zero)
  */
 int OSSL_HPKE_dec(OSSL_LIB_CTX *libctx,
-                  unsigned int mode, hpke_suite_t suite,
+                  unsigned int mode, ossl_hpke_suite_st suite,
                   char *pskid, size_t psklen, unsigned char *psk,
                   size_t publen, unsigned char *pub,
                   size_t privlen, unsigned char *priv,
@@ -420,11 +420,12 @@ int OSSL_HPKE_dec(OSSL_LIB_CTX *libctx,
  * @param privlen is the size of the private key buffer (exact length on output)
  * @param priv is the private key
  * @return 1 for success, other for error (error returns can be non-zero)
+ *
+ * TODO: need to add this for RFC9180 deterministic key gen
+ * size_t ikmlen, unsigned char *ikm,
  */
 int OSSL_HPKE_kg(OSSL_LIB_CTX *libctx,
-                 unsigned int mode, hpke_suite_t suite,
-                 // need to add this
-                 // size_t ikmlen, unsigned char *ikm,
+                 unsigned int mode, ossl_hpke_suite_st suite,
                  size_t *publen, unsigned char *pub,
                  size_t *privlen, unsigned char *priv);
 
@@ -448,7 +449,7 @@ int OSSL_HPKE_kg(OSSL_LIB_CTX *libctx,
  * @return 1 for success, other for error (error returns can be non-zero)
  */
 int OSSL_HPKE_kg_evp(OSSL_LIB_CTX *libctx,
-                     unsigned int mode, hpke_suite_t suite,
+                     unsigned int mode, ossl_hpke_suite_st suite,
                      size_t *publen, unsigned char *pub,
                      EVP_PKEY **priv);
 
@@ -458,7 +459,7 @@ int OSSL_HPKE_kg_evp(OSSL_LIB_CTX *libctx,
  * @param suite is the suite to check
  * @return 1 for success, other for error (error returns can be non-zero)
  */
-int OSSL_HPKE_suite_check(hpke_suite_t suite);
+int OSSL_HPKE_suite_check(ossl_hpke_suite_st suite);
 
 /**
  * @brief: map a kem_id and a private key buffer into an EVP_PKEY
@@ -498,8 +499,8 @@ int OSSL_HPKE_prbuf2evp(OSSL_LIB_CTX *libctx,
  * @return 1 for success, otherwise failure
  */
 int OSSL_HPKE_good4grease(OSSL_LIB_CTX *libctx,
-                          hpke_suite_t *suite_in,
-                          hpke_suite_t *suite,
+                          ossl_hpke_suite_st *suite_in,
+                          ossl_hpke_suite_st *suite,
                           unsigned char *pub,
                           size_t *pub_len,
                           unsigned char *cipher,
@@ -510,7 +511,7 @@ int OSSL_HPKE_good4grease(OSSL_LIB_CTX *libctx,
  *
  * An example good string is "x25519,hkdf-sha256,aes-128-gcm"
  * Symbols are #define'd for the relevant labels, e.g.
- * HPKE_KEMSTR_X25519. Numeric (decimal or hex) values with
+ * OSSL_HPKE_KEMSTR_X25519. Numeric (decimal or hex) values with
  * the relevant IANA codepoint valus may also be used,
  * e.g., "0x20,1,1" represents the same suite as the first
  * example.
@@ -520,7 +521,7 @@ int OSSL_HPKE_good4grease(OSSL_LIB_CTX *libctx,
  * @return 1 for success, otherwise failure
  */
 int OSSL_HPKE_str2suite(char *str,
-                        hpke_suite_t *suite);
+                        ossl_hpke_suite_st *suite);
 
 /**
  * @brief tell the caller how big the cipertext will be
@@ -530,7 +531,7 @@ int OSSL_HPKE_str2suite(char *str,
  * @param cipherlen points to what'll be ciphertext length
  * @return 1 for success, otherwise failure
  */
-int OSSL_HPKE_expansion(hpke_suite_t suite,
+int OSSL_HPKE_expansion(ossl_hpke_suite_st suite,
                         size_t clearlen,
                         size_t *cipherlen);
 

@@ -55,8 +55,8 @@ static int neod_pbuf(char *msg,unsigned char *buf,size_t blen)
         printf("buf is NULL, so probably something wrong\n");
         return 1;
     }
-    if (blen==HPKE_MAXSIZE) {
-        printf("length is HPKE_MAXSIZE, so probably unused\n");
+    if (blen==OSSL_HPKE_MAXSIZE) {
+        printf("length is OSSL_HPKE_MAXSIZE, so probably unused\n");
         return 1;
     } 
     if (blen==0) {
@@ -77,12 +77,12 @@ int main(int argc, char **argv)
     /*
      * Generate a key pair
      */
-    int hpke_mode=HPKE_MODE_BASE;
-    hpke_suite_t hpke_suite = HPKE_SUITE_DEFAULT;
-    hpke_suite.kem_id=HPKE_KEM_ID_P384;
-    size_t publen=HPKE_MAXSIZE; unsigned char pub[HPKE_MAXSIZE];
+    int hpke_mode=OSSL_HPKE_MODE_BASE;
+    ossl_hpke_suite_st hpke_suite = OSSL_HPKE_SUITE_DEFAULT;
+    hpke_suite.kem_id=OSSL_HPKE_KEM_ID_P384;
+    size_t publen=OSSL_HPKE_MAXSIZE; unsigned char pub[OSSL_HPKE_MAXSIZE];
     memset(pub,MEMCHAR,publen);
-    size_t privlen=HPKE_MAXSIZE; unsigned char priv[HPKE_MAXSIZE];
+    size_t privlen=OSSL_HPKE_MAXSIZE; unsigned char priv[OSSL_HPKE_MAXSIZE];
     memset(priv,MEMCHAR,privlen);
 
     EVP_PKEY *privevp=NULL;
@@ -97,7 +97,7 @@ int main(int argc, char **argv)
     neod_pbuf("receiver pub",pub,publen);
 
     EVP_PKEY *senderpriv=NULL;
-    size_t senderpublen=HPKE_MAXSIZE; unsigned char senderpub[HPKE_MAXSIZE];
+    size_t senderpublen=OSSL_HPKE_MAXSIZE; unsigned char senderpub[OSSL_HPKE_MAXSIZE];
     rv=OSSL_HPKE_kg_evp(
         NULL, hpke_mode, hpke_suite,
         &senderpublen, senderpub,
@@ -111,11 +111,11 @@ int main(int argc, char **argv)
     /*
      * Setup AAD/Info buffers etc.
      */
-    size_t aadlen=HPKE_MAXSIZE; unsigned char aad[HPKE_MAXSIZE];
-    size_t infolen=HPKE_MAXSIZE; unsigned char info[HPKE_MAXSIZE];
-    size_t cipherlen=HPKE_MAXSIZE; unsigned char cipher[HPKE_MAXSIZE];
+    size_t aadlen=OSSL_HPKE_MAXSIZE; unsigned char aad[OSSL_HPKE_MAXSIZE];
+    size_t infolen=OSSL_HPKE_MAXSIZE; unsigned char info[OSSL_HPKE_MAXSIZE];
+    size_t cipherlen=OSSL_HPKE_MAXSIZE; unsigned char cipher[OSSL_HPKE_MAXSIZE];
     size_t psklen=0; unsigned char *psk=NULL; char *pskid=NULL;
-    size_t clearlen=HPKE_MAXSIZE; unsigned char clear[HPKE_MAXSIZE];
+    size_t clearlen=OSSL_HPKE_MAXSIZE; unsigned char clear[OSSL_HPKE_MAXSIZE];
 
     /*
      * Initial values

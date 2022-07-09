@@ -24,18 +24,18 @@ int main()
     int testresult = 0;
     /* we'll do a round-trip, generating a key, encrypting and decrypting
      * and also an encrypt to a known test vector */
-    int hpke_mode=HPKE_MODE_BASE;
-    hpke_suite_t hpke_suite = HPKE_SUITE_DEFAULT;
+    int hpke_mode=OSSL_HPKE_MODE_BASE;
+    ossl_hpke_suite_st hpke_suite = OSSL_HPKE_SUITE_DEFAULT;
     /* we'll alloc all these on the stack for simplicity */
-    size_t publen=HPKE_MAXSIZE; unsigned char pub[HPKE_MAXSIZE];
-    size_t privlen=HPKE_MAXSIZE; unsigned char priv[HPKE_MAXSIZE];
-    size_t senderpublen=HPKE_MAXSIZE; unsigned char senderpub[HPKE_MAXSIZE];
-    size_t plainlen=HPKE_MAXSIZE; unsigned char plain[HPKE_MAXSIZE];
-    size_t cipherlen=HPKE_MAXSIZE; unsigned char cipher[HPKE_MAXSIZE];
-    size_t clearlen=HPKE_MAXSIZE; unsigned char clear[HPKE_MAXSIZE];
+    size_t publen=OSSL_HPKE_MAXSIZE; unsigned char pub[OSSL_HPKE_MAXSIZE];
+    size_t privlen=OSSL_HPKE_MAXSIZE; unsigned char priv[OSSL_HPKE_MAXSIZE];
+    size_t senderpublen=OSSL_HPKE_MAXSIZE; unsigned char senderpub[OSSL_HPKE_MAXSIZE];
+    size_t plainlen=OSSL_HPKE_MAXSIZE; unsigned char plain[OSSL_HPKE_MAXSIZE];
+    size_t cipherlen=OSSL_HPKE_MAXSIZE; unsigned char cipher[OSSL_HPKE_MAXSIZE];
+    size_t clearlen=OSSL_HPKE_MAXSIZE; unsigned char clear[OSSL_HPKE_MAXSIZE];
     if (OSSL_HPKE_kg(NULL,hpke_mode, hpke_suite,&publen, pub,&privlen, priv)!=1)
         goto err;
-    memset(plain,0,HPKE_MAXSIZE);
+    memset(plain,0,OSSL_HPKE_MAXSIZE);
     strcpy((char*)plain,"a message not in a bottle");
     plainlen=strlen((char*)plain);
     if (OSSL_HPKE_enc(NULL,hpke_mode, hpke_suite,

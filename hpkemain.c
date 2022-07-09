@@ -62,7 +62,7 @@ static void usage(char *prog,char *errmsg)
     fprintf(stderr,"\t-P public key file name or base64 or ascii-hex encoded value\n");
     fprintf(stderr,"\t-p private key file name or base64 or ascii-hex encoded value\n");
     fprintf(stderr,"\t-m mode (a number or one of: %s,%s,%s or %s)\n",
-            HPKE_MODESTR_BASE,HPKE_MODESTR_PSK,HPKE_MODESTR_AUTH,HPKE_MODESTR_PSKAUTH);
+            OSSL_HPKE_MODESTR_BASE,OSSL_HPKE_MODESTR_PSK,OSSL_HPKE_MODESTR_AUTH,OSSL_HPKE_MODESTR_PSKAUTH);
     fprintf(stderr,"\t-n PSK id string\n");
     fprintf(stderr,"\t-o output file name (output to stdout if not specified) \n");
     fprintf(stderr,"\t-s psk file name or base64 or ascii-hex encoded value\n");
@@ -77,17 +77,17 @@ static void usage(char *prog,char *errmsg)
     fprintf(stderr,"- If a PSK mode is used, both pskid \"-n\" and psk \"-s\" MUST\n");
     fprintf(stderr,"  be supplied\n");
     fprintf(stderr,"- For %s or %s modes, provide both public and private keys\n",
-            HPKE_MODESTR_AUTH,HPKE_MODESTR_PSKAUTH);
+            OSSL_HPKE_MODESTR_AUTH,OSSL_HPKE_MODESTR_PSKAUTH);
     fprintf(stderr,"- Ciphersuites are specified using a comma-separated list of numbers\n");
     fprintf(stderr,"  e.g. \"-c 0x20,1,3\" or a comma-separated list of strings from:\n");
     fprintf(stderr,"      KEMs: %s, %s, %s, %s or %s\n",
-            HPKE_KEMSTR_P256, HPKE_KEMSTR_P384, HPKE_KEMSTR_P521, HPKE_KEMSTR_X25519, HPKE_KEMSTR_X448);
+            OSSL_HPKE_KEMSTR_P256, OSSL_HPKE_KEMSTR_P384, OSSL_HPKE_KEMSTR_P521, OSSL_HPKE_KEMSTR_X25519, OSSL_HPKE_KEMSTR_X448);
     fprintf(stderr,"      KDFs: %s, %s or %s\n",
-            HPKE_KDFSTR_256, HPKE_KDFSTR_384, HPKE_KDFSTR_512);
+            OSSL_HPKE_KDFSTR_256, OSSL_HPKE_KDFSTR_384, OSSL_HPKE_KDFSTR_512);
     fprintf(stderr,"      AEADs: %s, %s or %s\n",
-            HPKE_AEADSTR_AES128GCM, HPKE_AEADSTR_AES256GCM, HPKE_AEADSTR_CP);
+            OSSL_HPKE_AEADSTR_AES128GCM, OSSL_HPKE_AEADSTR_AES256GCM, OSSL_HPKE_AEADSTR_CP);
     fprintf(stderr,"  For example \"-c %s,%s,%s\" (the default)\n",
-            HPKE_KEMSTR_X25519, HPKE_KDFSTR_256, HPKE_AEADSTR_AES128GCM);
+            OSSL_HPKE_KEMSTR_X25519, OSSL_HPKE_KDFSTR_256, OSSL_HPKE_AEADSTR_AES128GCM);
     if (errmsg==NULL) {
         exit(0);
     } else {
@@ -98,7 +98,7 @@ static void usage(char *prog,char *errmsg)
 /*!
  * @brief  Map ascii to binary - utility macro used in >1 place
  */
-#define HPKE_A2B(__c__) ( __c__ >= '0' && __c__ <= '9' ? (__c__ -'0' ) :\
+#define OSSL_HPKE_A2B(__c__) ( __c__ >= '0' && __c__ <= '9' ? (__c__ -'0' ) :\
                         ( __c__ >= 'A' && __c__ <= 'F' ? (__c__ -'A' + 10) :\
                         ( __c__ >= 'a' && __c__ <= 'f' ? (__c__ -'a' + 10) : 0)))
 
@@ -132,10 +132,10 @@ static int ah_decode(
     }
     for (i = ahlen - 1; i > nibble ; i -= 2) {
         int j = i / 2;
-        lbuf[j] = HPKE_A2B(ah[i-1]) * 16 + HPKE_A2B(ah[i]);
+        lbuf[j] = OSSL_HPKE_A2B(ah[i-1]) * 16 + OSSL_HPKE_A2B(ah[i]);
     }
     if (nibble) {
-        lbuf[0] = HPKE_A2B(ah[0]);
+        lbuf[0] = OSSL_HPKE_A2B(ah[0]);
     }
     *blen = lblen;
     *buf = lbuf;
@@ -184,9 +184,9 @@ static int map_input(const char *inp, size_t *outlen, unsigned char **outbuf, in
 {
     if (!outlen || !outbuf) return(__LINE__);
     /* on-stack buffer/length to handle various cases */
-    size_t toutlen=HPKE_DEFSIZE;
-    unsigned char tbuf[HPKE_DEFSIZE];
-    memset(tbuf,0,HPKE_DEFSIZE); /* need this so valgrind doesn't complain about b64 strspn below with short values */
+    size_t toutlen=OSSL_HPKE_DEFSIZE;
+    unsigned char tbuf[OSSL_HPKE_DEFSIZE];
+    memset(tbuf,0,OSSL_HPKE_DEFSIZE); /* need this so valgrind doesn't complain about b64 strspn below with short values */
     /* asci hex is easy:-) either case allowed*/
     const char *AH_alphabet="0123456789ABCDEFabcdef\n";
     /* and base64 isn't much harder */
@@ -194,12 +194,12 @@ static int map_input(const char *inp, size_t *outlen, unsigned char **outbuf, in
 
     /* if no input, try stdin */
     if (!inp) {
-        toutlen=fread(tbuf,1,HPKE_DEFSIZE,stdin);
+        toutlen=fread(tbuf,1,OSSL_HPKE_DEFSIZE,stdin);
         if (verbose) fprintf(stderr,"got %lu bytes from stdin\n",(unsigned long)toutlen);
         if (!feof(stdin)) return(__LINE__);
     } else {
         toutlen=strlen(inp);
-        if (toutlen>HPKE_MAXSIZE) return(__LINE__);
+        if (toutlen>OSSL_HPKE_MAXSIZE) return(__LINE__);
         FILE *fp=fopen(inp,"r"); /* check if inp is file name */
         if (fp) {
             /* that worked - so read file up to max into buffer */
@@ -221,7 +221,7 @@ static int map_input(const char *inp, size_t *outlen, unsigned char **outbuf, in
             memcpy(tbuf,inp,toutlen);
         }
     }
-    if (toutlen>HPKE_DEFSIZE) return(__LINE__);
+    if (toutlen>OSSL_HPKE_DEFSIZE) return(__LINE__);
 
     /* ascii-hex or b64 decode as needed */
     /* try from most constrained to least in that order */
@@ -266,14 +266,14 @@ static int map_input(const char *inp, size_t *outlen, unsigned char **outbuf, in
 /*
  * Our PEM-like labels
  */
-#define HPKE_START_SP "-----BEGIN SENDERPUB-----"
-#define HPKE_END_SP "-----END SENDERPUB-----"
-#define HPKE_START_CP "-----BEGIN CIPHERTEXT-----"
-#define HPKE_END_CP "-----END CIPHERTEXT-----"
-#define HPKE_START_PUB "-----BEGIN PUBLIC KEY-----"
-#define HPKE_END_PUB "-----END PUBLIC KEY-----"
-#define HPKE_START_PRIV "-----BEGIN PRIVATE KEY-----"
-#define HPKE_END_PRIV "-----END PRIVATE KEY-----"
+#define OSSL_HPKE_START_SP "-----BEGIN SENDERPUB-----"
+#define OSSL_HPKE_END_SP "-----END SENDERPUB-----"
+#define OSSL_HPKE_START_CP "-----BEGIN CIPHERTEXT-----"
+#define OSSL_HPKE_END_CP "-----END CIPHERTEXT-----"
+#define OSSL_HPKE_START_PUB "-----BEGIN PUBLIC KEY-----"
+#define OSSL_HPKE_END_PUB "-----END PUBLIC KEY-----"
+#define OSSL_HPKE_START_PRIV "-----BEGIN PRIVATE KEY-----"
+#define OSSL_HPKE_END_PRIV "-----END PRIVATE KEY-----"
 
 
 /*!
@@ -323,16 +323,16 @@ static int hpkemain_write_keys(
             return(__LINE__);
         }
 
-        char b64pub[HPKE_MAXSIZE];
-        size_t b64publen=HPKE_MAXSIZE;
-        if (publen>HPKE_MAXSIZE) {
+        char b64pub[OSSL_HPKE_MAXSIZE];
+        size_t b64publen=OSSL_HPKE_MAXSIZE;
+        if (publen>OSSL_HPKE_MAXSIZE) {
             fprintf(stderr,"Error key too big %lu bytes\n",(unsigned long)publen);
             return(__LINE__);
         }
-        fprintf(fp,"%s\n",HPKE_START_PUB);
+        fprintf(fp,"%s\n",OSSL_HPKE_START_PUB);
         b64publen=EVP_EncodeBlock(b64pub, pub, publen);
         frv=fwrite(b64pub,1,b64publen,fp);
-        fprintf(fp,"\n%s\n",HPKE_END_PUB);
+        fprintf(fp,"\n%s\n",OSSL_HPKE_END_PUB);
         fclose(fp);
         if (frv!=b64publen) {
             return(__LINE__);
@@ -373,13 +373,13 @@ static int hpkemain_write_ct(const char *fname,
         fprintf(stderr,"Error allocating %lu bytes\n",(unsigned long)eblen);
         return(__LINE__);
     }
-    if (splen>HPKE_MAXSIZE) {
+    if (splen>OSSL_HPKE_MAXSIZE) {
         fprintf(stderr,"Error key too big %lu bytes\n",(unsigned long)splen);
         OPENSSL_free(eb);
         return(__LINE__);
     }
     eblen=EVP_EncodeBlock(eb, sp, splen);
-    fprintf(fout,"%s\n",HPKE_START_SP);
+    fprintf(fout,"%s\n",OSSL_HPKE_START_SP);
     size_t rrv=fwrite(eb,1,eblen,fout);
     if (rrv!=eblen) {
         fprintf(stderr,"Error writing %lu bytes of output to %s (only %lu written)\n",
@@ -387,8 +387,8 @@ static int hpkemain_write_ct(const char *fname,
         OPENSSL_free(eb);
         return(__LINE__);
     }
-    fprintf(fout,"\n%s\n",HPKE_END_SP);
-    fprintf(fout,"%s\n",HPKE_START_CP);
+    fprintf(fout,"\n%s\n",OSSL_HPKE_END_SP);
+    fprintf(fout,"%s\n",OSSL_HPKE_START_CP);
     eblen=EVP_EncodeBlock(eb, ct, ctlen);
     rrv=fwrite(eb,1,eblen,fout);
     if (rrv!=eblen) {
@@ -397,7 +397,7 @@ static int hpkemain_write_ct(const char *fname,
         OPENSSL_free(eb);
         return(__LINE__);
     }
-    fprintf(fout,"\n%s\n",HPKE_END_CP);
+    fprintf(fout,"\n%s\n",OSSL_HPKE_END_CP);
     fclose(fout);
     OPENSSL_free(eb);
     return(1);
@@ -440,8 +440,8 @@ static int hpkemain_read_ct(const char *fname,
     if (!fname || fname[0]=='\0') {
         fin=stdin;
         pfname="STDIN";
-        fsize=HPKE_DEFSIZE;
-        fbuf=OPENSSL_malloc(HPKE_DEFSIZE);
+        fsize=OSSL_HPKE_DEFSIZE;
+        fbuf=OPENSSL_malloc(OSSL_HPKE_DEFSIZE);
         if (!fbuf) return(__LINE__);
     } else {
         int frv;
@@ -478,14 +478,14 @@ static int hpkemain_read_ct(const char *fname,
         }
 
     char *sps=NULL;
-    FINDLAB(fbuf,HPKE_START_SP,sps);
+    FINDLAB(fbuf,OSSL_HPKE_START_SP,sps);
     char *spe=NULL;
-    FINDLAB(sps,HPKE_END_SP,spe);
+    FINDLAB(sps,OSSL_HPKE_END_SP,spe);
     spe--; /* there's a LF before */
     char *cts=NULL;
-    FINDLAB(spe,HPKE_START_CP,cts);
+    FINDLAB(spe,OSSL_HPKE_START_CP,cts);
     char *cte=NULL;
-    FINDLAB(cts,HPKE_END_CP,cte);
+    FINDLAB(cts,OSSL_HPKE_END_CP,cte);
     cte--; /* there's a LF before */
 
     /* next we gotta chew whitespace... boring, isn't it? ;-( */
@@ -497,7 +497,7 @@ static int hpkemain_read_ct(const char *fname,
     memset(b64buf,0,fsize);
 
     char *bp=b64buf;
-    char *bstart=sps+strlen(HPKE_START_SP)+1;
+    char *bstart=sps+strlen(OSSL_HPKE_START_SP)+1;
 
     for (char *cp=bstart;cp<spe;cp++) {
         if (!isspace(*cp)) *bp++=*cp;
@@ -515,7 +515,7 @@ static int hpkemain_read_ct(const char *fname,
     *splen=lsplen-paddingoctets;
 
     bp=b64buf;
-    bstart=cts+strlen(HPKE_START_CP)+1;
+    bstart=cts+strlen(OSSL_HPKE_START_CP)+1;
     for (char *cp=bstart;cp<cte;cp++) {
         if (!isspace(*cp)) *bp++=*cp;
     }
@@ -573,8 +573,8 @@ int main(int argc, char **argv)
     /*
      * Mode and ciphersuites - we're not parameterising this yet
      */
-    int hpke_mode=HPKE_MODE_BASE;
-    hpke_suite_t hpke_suite = HPKE_SUITE_DEFAULT;
+    int hpke_mode=OSSL_HPKE_MODE_BASE;
+    ossl_hpke_suite_st hpke_suite = OSSL_HPKE_SUITE_DEFAULT;
 
     int opt;
 
@@ -620,10 +620,10 @@ int main(int argc, char **argv)
 
     /* if we're just greasing get that out of the way and exit */
     if (doing_grease==1) {
-        hpke_suite_t g_suite;
-        unsigned char g_pub[HPKE_MAXSIZE];
-        size_t g_pub_len=HPKE_MAXSIZE;
-        unsigned char g_cipher[HPKE_MAXSIZE];
+        ossl_hpke_suite_st g_suite;
+        unsigned char g_pub[OSSL_HPKE_MAXSIZE];
+        size_t g_pub_len=OSSL_HPKE_MAXSIZE;
+        unsigned char g_cipher[OSSL_HPKE_MAXSIZE];
         size_t g_cipher_len=266;
 
         if (OSSL_HPKE_good4grease(NULL,NULL,&g_suite,g_pub,&g_pub_len,g_cipher,g_cipher_len)!=1) {
@@ -636,24 +636,24 @@ int main(int argc, char **argv)
 
     /* check command line args */
     if (modestr!=NULL) {
-        if (strlen(modestr)==strlen(HPKE_MODESTR_BASE) && 
-                !strncmp(modestr,HPKE_MODESTR_BASE,strlen(HPKE_MODESTR_BASE))) {
-            hpke_mode=HPKE_MODE_BASE;
-        } else if (strlen(modestr)==strlen(HPKE_MODESTR_PSK) && 
-                !strncmp(modestr,HPKE_MODESTR_PSK,strlen(HPKE_MODESTR_PSK))) {
-            hpke_mode=HPKE_MODE_PSK;
-        } else if (strlen(modestr)==strlen(HPKE_MODESTR_AUTH) && 
-                !strncmp(modestr,HPKE_MODESTR_AUTH,strlen(HPKE_MODESTR_AUTH))) {
-            hpke_mode=HPKE_MODE_AUTH;
-        } else if (strlen(modestr)==strlen(HPKE_MODESTR_PSKAUTH) && 
-                !strncmp(modestr,HPKE_MODESTR_PSKAUTH,strlen(HPKE_MODESTR_PSKAUTH))) {
-            hpke_mode=HPKE_MODE_PSKAUTH;
+        if (strlen(modestr)==strlen(OSSL_HPKE_MODESTR_BASE) && 
+                !strncmp(modestr,OSSL_HPKE_MODESTR_BASE,strlen(OSSL_HPKE_MODESTR_BASE))) {
+            hpke_mode=OSSL_HPKE_MODE_BASE;
+        } else if (strlen(modestr)==strlen(OSSL_HPKE_MODESTR_PSK) && 
+                !strncmp(modestr,OSSL_HPKE_MODESTR_PSK,strlen(OSSL_HPKE_MODESTR_PSK))) {
+            hpke_mode=OSSL_HPKE_MODE_PSK;
+        } else if (strlen(modestr)==strlen(OSSL_HPKE_MODESTR_AUTH) && 
+                !strncmp(modestr,OSSL_HPKE_MODESTR_AUTH,strlen(OSSL_HPKE_MODESTR_AUTH))) {
+            hpke_mode=OSSL_HPKE_MODE_AUTH;
+        } else if (strlen(modestr)==strlen(OSSL_HPKE_MODESTR_PSKAUTH) && 
+                !strncmp(modestr,OSSL_HPKE_MODESTR_PSKAUTH,strlen(OSSL_HPKE_MODESTR_PSKAUTH))) {
+            hpke_mode=OSSL_HPKE_MODE_PSKAUTH;
         } else if (strlen(modestr)==1) {
             switch(modestr[0]) {
-                case '0': hpke_mode=HPKE_MODE_BASE; break;
-                case '1': hpke_mode=HPKE_MODE_PSK; break;
-                case '2': hpke_mode=HPKE_MODE_AUTH; break;
-                case '3': hpke_mode=HPKE_MODE_PSKAUTH; break;
+                case '0': hpke_mode=OSSL_HPKE_MODE_BASE; break;
+                case '1': hpke_mode=OSSL_HPKE_MODE_PSK; break;
+                case '2': hpke_mode=OSSL_HPKE_MODE_AUTH; break;
+                case '3': hpke_mode=OSSL_HPKE_MODE_PSKAUTH; break;
                 default: usage(argv[0],"unnkown mode");
             }
         } else {
@@ -743,14 +743,14 @@ int main(int argc, char **argv)
          * needs to be decoded here but MUST NOT in the normal case.
          */
         if (map_input(tv->pkRm,&publen,&pub,1)!=1) usage(argv[0],"bad -P value");
-        if (hpke_mode==HPKE_MODE_AUTH || hpke_mode==HPKE_MODE_PSKAUTH) {
+        if (hpke_mode==OSSL_HPKE_MODE_AUTH || hpke_mode==OSSL_HPKE_MODE_PSKAUTH) {
             if (map_input(tv->skSm,&privlen,&priv,1)!=1) usage(argv[0],"bad -p value");
         }
         if (tv->encs && map_input(tv->encs[0].aad,&aadlen,&aad,1)!=1) usage(argv[0],"bad -a value");
         if (tv->info && map_input(tv->info,&infolen,&info,1)!=1) usage(argv[0],"bad -I value");
         if (tv->encs && map_input(tv->encs[0].plaintext,&plainlen,&plain,1)!=1) usage(argv[0],"bad -i value");
 
-        if (hpke_mode==HPKE_MODE_PSK || hpke_mode==HPKE_MODE_PSKAUTH) {
+        if (hpke_mode==OSSL_HPKE_MODE_PSK || hpke_mode==OSSL_HPKE_MODE_PSKAUTH) {
             /*
              * grab from tv 
              */
@@ -770,8 +770,8 @@ int main(int argc, char **argv)
      * Call one of our functions
      */
     if (generate) {
-        size_t publen=HPKE_MAXSIZE; unsigned char pub[HPKE_MAXSIZE];
-        size_t privlen=HPKE_MAXSIZE; unsigned char priv[HPKE_MAXSIZE];
+        size_t publen=OSSL_HPKE_MAXSIZE; unsigned char pub[OSSL_HPKE_MAXSIZE];
+        size_t privlen=OSSL_HPKE_MAXSIZE; unsigned char priv[OSSL_HPKE_MAXSIZE];
         int rv=OSSL_HPKE_kg(
             NULL, hpke_mode, hpke_suite,
             &publen, pub,
@@ -790,7 +790,7 @@ int main(int argc, char **argv)
         }
         
     } else if (doing_enc) {
-        size_t senderpublen=HPKE_MAXSIZE; unsigned char senderpub[HPKE_MAXSIZE];
+        size_t senderpublen=OSSL_HPKE_MAXSIZE; unsigned char senderpub[OSSL_HPKE_MAXSIZE];
         size_t cipherlen=plainlen+32; unsigned char *cipher=NULL;
         int rv;
         cipher=malloc(cipherlen);
@@ -834,7 +834,7 @@ int main(int argc, char **argv)
                             tv->encs[0].ciphertext,
                             &bcipherlen,
                             &bcipher);
-                if ((cipherlen==0 || cipherlen==HPKE_MAXSIZE) || cipher==NULL) { 
+                if ((cipherlen==0 || cipherlen==OSSL_HPKE_MAXSIZE) || cipher==NULL) { 
                     printf("Re-generated ciphertext is NULL sorry. \n");
                     goodres=0;
                 } else if (bcipherlen!=cipherlen) {
@@ -867,7 +867,7 @@ int main(int argc, char **argv)
         /*
          * try decode and then decrypt so
          */
-        size_t senderpublen=HPKE_MAXSIZE; unsigned char senderpub[HPKE_MAXSIZE];
+        size_t senderpublen=OSSL_HPKE_MAXSIZE; unsigned char senderpub[OSSL_HPKE_MAXSIZE];
         size_t cipherlen=0; unsigned char *cipher=NULL;
         size_t clearlen=0; unsigned char *clear=NULL;
 
