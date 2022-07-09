@@ -247,10 +247,6 @@ static uint16_t aead_iana2index(uint16_t codepoint)
     uint16_t naeads = OSSL_NELEM(hpke_aead_tab);
     uint16_t i = 0;
 
-    /* why not be paranoid:-) */
-    if (naeads > 65536) {
-        return (0);
-    }
     for (i = 0; i != naeads; i++) {
         if (hpke_aead_tab[i].aead_id == codepoint) {
             return (i);
@@ -270,10 +266,6 @@ static uint16_t kem_iana2index(uint16_t codepoint)
     uint16_t nkems = OSSL_NELEM(hpke_kem_tab);
     uint16_t i = 0;
 
-    /* why not be paranoid:-) */
-    if (nkems > 65536) {
-        return (0);
-    }
     for (i = 0; i != nkems; i++) {
         if (hpke_kem_tab[i].kem_id == codepoint) {
             return (i);
@@ -293,10 +285,6 @@ static uint16_t kdf_iana2index(uint16_t codepoint)
     uint16_t nkdfs = OSSL_NELEM(hpke_kdf_tab);
     uint16_t i = 0;
 
-    /* why not be paranoid:-) */
-    if (nkdfs > 65536) {
-        return (0);
-    }
     for (i = 0; i != nkdfs; i++) {
         if (hpke_kdf_tab[i].kdf_id == codepoint) {
             return (i);
