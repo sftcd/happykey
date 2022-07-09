@@ -27,6 +27,11 @@ High level notes:
 
 ## Recent Changes
 
+- 20220709: a pile of changes (including some external names) based on 
+  fine comments received from OpenSSL developers) - still needs a bit of
+  testing before pushing a version of OpenSSL for HPKE or ECH (planned for
+  next day or so).
+
 - 20220610: improved the doxygen documentation some - the [PDF](hpke-api.pdf)
   should now actually be useful:-)
 
