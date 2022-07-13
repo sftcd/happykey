@@ -41,9 +41,9 @@ CC=gcc
 
 # testvectors isn't compatible with apitest
 ifdef testvectors
-all: hpkemain neod oeod test2evp osslplayground 
+all: hpkemain neod oeod test2evp osslplayground kgikm os2evp
 else
-all: hpkemain apitest neod oeod test2evp osslplayground 
+all: hpkemain apitest neod oeod test2evp osslplayground kgikm os2evp
 endif
 
 # hpke.c and hpke.h here incldue some additional tracing and test vector
@@ -79,14 +79,26 @@ copy2lib: forlib
 	- cp hpke.h-forlib ${INCL}/openssl/hpke.h
 	- ./dosub.sh ${OSSL}/test/evp_extra_test.c
 
-# This is a round-trip test with NSS encrypting and my code decrypting
-# (no parameters for now)
+os2evp: os2evp.o hpke.o 
+	LD_LIBRARY_PATH=${OSSL} ${CC} ${CFLAGS} -g -o $@ os2evp.o hpke.o -L ${OSSL} -lcrypto -L ${NSSL} -lnss3 -lnspr4
 
-osslplayground: osslplayground.o 
+os2evp.o: os2evp.c
+	${CC} ${CFLAGS} -g -I ${INCL} -c $<
+
+kgikm: kgikm.o hpke.o 
+	LD_LIBRARY_PATH=${OSSL} ${CC} ${CFLAGS} -g -o $@ kgikm.o hpke.o -L ${OSSL} -lcrypto -L ${NSSL} -lnss3 -lnspr4
+
+kgikm.o: kgikm.c
+	${CC} ${CFLAGS} -g -I ${INCL} -c $<
+
+osslplayground: osslplayground.o
 	LD_LIBRARY_PATH=${OSSL} ${CC} ${CFLAGS} -g -o $@ osslplayground.o -L ${OSSL} -lcrypto -L ${NSSL} -lnss3 -lnspr4
 
 osslplayground.o: osslplayground.c
 	${CC} ${CFLAGS} -g -I ${INCL} -c $<
+
+# This is a round-trip test with NSS encrypting and my code decrypting
+# (no parameters for now)
 
 neod: neod.o hpke.o neod_nss.o
 	if [ -d ${NSSL} ]; then LD_LIBRARY_PATH=${OSSL}:${NSSL} ${CC} ${CFLAGS}  -g -o $@ neod.o hpke.o neod_nss.o -L ${OSSL} -lssl -lcrypto -L ${NSSL} -lnss3 -lnspr4 ; fi
@@ -110,8 +122,8 @@ oeod.o: oeod.c
 
 # A test of a buffer->EVP_PKEY problem
 
-test2evp: test2evp.o 
-	LD_LIBRARY_PATH=${OSSL} ${CC} ${CFLAGS} -g -o $@ test2evp.o -L ${OSSL} -lssl -lcrypto 
+test2evp: test2evp.o hpke.o
+	LD_LIBRARY_PATH=${OSSL} ${CC} ${CFLAGS} -g -o $@ test2evp.o hpke.o -L ${OSSL} -lssl -lcrypto 
 
 test2evp.o: test2evp.c
 	${CC} ${CFLAGS} -g -I ${INCL} -c $<
@@ -171,4 +183,6 @@ clean:
 	- rm -f test2evp test2evp.o
 	- rm -rf scratch/*
 	- rm -f apitest apitest.o
+	- rm -f kgikm kgikm.o
+	- rm -f os2evp os2evp.o
 

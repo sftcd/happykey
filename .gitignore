@@ -2,6 +2,8 @@
 *.o
 *-forlib
 apitest
+kgikm
+os2evp
 priv
 hpkemain
 neod

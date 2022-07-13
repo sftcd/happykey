@@ -773,7 +773,7 @@ int main(int argc, char **argv)
         size_t publen=OSSL_HPKE_MAXSIZE; unsigned char pub[OSSL_HPKE_MAXSIZE];
         size_t privlen=OSSL_HPKE_MAXSIZE; unsigned char priv[OSSL_HPKE_MAXSIZE];
         int rv=OSSL_HPKE_kg(
-            NULL, hpke_mode, hpke_suite,
+            NULL, hpke_mode, hpke_suite, 0, NULL,
             &publen, pub,
             &privlen, priv);
         if (rv!=1) {

@@ -27,6 +27,11 @@ High level notes:
 
 ## Recent Changes
 
+- 20220713: working on adding HPKE deterministic key generation - had
+  previously omitted that as it wasn't needed for ECH but it will be
+  needed for MLS and maybe other HPKE consumers, so time to add it
+  now. (That's in-work, and not yet finished/working.)
+
 - 20220711: a pile of changes (including some external names) based on 
   fine comments received from OpenSSL developers)
 

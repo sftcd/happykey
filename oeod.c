@@ -88,6 +88,7 @@ int main(int argc, char **argv)
     EVP_PKEY *privevp=NULL;
     int rv=OSSL_HPKE_kg_evp(
         NULL, hpke_mode, hpke_suite,
+        0, NULL,
         &publen, pub,
         &privevp);
     if (rv!=1) {
@@ -100,6 +101,7 @@ int main(int argc, char **argv)
     size_t senderpublen=OSSL_HPKE_MAXSIZE; unsigned char senderpub[OSSL_HPKE_MAXSIZE];
     rv=OSSL_HPKE_kg_evp(
         NULL, hpke_mode, hpke_suite,
+        0, NULL,
         &senderpublen, senderpub,
         &senderpriv);
     if (rv!=1) {

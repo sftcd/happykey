@@ -101,6 +101,7 @@ int main(int argc, char **argv)
     EVP_PKEY *privevp=NULL;
     int rv=OSSL_HPKE_kg_evp(
         NULL, hpke_mode, hpke_suite,
+        0, NULL,
         &publen, pub,
         &privevp);
     if (rv!=1) {
@@ -110,6 +111,7 @@ int main(int argc, char **argv)
 #else
     int rv=OSSL_HPKE_kg(
         NULL, hpke_mode, hpke_suite,
+        0, NULL,
         &publen, pub,
         &privlen, priv);
     if (rv!=1) {

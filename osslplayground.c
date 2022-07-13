@@ -33,8 +33,19 @@ int main()
     size_t plainlen=OSSL_HPKE_MAXSIZE; unsigned char plain[OSSL_HPKE_MAXSIZE];
     size_t cipherlen=OSSL_HPKE_MAXSIZE; unsigned char cipher[OSSL_HPKE_MAXSIZE];
     size_t clearlen=OSSL_HPKE_MAXSIZE; unsigned char clear[OSSL_HPKE_MAXSIZE];
-    if (OSSL_HPKE_kg(NULL,hpke_mode, hpke_suite,&publen, pub,&privlen, priv)!=1)
+    size_t ikmlen=OSSL_HPKE_MAXSIZE; unsigned char ikm[OSSL_HPKE_MAXSIZE];
+
+#ifdef TRYDET
+    hpke_suite.kem_id=OSSL_HPKE_KEM_ID_P521;
+    memset(ikm,0,ikmlen);
+    if (OSSL_HPKE_kg(NULL, hpke_mode, hpke_suite,
+                     ikmlen, ikm, &publen, pub, &privlen, priv)!=1)
         goto err;
+#else
+    if (OSSL_HPKE_kg(NULL, hpke_mode, hpke_suite,
+                     0, NULL, &publen, pub, &privlen, priv)!=1)
+        goto err;
+#endif
     memset(plain,0,OSSL_HPKE_MAXSIZE);
     strcpy((char*)plain,"a message not in a bottle");
     plainlen=strlen((char*)plain);
