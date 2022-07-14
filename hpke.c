@@ -1628,6 +1628,10 @@ static int hpke_prbuf2evp(OSSL_LIB_CTX *libctx,
     OSSL_PARAM *params = NULL;
     uint16_t kem_ind = 0;
     int groupnid = 0;
+    size_t pubsize = 0;
+    BIGNUM *calc_priv = NULL;
+    EC_POINT *calc_pub = NULL;
+    EC_GROUP *curve = NULL;
 
     if (hpke_kem_id_check(kem_id) != 1) {
         OSSL_HPKE_err;
@@ -1641,6 +1645,7 @@ static int hpke_prbuf2evp(OSSL_LIB_CTX *libctx,
     keytype = hpke_kem_tab[kem_ind].keytype;
     groupname = hpke_kem_tab[kem_ind].groupname;
     groupnid = hpke_kem_tab[kem_ind].groupid;
+    pubsize = hpke_kem_tab[kem_ind].Npk;
 #if defined(SUPERVERBOSE) || defined(TESTVECTORS)
     printf("Called hpke_prbuf2evp with kem id: %04x\n", kem_id);
     hpke_pbuf(stdout, "hpke_prbuf2evp priv input", prbuf, prbuf_len);
@@ -1678,9 +1683,6 @@ static int hpke_prbuf2evp(OSSL_LIB_CTX *libctx,
             }
         } else if (hpke_kem_id_nist_curve(kem_id) == 1) {
             /* need to calculate that public value, but we can:-) */
-            BIGNUM *calc_priv = NULL;
-            EC_POINT *calc_pub = NULL;
-            EC_GROUP *curve = NULL;
             unsigned char calc_pubuf[1024];
             size_t calc_pubuf_len = 1024;
             point_conversion_form_t form = POINT_CONVERSION_UNCOMPRESSED;
@@ -1700,14 +1702,14 @@ static int hpke_prbuf2evp(OSSL_LIB_CTX *libctx,
                 OSSL_HPKE_err;
                 goto err;
             }
-            if (EC_POINT_mul(curve, calc_pub, calc_priv, NULL, NULL, NULL) != 1 ) {
+            if (EC_POINT_mul(curve, calc_pub, calc_priv, NULL, NULL,
+                             NULL) != 1) {
                 OSSL_HPKE_err;
                 goto err;
             }
-            if ((calc_pubuf_len=EC_POINT_point2oct(curve, calc_pub, form,
-                                                    calc_pubuf, calc_pubuf_len,
-                                                    NULL)) !=
-                 hpke_kem_tab[kem_ind].Npk) {
+            if ((calc_pubuf_len = EC_POINT_point2oct(curve, calc_pub, form,
+                                                     calc_pubuf, calc_pubuf_len,
+                                                     NULL)) != pubsize) {
                 OSSL_HPKE_err;
                 goto err;
             }
@@ -1815,6 +1817,9 @@ static int hpke_prbuf2evp(OSSL_LIB_CTX *libctx,
 #endif
 
 err:
+    BN_free(calc_priv);
+    EC_POINT_free(calc_pub);
+    EC_GROUP_free(curve);
     BN_free(priv);
     EVP_PKEY_CTX_free(ctx);
     OSSL_PARAM_BLD_free(param_bld);
@@ -2766,19 +2771,76 @@ err:
  * @param kemid specifies the group (HPKE KEM code-points)
  * @param buflen is the size of the buffer
  * @param buf is the buffer
- * @return 0 for equal, -1 if buf < order, +1 if buf > order
+ * @param res is returned as 0 for equal, -1 if buf < order, +1 if buf > order
+ * @return 1 for good, other otherwise
  */
-static int hpke_kg_comp2order(uint32_t kemid,
-                              size_t buflen, unsigned char *buf)
+static int hpke_kg_comp2order(uint32_t kemid, size_t buflen,
+                              unsigned char *buf, int *res)
 {
     /*
      * P-256: ffffffff00000000ffffffffffffffffbce6faada7179e84f3b9cac2fc632551
      * P-384: ffffffffffffffffffffffffffffffffffffffffffffffffc7634d81f4372ddf
-              581a0db248b0a77aecec196accc52973
+     *        581a0db248b0a77aecec196accc52973
      * P-521: 01ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff
      *        fa51868783bf2f966b7fcc0148f709a5d03bb5c9b8899c47aebb6fb71e91386409
      */
-    return -1;
+    BIGNUM *bufbn = NULL;
+    BIGNUM *gorder = NULL;
+    int cres = 0;
+    unsigned char p256ord[] = {
+        0xff, 0xff, 0xff, 0xff, 0x00, 0x00, 0x00, 0x00,
+        0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff,
+        0xbc, 0xe6, 0xfa, 0xad, 0xa7, 0x17, 0x9e, 0x84,
+        0xf3, 0xb9, 0xca, 0xc2, 0xfc, 0x63, 0x25, 0x51
+    };
+    unsigned char p384ord[] = {
+        0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff,
+        0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff,
+        0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff,
+        0xc7, 0x63, 0x4d, 0x81, 0xf4, 0x37, 0x2d, 0xdf,
+        0x58, 0x1a, 0x0d, 0xb2, 0x48, 0xb0, 0xa7, 0x7a,
+        0xec, 0xec, 0x19, 0x6a, 0xcc, 0xc5, 0x29, 0x73
+    };
+    unsigned char p521ord[] = {
+        0x01, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff,
+        0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff,
+        0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff,
+        0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff,
+        0xff, 0xfa, 0x51, 0x86, 0x87, 0x83, 0xbf, 0x2f,
+        0x96, 0x6b, 0x7f, 0xcc, 0x01, 0x48, 0xf7, 0x09,
+        0xa5, 0xd0, 0x3b, 0xb5, 0xc9, 0xb8, 0x89, 0x9c,
+        0x47, 0xae, 0xbb, 0x6f, 0xb7, 0x1e, 0x91, 0x38,
+        0x64, 0x09
+    };
+
+    if (res == NULL || buf == NULL || buflen == 0) {
+        return - __LINE__;
+    }
+    switch (kemid) {
+    case OSSL_HPKE_KEM_ID_P256:
+        gorder = BN_bin2bn(p256ord, sizeof(p256ord), NULL);
+        break;
+    case OSSL_HPKE_KEM_ID_P384:
+        gorder = BN_bin2bn(p384ord, sizeof(p384ord), NULL);
+        break;
+    case OSSL_HPKE_KEM_ID_P521:
+        gorder = BN_bin2bn(p521ord, sizeof(p521ord), NULL);
+        break;
+    default:
+        return - __LINE__;
+    }
+    if (gorder == NULL) {
+        return - __LINE__;
+    }
+    bufbn = BN_bin2bn(buf, buflen, NULL);
+    if (bufbn == NULL) {
+        return - __LINE__;
+    }
+    cres = BN_cmp(bufbn, gorder);
+    *res = cres;
+    BN_free(bufbn);
+    BN_free(gorder);
+    return 1;
 }
 
 /*
@@ -2804,6 +2866,7 @@ static int hpke_kg_evp(OSSL_LIB_CTX *libctx,
     unsigned char *lpub = NULL;
     size_t lpublen = 0;
     uint16_t kem_ind = 0;
+    int cmp = 0;
 
     if (hpke_suite_check(suite) != 1)
         return (- __LINE__);
@@ -2858,14 +2921,14 @@ static int hpke_kg_evp(OSSL_LIB_CTX *libctx,
              *       counter = counter + 1
              *     return (sk, pk(sk))
              */
-            size_t tmplen=OSSL_HPKE_MAXSIZE;
+            size_t tmplen = OSSL_HPKE_MAXSIZE;
             unsigned char tmp[OSSL_HPKE_MAXSIZE];
-            size_t sklen=OSSL_HPKE_MAXSIZE;
+            size_t sklen = OSSL_HPKE_MAXSIZE;
             unsigned char sk[OSSL_HPKE_MAXSIZE];
             unsigned char counter = 0;
 
 #ifdef SUPERVERBOSE
-            printf("Deterministic KG for KEM %d\n",suite.kem_id);
+            printf("Deterministic KG for KEM %d\n", suite.kem_id);
 #endif
             erv = hpke_extract(libctx, suite, OSSL_HPKE_5869_MODE_KEM,
                                (const unsigned char *)"", 0,
@@ -2883,42 +2946,44 @@ static int hpke_kg_evp(OSSL_LIB_CTX *libctx,
                                   hpke_kem_tab[kem_ind].Npriv,
                                   sk, &sklen);
                 if (erv != 1) {
-                    memset(tmp,0,tmplen);
+                    memset(tmp, 0, tmplen);
                     goto err;
                 }
                 switch (suite.kem_id) {
-                    case OSSL_HPKE_KEM_ID_P256:
-                    case OSSL_HPKE_KEM_ID_P384:
-                        /* nothing to do for those really */
-                        break;
-                    case OSSL_HPKE_KEM_ID_P521:
-                        /* mask as RFC requires */
-                        sk[0] &= 0x01;
-                        break;
-                    default:
-                        memset(tmp,0,tmplen);
-                        goto err;
+                case OSSL_HPKE_KEM_ID_P256:
+                case OSSL_HPKE_KEM_ID_P384:
+                    /* nothing to do for those really */
+                    break;
+                case OSSL_HPKE_KEM_ID_P521:
+                    /* mask as RFC requires */
+                    sk[0] &= 0x01;
+                    break;
+                default:
+                    memset(tmp, 0, tmplen);
+                    goto err;
                 }
                 /* check sk vs. group order */
-                if (hpke_kg_comp2order(suite.kem_id,sklen,sk) == -1) {
-                    /* success! */
+                if (hpke_kg_comp2order(suite.kem_id, sklen, sk, &cmp) != 1) {
+                    goto err;
+                }
+                if (cmp == -1) { /* success! */
                     break;
                 }
 #ifdef SUPERVERBOSE
-                printf("Incrememting det counter! (%d)\n",counter);
+                printf("Incrememting det counter! (%d)\n", counter);
 #endif
             }
             if (counter == 255) {
-                memset(tmp,0,tmplen);
+                memset(tmp, 0, tmplen);
                 goto err;
             }
 #ifdef SUPERVERBOSE
             hpke_pbuf(stdout, "deterministic sk", sk, sklen);
 #endif
             erv = hpke_prbuf2evp(libctx, suite.kem_id, sk, sklen,
-                             NULL, 0, &skR);
-            memset(sk,0,sklen);
-            memset(tmp,0,tmplen);
+                                 NULL, 0, &skR);
+            memset(sk, 0, sklen);
+            memset(tmp, 0, tmplen);
             if (erv != 1) { goto err; }
         }
     } else {
@@ -2940,13 +3005,13 @@ static int hpke_kg_evp(OSSL_LIB_CTX *libctx,
              *   sk = LabeledExpand(dkp_prk, "sk", "", Nsk)
              *   return (sk, pk(sk))
              */
-            size_t tmplen=OSSL_HPKE_MAXSIZE;
+            size_t tmplen = OSSL_HPKE_MAXSIZE;
             unsigned char tmp[OSSL_HPKE_MAXSIZE];
-            size_t sklen=OSSL_HPKE_MAXSIZE;
+            size_t sklen = OSSL_HPKE_MAXSIZE;
             unsigned char sk[OSSL_HPKE_MAXSIZE];
 
 #ifdef SUPERVERBOSE
-            printf("Deterministic KG for KEM %d\n",suite.kem_id);
+            printf("Deterministic KG for KEM %d\n", suite.kem_id);
 #endif
             erv = hpke_extract(libctx, suite, OSSL_HPKE_5869_MODE_KEM,
                                (const unsigned char *)"", 0,
@@ -2961,16 +3026,16 @@ static int hpke_kg_evp(OSSL_LIB_CTX *libctx,
                               hpke_kem_tab[kem_ind].Npriv,
                               sk, &sklen);
             if (erv != 1) {
-                memset(tmp,0,tmplen);
+                memset(tmp, 0, tmplen);
                 goto err;
             }
 #ifdef SUPERVERBOSE
             hpke_pbuf(stdout, "deterministic sk", sk, sklen);
 #endif
             erv = hpke_prbuf2evp(libctx, suite.kem_id, sk, sklen,
-                             NULL, 0, &skR);
-            memset(sk,0,sklen);
-            memset(tmp,0,tmplen);
+                                 NULL, 0, &skR);
+            memset(sk, 0, sklen);
+            memset(tmp, 0, tmplen);
             if (erv != 1) { goto err; }
 
         }

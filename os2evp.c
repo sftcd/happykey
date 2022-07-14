@@ -90,6 +90,7 @@ int main(int argc, char *argv[])
                     printf("%02x",lpub[i]);
                 }
                 printf("\nhard coded pub:\n\t%s\n",xpubstr);
+                OPENSSL_free(lpub);
             }
         }
         EVP_PKEY_free(sk);
@@ -112,8 +113,15 @@ int main(int argc, char *argv[])
                 printf("%02x",lpub[i]);
             }
             printf("\nhard coded pub:\n\t%s\n",npubstr);
+            OPENSSL_free(lpub);
         }
     }
+
+    EVP_PKEY_free(sk);
+    OPENSSL_free(nprivbuf);
+    OPENSSL_free(xprivbuf);
+    OPENSSL_free(npubbuf);
+    OPENSSL_free(xpubbuf);
 
 }
 
