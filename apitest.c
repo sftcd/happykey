@@ -2833,7 +2833,7 @@ static int test_hpke_one_key_gen_from_priv(uint16_t kem_id,
     unsigned char *lpub = NULL;
     size_t lpublen = 1024;
 
-    if (OSSL_HPKE_prbuf2evp(NULL, kem_id, priv, privlen, NULL, 0, &sk) != 1) {
+    if (OSSL_HPKE_prbuf2evp(testctx, kem_id, priv, privlen, NULL, 0, &sk) != 1) {
         res = 0;
     }
     if (sk == NULL) {
@@ -2966,7 +2966,7 @@ static int hpke_test_one_ikm_gen(uint16_t kem_id,
     EVP_PKEY *sk = NULL;
 
     hpke_suite.kem_id = kem_id;
-    if (OSSL_HPKE_kg_evp(NULL, hpke_mode, hpke_suite, ikmlen, ikm,
+    if (OSSL_HPKE_kg_evp(testctx, hpke_mode, hpke_suite, ikmlen, ikm,
                          &lpublen, lpub, &sk) != 1) {
         return (- __LINE__);
     }
