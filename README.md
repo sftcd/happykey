@@ -27,6 +27,9 @@ High level notes:
 
 ## Recent Changes
 
+- 20220716: replace ``ossl_hpke_suite_st`` with ``OSSL_HPKE_SUITE``
+  as per OpenSSL dev guidance.
+
 - 20220714: added HPKE deterministic key generation - had
   previously omitted that as it wasn't needed for ECH but as it will be
   needed for MLS and maybe other HPKE consumers, it was time to add it
