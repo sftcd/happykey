@@ -825,7 +825,6 @@ static int hpke_extract(OSSL_LIB_CTX *libctx,
     case OSSL_HPKE_5869_MODE_PURE:
         labeled_ikmlen = ikmlen;
         labeled_ikm = (unsigned char *)ikm;
-
         break;
 
     case OSSL_HPKE_5869_MODE_KEM:

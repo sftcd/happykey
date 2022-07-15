@@ -84,7 +84,7 @@ static void usage(char *prog, char *errmsg)
  * Randomly toss a coin
  */
 static unsigned char rb = 0;
-#define COIN_IS_HEADS (RAND_bytes_ex(testctx, &rb, 1, 10) && rb % 2)
+# define COIN_IS_HEADS (RAND_bytes_ex(testctx, &rb, 1, 10) && rb % 2)
 
 /* tables of HPKE modes and suite values */
 static int hpke_mode_list[] = {
@@ -2772,7 +2772,7 @@ static int test_hpke_badcalls(void)
     return (overallresult);
 }
 
-#ifndef OPENSSL_NO_ASM
+# ifndef OPENSSL_NO_ASM
 /*
  * NIST p256 key pair from HPKE-07 test vectors
  * FIXME: I have no idea why, but as of now building
@@ -2800,7 +2800,7 @@ static unsigned char n256pub[] = {
     0x99, 0x14, 0x98, 0xe3, 0x45, 0xaa, 0x76, 0x60,
     0x04
 };
-#endif
+# endif
 
 /*
  * X25519 key pair from HPKE-07 test vectors
@@ -2872,7 +2872,7 @@ static int test_hpke_gen_from_priv(void)
 {
     int res = 0;
 
-#ifndef OPENSSL_NO_ASM
+# ifndef OPENSSL_NO_ASM
     /*
      * NIST P-256 case
      * FIXME: I have no idea why, but as of now building
@@ -2887,7 +2887,7 @@ static int test_hpke_gen_from_priv(void)
                                           n256priv, sizeof(n256priv),
                                           n256pub, sizeof(n256pub));
     if (res != 1) { return (res); }
-#endif
+# endif
 
     /* X25519 case */
     res = test_hpke_one_key_gen_from_priv(0x20,
