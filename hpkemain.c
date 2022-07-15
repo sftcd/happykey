@@ -574,7 +574,7 @@ int main(int argc, char **argv)
      * Mode and ciphersuites - we're not parameterising this yet
      */
     int hpke_mode=OSSL_HPKE_MODE_BASE;
-    ossl_hpke_suite_st hpke_suite = OSSL_HPKE_SUITE_DEFAULT;
+    OSSL_HPKE_SUITE hpke_suite = OSSL_HPKE_SUITE_DEFAULT;
 
     int opt;
 
@@ -620,7 +620,7 @@ int main(int argc, char **argv)
 
     /* if we're just greasing get that out of the way and exit */
     if (doing_grease==1) {
-        ossl_hpke_suite_st g_suite;
+        OSSL_HPKE_SUITE g_suite;
         unsigned char g_pub[OSSL_HPKE_MAXSIZE];
         size_t g_pub_len=OSSL_HPKE_MAXSIZE;
         unsigned char g_cipher[OSSL_HPKE_MAXSIZE];

@@ -104,7 +104,7 @@ static int hpke_test_one_ikm_gen(uint16_t kem_id,
                                  unsigned char *pub, size_t publen)
 {
     int hpke_mode=OSSL_HPKE_MODE_BASE;
-    ossl_hpke_suite_st hpke_suite = OSSL_HPKE_SUITE_DEFAULT;
+    OSSL_HPKE_SUITE hpke_suite = OSSL_HPKE_SUITE_DEFAULT;
     unsigned char lpub[OSSL_HPKE_MAXSIZE];
     size_t lpublen = OSSL_HPKE_MAXSIZE;
     EVP_PKEY *sk = NULL;

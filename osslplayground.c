@@ -25,7 +25,7 @@ int main()
     /* we'll do a round-trip, generating a key, encrypting and decrypting
      * and also an encrypt to a known test vector */
     int hpke_mode=OSSL_HPKE_MODE_BASE;
-    ossl_hpke_suite_st hpke_suite = OSSL_HPKE_SUITE_DEFAULT;
+    OSSL_HPKE_SUITE hpke_suite = OSSL_HPKE_SUITE_DEFAULT;
     /* we'll alloc all these on the stack for simplicity */
     size_t publen=OSSL_HPKE_MAXSIZE; unsigned char pub[OSSL_HPKE_MAXSIZE];
     size_t privlen=OSSL_HPKE_MAXSIZE; unsigned char priv[OSSL_HPKE_MAXSIZE];

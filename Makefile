@@ -75,7 +75,7 @@ forlibclean:
 	- rm -f hpke.c-forlib
 
 copy2lib: forlib
-	- cp hpke.c-forlib ${OSSL}/crypto/hpke.c
+	- cp hpke.c-forlib ${OSSL}/crypto/hpke/hpke.c
 	- cp hpke.h-forlib ${INCL}/openssl/hpke.h
 	- ./dosub.sh ${OSSL}/test/evp_extra_test.c
 
