@@ -2980,6 +2980,7 @@ static int hpke_kg_evp(OSSL_LIB_CTX *libctx,
 #ifdef SUPERVERBOSE
                 printf("Incrememting det counter! (%d)\n", counter);
 #endif
+                counter++;
             }
             if (counter == 255) {
                 memset(tmp, 0, tmplen);
