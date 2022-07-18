@@ -13,40 +13,39 @@
 /* opaque pointer to HPKE context */
 typedef void * OSSL_HPKE_CTX;
 
-int OSSL_HPKE_CTX_new(OSSL_LIB_CTX *libctx, int mode);
+OSSL_HPKE_CTX * OSSL_HPKE_CTX_new(const OSSL_LIB_CTX *libctx, int mode);
 int OSSL_HPKE_CTX_free(OSSL_HPKE_CTX *ctx);
 
-/* 
- * def DeriveKeyPair(ikm) 
+/*
+ * def DeriveKeyPair(ikm)
  * provide ikm/ikmlen as NULL/0 for random key gen
  * provide either privlen/priv or pkey as non-NULL
  * to get the private value in the desired format
- */ 
-int OSSL_HPKE_DeriverKeyPair(OSSL_HPKE_CTX * ctx,
-                             OSSL_HPKE_SUITE suite,
-                             size_t ikmlen, unsigned char *ikm,
-                             size_t *publen, unsigned char *pub,
-                             size_t *privlen, unsigned char *priv,
-                             EVP_PKEY *pkey);
+ */
+int OSSL_HPKE_DeriveKeyPair(OSSL_HPKE_CTX * ctx,
+                            OSSL_HPKE_SUITE suite,
+                            const unsigned char *ikm, size_t ikmlen,
+                            unsigned char *pub, size_t *publen,
+                            unsigned char *priv, size_t *privlen,
+                            EVP_PKEY *pkey);
 
 /*
  * Add stuff to context (basically the elipsis from
  * the RFC APIs:-)
  */
-int OSSL_HPKE_Add_Info(OSSL_HPKE_CTX *ctx,
-                       size_t infolen,
-                       unsigned char *info);
-int OSSL_HPKE_Add_PSK(OSSL_HPKE_CTX *ctx,
-                      size_t psklen,
-                      unsigned char *psk,
-                      char *psk_id);
+int OSSL_HPKE_set1_Info(OSSL_HPKE_CTX *ctx,
+                        const unsigned char *info, size_t infolen);
+int OSSL_HPKE_set1_PSK(OSSL_HPKE_CTX *ctx,
+                       const unsigned char *psk, size_t psklen,
+                       const char *psk_id);
 /*
  * public values can be 0/NULL
  * private value: same convention as derive
  */
-int OSSL_HPKE_Add_AuthKey(OSSL_HPKE_CTX *ctx,
-                          size_t skspublen, unsigned char *skspub,
-                          size_t skslen, unsigned char *sks, EVP_PKEY *sksp);
+int OSSL_HPKE_set1_AuthKey(OSSL_HPKE_CTX *ctx,
+                           const unsigned char *skspub, size_t skspublen,
+                           const unsigned char *sks, size_t skslen,
+                           const EVP_PKEY *sksp);
 
 /*
  * def SetupBaseS(pkR, info):
@@ -54,7 +53,8 @@ int OSSL_HPKE_Add_AuthKey(OSSL_HPKE_CTX *ctx,
  * def SetupAuthS(pkR, info, skS):
  * def SetupAuthPSKS(pkR, info, psk, psk_id, skS):
  */
-int OSSL_HPKE_SetupS(OSSL_HPKE_CTX *ctx, size_t pkrlen, unsigned char *pkr);
+int OSSL_HPKE_SetupS(OSSL_HPKE_CTX *ctx,
+                     const unsigned char *pkr, size_t pkrlen);
 
 /*
  * def SetupBaseR(enc, skR, info):
@@ -63,8 +63,8 @@ int OSSL_HPKE_SetupS(OSSL_HPKE_CTX *ctx, size_t pkrlen, unsigned char *pkr);
  * def SetupAuthPSKR(enc, skR, info, psk, psk_id, pkS):
  */
 int OSSL_HPKE_SetupR(OSSL_HPKE_CTX *ctx,
-                     size_t enclen, unsigned char *enc,
-                     size_t skrlen, unsigned char *skr, EVP_PKEY *skrp);
+                     const unsigned char *skr, size_t skrlen,
+                     const EVP_PKEY *skrp);
 
 /*
  * def Seal<MODE>(pkR, info, aad, pt, ...):
@@ -72,11 +72,11 @@ int OSSL_HPKE_SetupR(OSSL_HPKE_CTX *ctx,
  */
 int OSSL_HPKE_Seal(OSSL_HPKE_CTX *ctx,
                    OSSL_HPKE_SUITE suite,
-                   size_t plainlen, unsigned char *plain,
-                   size_t aadlen, unsigned char *aad,
-                   size_t seqlen, unsigned char *seq,
-                   size_t *enclen, unsigned char *enc,
-                   size_t *cipherlen, unsigned char *cipher);
+                   const unsigned char *plain, size_t plainlen,
+                   const unsigned char *aad, size_t aadlen,
+                   const unsigned char *seq, size_t seqlen,
+                   unsigned char *enc, size_t *enclen,
+                   unsigned char *cipher, size_t *cipherlen);
 
 /*
  * def Open<MODE>(enc, skR, info, aad, ct, ...):
@@ -84,34 +84,32 @@ int OSSL_HPKE_Seal(OSSL_HPKE_CTX *ctx,
  */
 int OSSL_HPKE_Open(OSSL_HPKE_CTX *ctx,
                    OSSL_HPKE_SUITE suite,
-                   size_t enclen, unsigned char *enc,
-                   size_t cipherlen, unsigned char *cipher,
-                   size_t aadlen, unsigned char *aad,
-                   size_t seqlen, unsigned char *seq,
-                   size_t *plainlen, unsigned char *plain);
+                   const unsigned char *enc, size_t enclen,
+                   const unsigned char *cipher, size_t cipherlen,
+                   const unsigned char *aad, size_t aadlen,
+                   const unsigned char *seq, size_t seqlen,
+                   unsigned char *plain, size_t *plainlen);
 
 /* def LabeledExpand(prk, label, info, L): */
-int OSSL_HPKE_expand(OSSL_HPKE_CTX *ctx,
-                     const unsigned char *prk, const size_t prklen,
-                     const char *label, const size_t labellen,
-                     const unsigned char *info, const size_t infolen,
-                     const uint32_t L,
+int OSSL_HPKE_Expand(OSSL_HPKE_CTX *ctx,
+                     const unsigned char *prk, size_t prklen,
+                     const char *label, size_t labellen,
+                     const unsigned char *info, size_t infolen,
+                     uint32_t L,
                      unsigned char *out, size_t *outlen);
 
 /* def LabeledExtract(salt, label, ikm): */
-int OSSL_HPKE_extract(OSSL_HPKE_CTX *ctx,
-                      const unsigned char *salt, const size_t saltlen,
-                      const char *label, const size_t labellen,
-                      const unsigned char *ikm, const size_t ikmlen,
+int OSSL_HPKE_Extract(OSSL_HPKE_CTX *ctx,
+                      const unsigned char *salt, size_t saltlen,
+                      const char *label, size_t labellen,
+                      const unsigned char *ikm, size_t ikmlen,
                       unsigned char *secret, size_t *secretlen);
 
 /* def Context.Export(exporter_context, L): */
-int OSSL_HPKE_export(OSSL_HPKE_CTX *ctx,
-                     unsigned char *inp,
-                     size_t inp_len,
+int OSSL_HPKE_Export(OSSL_HPKE_CTX *ctx,
+                     const unsigned char *inp, size_t inp_len,
                      size_t L,
-                     unsigned char *exporter,
-                     size_t *exporter_len);
+                     unsigned char *exporter, size_t *exporter_len);
 
 /*
  * These remaining APIs belwow can be implemented using the above,
