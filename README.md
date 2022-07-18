@@ -27,6 +27,11 @@ High level notes:
 
 ## Recent Changes
 
+- 20220618: added a (possibly temporary, possibly not) proposal for
+  a higher level API that better matches the RFC text - idea is to
+  see if OpenSSL devs prefer that (or something derived from that).
+  If so, will implement it then:-)
+
 - 20220716: replace ``ossl_hpke_suite_st`` with ``OSSL_HPKE_SUITE``
   as per OpenSSL dev guidance.
 
