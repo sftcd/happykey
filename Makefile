@@ -10,6 +10,8 @@
 
 OSSL?=../openssl
 INCL=${OSSL}/include
+SLONTIS_OSSL=../openssl-slontis
+SLONTIS_INCL=${SLONTIS_OSSL}/include
 
 # NSS 
 NSSL?=../dist/Debug/lib
@@ -186,3 +188,13 @@ clean:
 	- rm -f kgikm kgikm.o
 	- rm -f os2evp os2evp.o
 
+# round-trip test wht NSS of "alternative" HPKE OpenSSL code 
+
+nss_slontis.o: nss_slontis.c
+	${CC} ${CFLAGS} -g -I ${SLONTIS_INCL} -c $<
+
+nss_slontis: nss_slontis.o neod_nss.o
+	if [ -d ${NSSL} ]; then LD_LIBRARY_PATH=${OSSL}:${NSSL} ${CC} ${CFLAGS}  -g -o $@ nss_slontis.o neod_nss.o -L ${SLONTIS_OSSL} -lssl -lcrypto -L ${NSSL} -lnss3 -lnspr4 ; fi
+
+nss_slontis-test:
+	- if [ -d ${NSSL} ]; then LD_LIBRARY_PATH=${SLONTIS_OSSL}:${NSSL} ./nss_slontis ; fi

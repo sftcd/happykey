@@ -46,6 +46,13 @@
 #  include "hpketv.h"
 # endif
 
+/*
+ * tmp exporter context while in-work
+ */
+static size_t s_exporter_size = OSSL_HPKE_MAXSIZE;
+static size_t s_exporter_len = OSSL_HPKE_MAXSIZE;
+static unsigned char s_exporter[OSSL_HPKE_MAXSIZE];
+
 #else /* For OpenSSL library */
 #include <openssl/hpke.h>
 #include <openssl/err.h>
@@ -61,6 +68,7 @@
 #define OSSL_HPKE_SS_LABEL        "shared_secret" /**< Yet another label */
 #define OSSL_HPKE_NONCE_LABEL     "base_nonce"  /**< guess? */
 #define OSSL_HPKE_EXP_LABEL       "exp" /**< guess again? */
+#define OSSL_HPKE_EXP_SEC_LABEL   "sec" /**< guess again? */
 #define OSSL_HPKE_KEY_LABEL       "key" /**< guess again? */
 #define OSSL_HPKE_PSK_HASH_LABEL  "psk_hash" /**< guess again? */
 #define OSSL_HPKE_SECRET_LABEL    "secret" /**< guess again? */
@@ -238,6 +246,24 @@ const char *hpke_kdf_strtab[] = {
     OSSL_HPKE_KDFSTR_384,
     OSSL_HPKE_KDFSTR_512};
 #endif
+
+/*
+ * Internal version of OSSL_HPKE_CTX
+ */
+typedef struct hpke_ctx_st {
+    int mode;
+    OSSL_HPKE_SUITE suite;
+    unsigned char info[OSSL_HPKE_MAXSIZE];
+    size_t infolen;
+    unsigned char exporter[OSSL_HPKE_MAXSIZE];
+    size_t exporterlen;
+    unsigned char psk[OSSL_HPKE_MAXSIZE];
+    size_t psklen;
+    char *psk_id;
+    EVP_PKEY *recip;
+    EVP_PKEY *sender;
+    EVP_PKEY *sender_auth;
+} hpke_ctx;
 
 /*
  * @brief map from IANA codepoint to AEAD table index
@@ -2328,6 +2354,15 @@ static int hpke_enc_int(OSSL_LIB_CTX *libctx,
         goto err;
     }
 
+    /* stash tmp exporter stuff */
+    if (exporterlen > OSSL_HPKE_MAXSIZE) {
+        OSSL_HPKE_err;
+        goto err;
+    }
+    s_exporter_len = exporterlen;
+    memcpy(s_exporter, exporter, exporterlen);
+
+
     /* step 5. call the AEAD */
     erv = hpke_aead_enc(libctx, suite, key, keylen, nonce, noncelen,
                         aad, aadlen, clear, clearlen, cipher, cipherlen);
@@ -2707,6 +2742,14 @@ static int hpke_dec_int(OSSL_LIB_CTX *libctx,
         OSSL_HPKE_err;
         goto err;
     }
+
+    /* stash tmp exporter stuff */
+    if (exporterlen > OSSL_HPKE_MAXSIZE) {
+        OSSL_HPKE_err;
+        goto err;
+    }
+    s_exporter_len = exporterlen;
+    memcpy(s_exporter, exporter, exporterlen);
 
     /* step 5. call the AEAD */
     erv = hpke_aead_dec(libctx, suite, key, keylen,
@@ -3411,6 +3454,42 @@ err:
     return erv;
 }
 
+static int hpke_export(OSSL_LIB_CTX *libctx,
+                       OSSL_HPKE_SUITE suite,
+                       size_t inp_len,
+                       unsigned char *inp,
+                       size_t L,
+                       size_t *exportval_len,
+                       unsigned char *exportval)
+{
+    int erv = 1;
+
+    if (exportval_len == NULL || exportval == NULL) {
+        OSSL_HPKE_err;
+        goto err;
+    }
+#ifdef SUPERVERBOSE
+    hpke_pbuf(stdout, "hpke_export latest", s_exporter, s_exporter_len);
+    hpke_pbuf(stdout, "hpke_export inp", inp, inp_len);
+#endif
+    erv = hpke_expand(libctx, suite, OSSL_HPKE_5869_MODE_KEM,
+                      s_exporter, s_exporter_len,
+                      OSSL_HPKE_EXP_SEC_LABEL, strlen(OSSL_HPKE_EXP_SEC_LABEL),
+                      inp, inp_len,
+                      L,
+                      exportval, exportval_len);
+    if (erv != 1) {
+        OSSL_HPKE_err;
+        goto err;
+    }
+#ifdef SUPERVERBOSE
+    hpke_pbuf(stdout, "hpke_export", exportval, *exportval_len);
+#endif
+err:
+    return (erv);
+
+}
+
 /*
  * @brief HPKE single-shot encryption function
  *
@@ -3791,4 +3870,15 @@ int OSSL_HPKE_expansion(OSSL_HPKE_SUITE suite,
                         size_t *cipherlen)
 {
     return (hpke_expansion(suite, clearlen, cipherlen));
+}
+
+int OSSL_HPKE_export(OSSL_LIB_CTX *libctx,
+                     OSSL_HPKE_SUITE suite,
+                     unsigned char *inp,
+                     size_t inp_len,
+                     size_t L,
+                     unsigned char *exporter,
+                     size_t *exporter_len)
+{
+    return hpke_export(libctx, suite, inp_len, inp, L, exporter_len, exporter);
 }

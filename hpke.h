@@ -539,4 +539,12 @@ int OSSL_HPKE_expansion(OSSL_HPKE_SUITE suite,
                         size_t clearlen,
                         size_t *cipherlen);
 
+int OSSL_HPKE_export(OSSL_LIB_CTX *libctx,
+                     OSSL_HPKE_SUITE suite,
+                     unsigned char *inp,
+                     size_t inp_len,
+                     size_t L,
+                     unsigned char *exporter,
+                     size_t *exporter_len);
+
 #endif

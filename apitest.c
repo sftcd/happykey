@@ -3057,6 +3057,22 @@ static int test_hpke_ikms(void)
     return (res);
 }
 
+static int test_hpke_exporters(void)
+{
+    int res = 1;
+    unsigned char exportval[OSSL_HPKE_MAXSIZE];
+    size_t exportval_len = OSSL_HPKE_MAXSIZE;
+    OSSL_HPKE_SUITE suite = OSSL_HPKE_SUITE_DEFAULT;
+
+    res = OSSL_HPKE_export(testctx, suite,
+                           "test", strlen("test"), 240,
+                           exportval, &exportval_len);
+    if (res != 1)
+        return (res);
+
+    return (res);
+}
+
 static int test_hpke(void)
 {
     int res = 1;
@@ -3082,6 +3098,10 @@ static int test_hpke(void)
         return (res);
 
     res = test_hpke_ikms();
+    if (res != 1)
+        return (res);
+
+    res = test_hpke_exporters();
     if (res != 1)
         return (res);
 
