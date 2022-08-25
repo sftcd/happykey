@@ -89,7 +89,8 @@ static int test_hpke_one_key_gen_from_priv(uint16_t kem_id,
     unsigned char *lpub = NULL;
     size_t lpublen = 1024;
 
-    if (OSSL_HPKE_prbuf2evp(NULL, kem_id, priv, privlen, NULL, 0, &sk) != 1) {
+    if (OSSL_HPKE_prbuf2evp(NULL, NULL, kem_id,
+                            priv, privlen, NULL, 0, &sk) != 1) {
         res = 0;
     }
     if (sk == NULL) {

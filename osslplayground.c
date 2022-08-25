@@ -38,18 +38,18 @@ int main()
 #ifdef TRYDET
     hpke_suite.kem_id=OSSL_HPKE_KEM_ID_P521;
     memset(ikm,0,ikmlen);
-    if (OSSL_HPKE_kg(NULL, hpke_mode, hpke_suite,
+    if (OSSL_HPKE_kg(NULL, NULL, hpke_mode, hpke_suite,
                      ikmlen, ikm, &publen, pub, &privlen, priv)!=1)
         goto err;
 #else
-    if (OSSL_HPKE_kg(NULL, hpke_mode, hpke_suite,
+    if (OSSL_HPKE_kg(NULL, NULL, hpke_mode, hpke_suite,
                      0, NULL, &publen, pub, &privlen, priv)!=1)
         goto err;
 #endif
     memset(plain,0,OSSL_HPKE_MAXSIZE);
     strcpy((char*)plain,"a message not in a bottle");
     plainlen=strlen((char*)plain);
-    if (OSSL_HPKE_enc(NULL,hpke_mode, hpke_suite,
+    if (OSSL_HPKE_enc(NULL, NULL, hpke_mode, hpke_suite,
                 NULL, 0, NULL, /* psk */
                 publen, pub,
                 0, NULL, NULL, /* priv */
@@ -64,7 +64,7 @@ int main()
 #endif
                 )!=1)
         goto err;
-    if (OSSL_HPKE_dec(NULL, hpke_mode, hpke_suite,
+    if (OSSL_HPKE_dec(NULL, NULL, hpke_mode, hpke_suite,
                 NULL, 0, NULL, /* psk */
                 0, NULL, /* authpub */
                 privlen, priv, NULL,

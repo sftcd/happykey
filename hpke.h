@@ -85,10 +85,10 @@
  * use the ``OSSL_HPKE_expansion()`` API.
  *
  * Many of the APIs defined here also take an ``OSSL_LIB_CTX``
- * pointer as input for cases where the default library context
- * is not in use. Return values are always 1 in the case
- * of success, or something else otherwise - note that non-zero
- * failure return values will be seen by callers.
+ * pointer and ``propq`` as input for cases where the default 
+ * library context is not in use. Return values are always 1 
+ * in the case of success, or something else otherwise - note 
+ * that non-zero failure return values will be seen by callers.
  *
  * ## Some Uses of HPKE
  *
@@ -169,15 +169,13 @@
 
 # define OSSL_HPKE_KDF_ID_RESERVED         0x0000 /**< not used */
 # define OSSL_HPKE_KDF_ID_HKDF_SHA256      0x0001 /**< HKDF-SHA256 */
-# define OSSL_HPKE_KDF_ID_HKDF_SHA384      0x0002 /**< HKDF-SHA512 */
+# define OSSL_HPKE_KDF_ID_HKDF_SHA384      0x0002 /**< HKDF-SHA384 */
 # define OSSL_HPKE_KDF_ID_HKDF_SHA512      0x0003 /**< HKDF-SHA512 */
-# define OSSL_HPKE_KDF_ID_MAX              0x0003 /**< HKDF-SHA512 */
 
 # define OSSL_HPKE_AEAD_ID_RESERVED        0x0000 /**< not used */
 # define OSSL_HPKE_AEAD_ID_AES_GCM_128     0x0001 /**< AES-GCM-128 */
 # define OSSL_HPKE_AEAD_ID_AES_GCM_256     0x0002 /**< AES-GCM-256 */
 # define OSSL_HPKE_AEAD_ID_CHACHA_POLY1305 0x0003 /**< Chacha20-Poly1305 */
-# define OSSL_HPKE_AEAD_ID_MAX             0x0003 /**< Chacha20-Poly1305 */
 
 /* strings for modes */
 # define OSSL_HPKE_MODESTR_BASE       "base"    /**< base mode (1) */
@@ -219,16 +217,6 @@ typedef struct {
     }
 
 /**
- * If you like your crypto turned up...
- */
-# define OSSL_HPKE_SUITE_TURNITUPTO11 \
-    { \
-        OSSL_HPKE_KEM_ID_448, \
-        OSSL_HPKE_KDF_ID_HKDF_SHA512, \
-        OSSL_HPKE_AEAD_ID_CHACHA_POLY1305 \
-    }
-
-/**
  * @brief HPKE single-shot encryption function
  *
  * This function generates an ephemeral ECDH value internally and
@@ -240,6 +228,7 @@ typedef struct {
  * is an input (along with the sender's private value).
  *
  * @param libctx is the context to use (normally NULL)
+ * @param propq is a properties string
  * @param mode is the HPKE mode
  * @param suite is the ciphersuite to use
  * @param pskid is the pskid string for a PSK mode (can be NULL)
@@ -265,7 +254,7 @@ typedef struct {
  * @return 1 for success, other for error (error returns can be non-zero)
  */
 # ifdef TESTVECTORS
-int OSSL_HPKE_enc(OSSL_LIB_CTX *libctx,
+int OSSL_HPKE_enc(OSSL_LIB_CTX *libctx, const char *propq,
                   unsigned int mode, OSSL_HPKE_SUITE suite,
                   char *pskid, size_t psklen, unsigned char *psk,
                   size_t publen, unsigned char *pub,
@@ -279,7 +268,7 @@ int OSSL_HPKE_enc(OSSL_LIB_CTX *libctx,
                   size_t *cipherlen, unsigned char *cipher,
                   void *tv);
 # else
-int OSSL_HPKE_enc(OSSL_LIB_CTX *libctx,
+int OSSL_HPKE_enc(OSSL_LIB_CTX *libctx, const char *propq,
                   unsigned int mode, OSSL_HPKE_SUITE suite,
                   char *pskid, size_t psklen, unsigned char *psk,
                   size_t publen, unsigned char *pub,
@@ -305,7 +294,8 @@ int OSSL_HPKE_enc(OSSL_LIB_CTX *libctx,
  * sender's private value), in contrast to the case of OSSL_HPKE_enc
  * where the sender's public value is an output.
  *
- * @param libctx is the context to use (normally NULL)
+ * @param libctx is the context to use
+ * @param propq is a properties string
  * @param mode is the HPKE mode
  * @param suite is the ciphersuite to use
  * @param pskid is the pskid string for a PSK mode (can be NULL)
@@ -332,7 +322,7 @@ int OSSL_HPKE_enc(OSSL_LIB_CTX *libctx,
  * @return 1 for success, other for error (error returns can be non-zero)
  */
 # ifdef TESTVECTORS
-int OSSL_HPKE_enc_evp(OSSL_LIB_CTX *libctx,
+int OSSL_HPKE_enc_evp(OSSL_LIB_CTX *libctx, const char *propq,
                       unsigned int mode, OSSL_HPKE_SUITE suite,
                       char *pskid, size_t psklen, unsigned char *psk,
                       size_t publen, unsigned char *pub,
@@ -347,7 +337,7 @@ int OSSL_HPKE_enc_evp(OSSL_LIB_CTX *libctx,
                       size_t *cipherlen, unsigned char *cipher,
                       void *tv);
 # else
-int OSSL_HPKE_enc_evp(OSSL_LIB_CTX *libctx,
+int OSSL_HPKE_enc_evp(OSSL_LIB_CTX *libctx, const char *propq,
                       unsigned int mode, OSSL_HPKE_SUITE suite,
                       char *pskid, size_t psklen, unsigned char *psk,
                       size_t publen, unsigned char *pub,
@@ -366,6 +356,7 @@ int OSSL_HPKE_enc_evp(OSSL_LIB_CTX *libctx,
  * @brief HPKE single-shot decryption function
  *
  * @param libctx is the context to use (normally NULL)
+ * @param propq is a properties string
  * @param mode is the HPKE mode
  * @param suite is the ciphersuite to use
  * @param pskid is the pskid string for a PSK mode (can be NULL)
@@ -390,7 +381,7 @@ int OSSL_HPKE_enc_evp(OSSL_LIB_CTX *libctx,
  * @param clear is the encoded cleartext
  * @return 1 for success, other for error (error returns can be non-zero)
  */
-int OSSL_HPKE_dec(OSSL_LIB_CTX *libctx,
+int OSSL_HPKE_dec(OSSL_LIB_CTX *libctx, const char *propq,
                   unsigned int mode, OSSL_HPKE_SUITE suite,
                   char *pskid, size_t psklen, unsigned char *psk,
                   size_t publen, unsigned char *pub,
@@ -414,6 +405,7 @@ int OSSL_HPKE_dec(OSSL_LIB_CTX *libctx,
  * hence is sensitive.
  *
  * @param libctx is the context to use (normally NULL)
+ * @param propq is a properties string
  * @param mode is the mode (currently unused)
  * @param suite is the ciphersuite (currently unused)
  * @param ikmlen is the length of IKM, if supplied
@@ -424,7 +416,7 @@ int OSSL_HPKE_dec(OSSL_LIB_CTX *libctx,
  * @param priv is the private key
  * @return 1 for success, other for error (error returns can be non-zero)
  */
-int OSSL_HPKE_kg(OSSL_LIB_CTX *libctx,
+int OSSL_HPKE_kg(OSSL_LIB_CTX *libctx, const char *propq,
                  unsigned int mode, OSSL_HPKE_SUITE suite,
                  size_t ikmlen, unsigned char *ikm,
                  size_t *publen, unsigned char *pub,
@@ -442,6 +434,7 @@ int OSSL_HPKE_kg(OSSL_LIB_CTX *libctx,
  * application.
  *
  * @param libctx is the context to use (normally NULL)
+ * @param propq is a properties string
  * @param mode is the mode (currently unused)
  * @param suite is the ciphersuite (currently unused)
  * @param ikmlen is the length of IKM, if supplied
@@ -451,7 +444,7 @@ int OSSL_HPKE_kg(OSSL_LIB_CTX *libctx,
  * @param priv is the private key handle
  * @return 1 for success, other for error (error returns can be non-zero)
  */
-int OSSL_HPKE_kg_evp(OSSL_LIB_CTX *libctx,
+int OSSL_HPKE_kg_evp(OSSL_LIB_CTX *libctx, const char *propq,
                      unsigned int mode, OSSL_HPKE_SUITE suite,
                      size_t ikmlen, unsigned char *ikm,
                      size_t *publen, unsigned char *pub,
@@ -474,6 +467,7 @@ int OSSL_HPKE_suite_check(OSSL_HPKE_SUITE suite);
  * we can.
  *
  * @param libctx is the context to use (normally NULL)
+ * @param propq is a properties string
  * @param kem_id is what'd you'd expect (using the HPKE registry values)
  * @param prbuf is the private key buffer
  * @param prbuf_len is the length of that buffer
@@ -482,7 +476,7 @@ int OSSL_HPKE_suite_check(OSSL_HPKE_SUITE suite);
  * @param priv is a pointer to an EVP_PKEY * for the result
  * @return 1 for success, other for error (error returns can be non-zero)
  */
-int OSSL_HPKE_prbuf2evp(OSSL_LIB_CTX *libctx,
+int OSSL_HPKE_prbuf2evp(OSSL_LIB_CTX *libctx, const char *propq,
                         unsigned int kem_id,
                         unsigned char *prbuf,
                         size_t prbuf_len,
@@ -494,6 +488,7 @@ int OSSL_HPKE_prbuf2evp(OSSL_LIB_CTX *libctx,
  * @brief get a (possibly) random suite, public key and ciphertext for GREASErs
  *
  * @param libctx is the context to use (normally NULL)
+ * @param propq is a properties string
  * @param suite_in specifies the preferred suite or NULL for a random choice
  * @param suite is the chosen or random suite
  * @param pub a random value of the appropriate length for a sender public value
@@ -502,7 +497,7 @@ int OSSL_HPKE_prbuf2evp(OSSL_LIB_CTX *libctx,
  * @param cipher_len is the length of cipher
  * @return 1 for success, otherwise failure
  */
-int OSSL_HPKE_good4grease(OSSL_LIB_CTX *libctx,
+int OSSL_HPKE_good4grease(OSSL_LIB_CTX *libctx, const char *propq,
                           OSSL_HPKE_SUITE *suite_in,
                           OSSL_HPKE_SUITE *suite,
                           unsigned char *pub,
@@ -524,22 +519,24 @@ int OSSL_HPKE_good4grease(OSSL_LIB_CTX *libctx,
  * @param suite is the resulting suite
  * @return 1 for success, otherwise failure
  */
-int OSSL_HPKE_str2suite(char *str,
+int OSSL_HPKE_str2suite(const char *str,
                         OSSL_HPKE_SUITE *suite);
 
 /**
  * @brief tell the caller how big the cipertext will be
  *
  * @param suite is the suite to be used
+ * @param enclen points to what'll be enc length
  * @param clearlen is the length of plaintext
  * @param cipherlen points to what'll be ciphertext length
  * @return 1 for success, otherwise failure
  */
 int OSSL_HPKE_expansion(OSSL_HPKE_SUITE suite,
+                        size_t *enclen,
                         size_t clearlen,
                         size_t *cipherlen);
 
-int OSSL_HPKE_export(OSSL_LIB_CTX *libctx,
+int OSSL_HPKE_export(OSSL_LIB_CTX *libctx, const char *propq,
                      OSSL_HPKE_SUITE suite,
                      unsigned char *inp,
                      size_t inp_len,

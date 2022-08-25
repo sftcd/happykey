@@ -87,7 +87,7 @@ int main(int argc, char **argv)
 
     EVP_PKEY *privevp=NULL;
     int rv=OSSL_HPKE_kg_evp(
-        NULL, hpke_mode, hpke_suite,
+        NULL, NULL, hpke_mode, hpke_suite,
         0, NULL,
         &publen, pub,
         &privevp);
@@ -100,7 +100,7 @@ int main(int argc, char **argv)
     EVP_PKEY *senderpriv=NULL;
     size_t senderpublen=OSSL_HPKE_MAXSIZE; unsigned char senderpub[OSSL_HPKE_MAXSIZE];
     rv=OSSL_HPKE_kg_evp(
-        NULL, hpke_mode, hpke_suite,
+        NULL, NULL, hpke_mode, hpke_suite,
         0, NULL,
         &senderpublen, senderpub,
         &senderpriv);
@@ -139,7 +139,7 @@ int main(int argc, char **argv)
      * Call EVP mode encrypt
      */
     rv=OSSL_HPKE_enc_evp(
-        NULL, hpke_mode, hpke_suite,
+        NULL, NULL, hpke_mode, hpke_suite,
         pskid, psklen, psk,
         publen, pub,
         0, NULL, NULL,
@@ -165,7 +165,7 @@ int main(int argc, char **argv)
      * Call happykey decrypt
      */
     rv=OSSL_HPKE_dec( 
-            NULL, hpke_mode, hpke_suite,
+            NULL, NULL, hpke_mode, hpke_suite,
             pskid, psklen, psk,
             0, NULL, // publen, pub,
             0, NULL, privevp,

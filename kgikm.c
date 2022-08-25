@@ -110,7 +110,7 @@ static int hpke_test_one_ikm_gen(uint16_t kem_id,
     EVP_PKEY *sk = NULL;
 
     hpke_suite.kem_id = kem_id;
-    if (OSSL_HPKE_kg_evp(NULL, hpke_mode, hpke_suite, ikmlen, ikm, 
+    if (OSSL_HPKE_kg_evp(NULL, NULL, hpke_mode, hpke_suite, ikmlen, ikm, 
                          &lpublen, lpub, &sk) != 1) {
         return (- __LINE__);
     }

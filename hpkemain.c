@@ -626,7 +626,7 @@ int main(int argc, char **argv)
         unsigned char g_cipher[OSSL_HPKE_MAXSIZE];
         size_t g_cipher_len=266;
 
-        if (OSSL_HPKE_good4grease(NULL,NULL,&g_suite,g_pub,&g_pub_len,g_cipher,g_cipher_len)!=1) {
+        if (OSSL_HPKE_good4grease(NULL,NULL,NULL,&g_suite,g_pub,&g_pub_len,g_cipher,g_cipher_len)!=1) {
             printf("OSSL_HPKE_good4grease failed, bummer\n");
         } else {
             printf("OSSL_HPKE_good4grease worked, yay! (use debugger or SUPERVERBOSE to see what it does:-)\n");
@@ -773,7 +773,7 @@ int main(int argc, char **argv)
         size_t publen=OSSL_HPKE_MAXSIZE; unsigned char pub[OSSL_HPKE_MAXSIZE];
         size_t privlen=OSSL_HPKE_MAXSIZE; unsigned char priv[OSSL_HPKE_MAXSIZE];
         int rv=OSSL_HPKE_kg(
-            NULL, hpke_mode, hpke_suite, 0, NULL,
+            NULL, NULL, hpke_mode, hpke_suite, 0, NULL,
             &publen, pub,
             &privlen, priv);
         if (rv!=1) {
@@ -799,7 +799,7 @@ int main(int argc, char **argv)
             overallreturn=101;
         } else {
             rv=OSSL_HPKE_enc(
-                NULL, hpke_mode, hpke_suite,
+                NULL, NULL, hpke_mode, hpke_suite,
                 pskid, psklen, psk,
                 publen, pub,
                 privlen, priv, NULL,
@@ -898,7 +898,7 @@ int main(int argc, char **argv)
             OPENSSL_free(clear);
             exit(8);
         }
-        rv=OSSL_HPKE_dec( NULL, hpke_mode, hpke_suite,
+        rv=OSSL_HPKE_dec(NULL, NULL, hpke_mode, hpke_suite,
                 pskid, psklen, psk,
                 publen, pub,
                 0, NULL, privevp,
@@ -909,7 +909,7 @@ int main(int argc, char **argv)
                 0,NULL, /* seq */
                 &clearlen, clear); 
 #else
-        rv=OSSL_HPKE_dec( NULL, hpke_mode, hpke_suite,
+        rv=OSSL_HPKE_dec(NULL, NULL, hpke_mode, hpke_suite,
                 pskid, psklen, psk,
                 publen, pub,
                 privlen, priv, NULL,
