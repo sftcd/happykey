@@ -772,12 +772,11 @@ int main(int argc, char **argv)
     if (generate) {
         size_t publen=OSSL_HPKE_MAXSIZE; unsigned char pub[OSSL_HPKE_MAXSIZE];
         size_t privlen=OSSL_HPKE_MAXSIZE; unsigned char priv[OSSL_HPKE_MAXSIZE];
-        int rv=OSSL_HPKE_kg(
-            NULL, NULL, hpke_mode, hpke_suite, 0, NULL,
-            &publen, pub,
-            &privlen, priv);
+        int rv=OSSL_HPKE_keygen(
+            NULL, NULL, hpke_mode, hpke_suite,
+            NULL, 0, pub, &publen, priv, &privlen);
         if (rv!=1) {
-            fprintf(stderr,"Error (%d) from OSSL_HPKE_kg\n",rv);
+            fprintf(stderr,"Error (%d) from OSSL_HPKE_keygen\n",rv);
             exit(3);
         }
         rv=hpkemain_write_keys(publen, pub, privlen, priv,
@@ -800,15 +799,15 @@ int main(int argc, char **argv)
         } else {
             rv=OSSL_HPKE_enc(
                 NULL, NULL, hpke_mode, hpke_suite,
-                pskid, psklen, psk,
-                publen, pub,
-                privlen, priv, NULL,
-                plainlen, plain,
-                aadlen, aad,
-                infolen, info,
-                0,NULL, /* seq */
-                &senderpublen, senderpub,
-                &cipherlen, cipher
+                pskid, psk, psklen,
+                pub, publen,
+                priv, privlen, NULL,
+                plain, plainlen,
+                aad, aadlen,
+                info, infolen,
+                NULL,0, /* seq */
+                senderpub, &senderpublen,
+                cipher, &cipherlen
 #ifdef TESTVECTORS
                 ,tv
 #endif
@@ -899,26 +898,26 @@ int main(int argc, char **argv)
             exit(8);
         }
         rv=OSSL_HPKE_dec(NULL, NULL, hpke_mode, hpke_suite,
-                pskid, psklen, psk,
-                publen, pub,
-                0, NULL, privevp,
-                senderpublen, senderpub,
-                cipherlen, cipher,
-                aadlen,aad,
-                infolen,info,
-                0,NULL, /* seq */
-                &clearlen, clear); 
+                pskid, psk, psklen,
+                pub, publen,
+                NULL, 0, privevp,
+                senderpub, senderpublen,
+                cipher, cipherlen,
+                aad, aadlen,
+                info, infolen,
+                NULL, 0, /* seq */
+                clear, &clearlen);
 #else
         rv=OSSL_HPKE_dec(NULL, NULL, hpke_mode, hpke_suite,
-                pskid, psklen, psk,
-                publen, pub,
-                privlen, priv, NULL,
-                senderpublen, senderpub,
-                cipherlen, cipher,
-                aadlen,aad,
-                infolen,info,
-                0,NULL, /* seq */
-                &clearlen, clear); 
+                pskid, psk, psklen,
+                pub, publen,
+                priv, privlen, NULL,
+                senderpub, senderpublen,
+                cipher, cipherlen,
+                aad, aadlen,
+                info, infolen,
+                NULL, 0, /* seq */
+                clear, &clearlen);
 #endif
         if (cipher!=NULL) OPENSSL_free(cipher);
         if (pub!=NULL) OPENSSL_free(pub);

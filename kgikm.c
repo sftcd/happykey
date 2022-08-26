@@ -95,7 +95,7 @@ unsigned char pubp521[] = {
  * @publen is the length of the public key
  * @return 1 for good, other otherwise
  *
- * This calls OSSL_HPKE_kg specifying only the IKM, then
+ * This calls OSSL_HPKE_keygen specifying only the IKM, then
  * compares the key pair values with the already-known values
  * that were input.
  */
@@ -110,8 +110,8 @@ static int hpke_test_one_ikm_gen(uint16_t kem_id,
     EVP_PKEY *sk = NULL;
 
     hpke_suite.kem_id = kem_id;
-    if (OSSL_HPKE_kg_evp(NULL, NULL, hpke_mode, hpke_suite, ikmlen, ikm, 
-                         &lpublen, lpub, &sk) != 1) {
+    if (OSSL_HPKE_keygen_evp(NULL, NULL, hpke_mode, hpke_suite,
+                             ikm, ikmlen, lpub, &lpublen, &sk) != 1) {
         return (- __LINE__);
     }
     if (sk == NULL) return(- __LINE__);

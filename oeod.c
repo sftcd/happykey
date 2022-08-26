@@ -86,26 +86,20 @@ int main(int argc, char **argv)
     memset(priv,MEMCHAR,privlen);
 
     EVP_PKEY *privevp=NULL;
-    int rv=OSSL_HPKE_kg_evp(
-        NULL, NULL, hpke_mode, hpke_suite,
-        0, NULL,
-        &publen, pub,
-        &privevp);
+    int rv=OSSL_HPKE_keygen_evp(NULL, NULL, hpke_mode, hpke_suite,
+                                NULL, 0, pub, &publen, &privevp);
     if (rv!=1) {
-        fprintf(stderr,"Error (%d) from OSSL_HPKE_kg (receiver)\n",rv);
+        fprintf(stderr,"Error (%d) from OSSL_HPKE_keygen (receiver)\n",rv);
         exit(1);
     } 
     neod_pbuf("receiver pub",pub,publen);
 
     EVP_PKEY *senderpriv=NULL;
     size_t senderpublen=OSSL_HPKE_MAXSIZE; unsigned char senderpub[OSSL_HPKE_MAXSIZE];
-    rv=OSSL_HPKE_kg_evp(
-        NULL, NULL, hpke_mode, hpke_suite,
-        0, NULL,
-        &senderpublen, senderpub,
-        &senderpriv);
+    rv=OSSL_HPKE_keygen_evp(NULL, NULL, hpke_mode, hpke_suite,
+                            NULL, 0, senderpub, &senderpublen, &senderpriv);
     if (rv!=1) {
-        fprintf(stderr,"Error (%d) from OSSL_HPKE_kg (sender)\n",rv);
+        fprintf(stderr,"Error (%d) from OSSL_HPKE_keygen (sender)\n",rv);
         exit(1);
     } 
     neod_pbuf("sender pub",senderpub,senderpublen);
@@ -140,15 +134,15 @@ int main(int argc, char **argv)
      */
     rv=OSSL_HPKE_enc_evp(
         NULL, NULL, hpke_mode, hpke_suite,
-        pskid, psklen, psk,
-        publen, pub,
-        0, NULL, NULL,
-        clearlen, clear,
-        aadlen, aad,
-        infolen, info,
-        0, NULL, /* seq */
-        senderpublen, senderpub, senderpriv,
-        &cipherlen, cipher
+        pskid, psk, psklen,
+        pub, publen,
+        NULL, 0, NULL,
+        clear, clearlen,
+        aad, aadlen,
+        info, infolen,
+        NULL, 0, /* seq */
+        senderpub, senderpublen, senderpriv,
+        cipher, &cipherlen
 #ifdef TESTVECTORS
         , NULL
 #endif
@@ -166,15 +160,15 @@ int main(int argc, char **argv)
      */
     rv=OSSL_HPKE_dec( 
             NULL, NULL, hpke_mode, hpke_suite,
-            pskid, psklen, psk,
-            0, NULL, // publen, pub,
-            0, NULL, privevp,
-            senderpublen, senderpub,
-            cipherlen, cipher,
-            aadlen,aad,
-            infolen, info,
-            0, NULL, /* seq */
-            &clearlen, clear
+            pskid, psk, psklen,
+            NULL, 0, // publen, pub,
+            NULL, 0, privevp,
+            senderpub, senderpublen,
+            cipher, cipherlen,
+            aad, aadlen,
+            info, infolen,
+            NULL, 0, /* seq */
+            clear, &clearlen
             ); 
     if (rv!=1) {
         printf("Error decrypting (%d) - exiting\n",rv);

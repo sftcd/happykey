@@ -99,23 +99,19 @@ int main(int argc, char **argv)
 #define EVP
 #ifdef EVP
     EVP_PKEY *privevp=NULL;
-    int rv=OSSL_HPKE_kg_evp(
+    int rv=OSSL_HPKE_keygen_evp(
         NULL, NULL, hpke_mode, hpke_suite,
-        0, NULL,
-        &publen, pub,
-        &privevp);
+        NULL, 0, pub, &publen, &privevp);
     if (rv!=1) {
-        fprintf(stderr,"Error (%d) from OSSL_HPKE_kg\n",rv);
+        fprintf(stderr,"Error (%d) from OSSL_HPKE_keygen\n",rv);
         exit(1);
     } 
 #else
-    int rv=OSSL_HPKE_kg(
+    int rv=OSSL_HPKE_keygen(
         NULL, NULL, hpke_mode, hpke_suite,
-        0, NULL,
-        &publen, pub,
-        &privlen, priv);
+        0, NULL, pub, &publen, priv, &privlen);
     if (rv!=1) {
-        fprintf(stderr,"Error (%d) from OSSL_HPKE_kg\n",rv);
+        fprintf(stderr,"Error (%d) from OSSL_HPKEkeygen\n",rv);
         exit(1);
     } 
 #endif
@@ -178,20 +174,19 @@ int main(int argc, char **argv)
      * Call happykey decrypt
      */
     rv=OSSL_HPKE_dec(NULL, NULL, hpke_mode, hpke_suite,
-            pskid, psklen, psk,
-            0, NULL, // publen, pub,
+            pskid, psk, psklen,
+            NULL, 0, // publen, pub,
 #ifdef EVP
-            0, NULL, privevp,
+            NULL, 0, privevp,
 #else
-            privlen, priv, NULL,
+            priv, privlen, NULL,
 #endif
-            senderpublen, senderpub,
-            cipherlen, cipher,
-            aadlen,aad,
-            // 0, NULL, // infolen, info,
-            infolen, info,
-            0, NULL, /* seq */
-            &clearlen, clear); 
+            senderpub, senderpublen,
+            cipher, cipherlen,
+            aad, aadlen,
+            info, infolen,
+            NULL, 0, /* seq */
+            clear, &clearlen);
     if (rv!=1) {
         printf("Error decrypting (%d) - exiting\n",rv);
         exit(rv);

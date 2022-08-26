@@ -461,12 +461,12 @@ static int hpke_kem_id_nist_curve(uint16_t kem_id)
  * @param buflen is the length of the private key buffer
  * @return a working EVP_PKEY * or NULL
  */
-static EVP_PKEY * hpke_EVP_PKEY_new_raw_nist_public_key(OSSL_LIB_CTX *libctx,
-                                                        const char *propq,
-                                                        int curve,
-                                                        const char *gname,
-                                                        unsigned char *buf,
-                                                        size_t buflen)
+static EVP_PKEY* hpke_EVP_PKEY_new_raw_nist_public_key(OSSL_LIB_CTX *libctx,
+                                                       const char *propq,
+                                                       int curve,
+                                                       const char *gname,
+                                                       const unsigned char *buf,
+                                                       size_t buflen)
 {
 #ifdef HAPPYKEY
     /*
@@ -515,21 +515,6 @@ err:
 }
 
 /*
- * There's an odd accidental coding style feature here:
- * For all the externally visible functions in hpke.h, when
- * passing in a buffer, the length parameter precedes the
- * associated buffer pointer. It turns out that, entirely by
- * accident, I did the exact opposite for all the static
- * functions defined inside here. But since I was consistent
- * in both cases, I'll declare that a feature and move on:-)
- *
- * For example, just below you'll see:
- *          unsigned char *iv, size_t ivlen,
- * ...whereas in hpke.h, you see:
- *          size_t publen, unsigned char *pub,
- */
-
-/*
  * @brief do the AEAD decryption
  *
  * @param libctx is the context to use
@@ -547,13 +532,12 @@ err:
  * @param plainlen input/output, better be big enough on input, exact on output
  * @return 1 for good otherwise bad
  */
-static int hpke_aead_dec(OSSL_LIB_CTX *libctx,
-                         const char *propq,
+static int hpke_aead_dec(OSSL_LIB_CTX *libctx, const char *propq,
                          OSSL_HPKE_SUITE suite,
-                         unsigned char *key, size_t keylen,
-                         unsigned char *iv, size_t ivlen,
-                         unsigned char *aad, size_t aadlen,
-                         unsigned char *cipher, size_t cipherlen,
+                         const unsigned char *key, size_t keylen,
+                         const unsigned char *iv, size_t ivlen,
+                         const unsigned char *aad, size_t aadlen,
+                         const unsigned char *cipher, size_t cipherlen,
                          unsigned char *plain, size_t *plainlen)
 {
     int erv = 1;
@@ -621,7 +605,7 @@ static int hpke_aead_dec(OSSL_LIB_CTX *libctx,
     plaintextlen = len;
     /* Set expected tag value. Works in OpenSSL 1.0.1d and later */
     if (!EVP_CIPHER_CTX_ctrl(ctx, EVP_CTRL_GCM_SET_TAG,
-                             taglen, cipher + cipherlen - taglen)) {
+                             taglen, (void *)(cipher + cipherlen - taglen))) {
         OSSL_HPKE_err;
         goto err;
     }
@@ -662,13 +646,12 @@ err:
  * @param cipherlen input/output, better be big enough on input, exact on output
  * @return 1 for good otherwise bad
  */
-static int hpke_aead_enc(OSSL_LIB_CTX *libctx,
-                         const char *propq,
+static int hpke_aead_enc(OSSL_LIB_CTX *libctx, const char *propq,
                          OSSL_HPKE_SUITE suite,
-                         unsigned char *key, size_t keylen,
-                         unsigned char *iv, size_t ivlen,
-                         unsigned char *aad, size_t aadlen,
-                         unsigned char *plain, size_t plainlen,
+                         const unsigned char *key, size_t keylen,
+                         const unsigned char *iv, size_t ivlen,
+                         const unsigned char *aad, size_t aadlen,
+                         const unsigned char *plain, size_t plainlen,
                          unsigned char *cipher, size_t *cipherlen)
 {
     int erv = 1;
@@ -1435,11 +1418,11 @@ static int hpke_test_expand_extract(void)
 static int hpke_do_kem(OSSL_LIB_CTX *libctx, const char *propq,
                        int encrypting, OSSL_HPKE_SUITE suite,
                        EVP_PKEY *key1,
-                       size_t key1enclen, unsigned char *key1enc,
+                       size_t key1enclen, const unsigned char *key1enc,
                        EVP_PKEY *key2,
-                       size_t key2enclen, unsigned char *key2enc,
+                       size_t key2enclen, const unsigned char *key2enc,
                        EVP_PKEY *akey,
-                       size_t apublen, unsigned char *apub,
+                       size_t apublen, const unsigned char *apub,
                        unsigned char **ss, size_t *sslen)
 {
     int erv = 1;
@@ -1598,7 +1581,7 @@ static int hpke_mode_check(unsigned int mode)
  * non-default. Otherwise we ignore the PSK params.
  */
 static int hpke_psk_check(unsigned int mode,
-                          char *pskid,
+                          const char *pskid,
                           size_t psklen,
                           const unsigned char *psk)
 {
@@ -1632,9 +1615,9 @@ static int hpke_psk_check(unsigned int mode,
  */
 static int hpke_prbuf2evp(OSSL_LIB_CTX *libctx, const char *propq,
                           unsigned int kem_id,
-                          unsigned char *prbuf,
+                          const unsigned char *prbuf,
                           size_t prbuf_len,
-                          unsigned char *pubuf,
+                          const unsigned char *pubuf,
                           size_t pubuf_len,
                           EVP_PKEY **retpriv)
 {
@@ -1939,33 +1922,39 @@ static int hpke_suite_check(OSSL_HPKE_SUITE suite)
 #ifdef TESTVECTORS
 static int hpke_enc_int(OSSL_LIB_CTX *libctx, const char *propq,
                         unsigned int mode, OSSL_HPKE_SUITE suite,
-                        char *pskid, size_t psklen, unsigned char *psk,
-                        size_t publen, unsigned char *pub,
-                        size_t authprivlen, unsigned char *authpriv,
+                        const char *pskid,
+                        size_t psklen, const unsigned char *psk,
+                        size_t publen, const unsigned char *pub,
+                        size_t authprivlen, const unsigned char *authpriv,
                         EVP_PKEY *authpriv_evp,
-                        size_t clearlen, unsigned char *clear,
-                        size_t aadlen, unsigned char *aad,
-                        size_t infolen, unsigned char *info,
-                        size_t seqlen, unsigned char *seq,
-                        size_t extsenderpublen, unsigned char *extsenderpub,
+                        size_t clearlen, const unsigned char *clear,
+                        size_t aadlen, const unsigned char *aad,
+                        size_t infolen, const unsigned char *info,
+                        size_t seqlen, const unsigned char *seq,
+                        size_t extsenderpublen,
+                        const unsigned char *extsenderpub,
                         EVP_PKEY *extsenderpriv,
-                        size_t rawsenderprivlen, unsigned char *rawsenderpriv,
+                        size_t rawsenderprivlen,
+                        const unsigned char *rawsenderpriv,
                         size_t *senderpublen, unsigned char *senderpub,
                         size_t *cipherlen, unsigned char *cipher, void *tv)
 #else
 static int hpke_enc_int(OSSL_LIB_CTX *libctx, const char *propq,
                         unsigned int mode, OSSL_HPKE_SUITE suite,
-                        char *pskid, size_t psklen, unsigned char *psk,
-                        size_t publen, unsigned char *pub,
-                        size_t authprivlen, unsigned char *authpriv,
+                        const char *pskid,
+                        size_t psklen, const unsigned char *psk,
+                        size_t publen, const unsigned char *pub,
+                        size_t authprivlen, const unsigned char *authpriv,
                         EVP_PKEY *authpriv_evp,
-                        size_t clearlen, unsigned char *clear,
-                        size_t aadlen, unsigned char *aad,
-                        size_t infolen, unsigned char *info,
-                        size_t seqlen, unsigned char *seq,
-                        size_t extsenderpublen, unsigned char *extsenderpub,
+                        size_t clearlen, const unsigned char *clear,
+                        size_t aadlen, const unsigned char *aad,
+                        size_t infolen, const unsigned char *info,
+                        size_t seqlen, const unsigned char *seq,
+                        size_t extsenderpublen,
+                        const unsigned char *extsenderpub,
                         EVP_PKEY *extsenderpriv,
-                        size_t rawsenderprivlen, unsigned char *rawsenderpriv,
+                        size_t rawsenderprivlen,
+                        const unsigned char *rawsenderpriv,
                         size_t *senderpublen, unsigned char *senderpub,
                         size_t *cipherlen, unsigned char *cipher)
 #endif
@@ -2460,15 +2449,16 @@ err:
  */
 static int hpke_dec_int(OSSL_LIB_CTX *libctx, const char *propq,
                         unsigned int mode, OSSL_HPKE_SUITE suite,
-                        char *pskid, size_t psklen, unsigned char *psk,
-                        size_t authpublen, unsigned char *authpub,
-                        size_t privlen, unsigned char *priv,
+                        const char *pskid,
+                        size_t psklen, const unsigned char *psk,
+                        size_t authpublen, const unsigned char *authpub,
+                        size_t privlen, const unsigned char *priv,
                         EVP_PKEY *evppriv,
-                        size_t enclen, unsigned char *enc,
-                        size_t cipherlen, unsigned char *cipher,
-                        size_t aadlen, unsigned char *aad,
-                        size_t infolen, unsigned char *info,
-                        size_t seqlen, unsigned char *seq,
+                        size_t enclen, const unsigned char *enc,
+                        size_t cipherlen, const unsigned char *cipher,
+                        size_t aadlen, const unsigned char *aad,
+                        size_t infolen, const unsigned char *info,
+                        size_t seqlen, const unsigned char *seq,
                         size_t *clearlen, unsigned char *clear)
 {
     int erv = 1;
@@ -2905,7 +2895,7 @@ static int hpke_kg_comp2order(uint32_t kemid, size_t buflen,
  */
 static int hpke_kg_evp(OSSL_LIB_CTX *libctx, const char *propq,
                        unsigned int mode, OSSL_HPKE_SUITE suite,
-                       size_t ikmlen, unsigned char *ikm,
+                       size_t ikmlen, const unsigned char *ikm,
                        size_t *publen, unsigned char *pub,
                        EVP_PKEY **priv)
 {
@@ -3140,7 +3130,7 @@ err:
  */
 static int hpke_kg(OSSL_LIB_CTX *libctx, const char *propq,
                    unsigned int mode, OSSL_HPKE_SUITE suite,
-                   size_t ikmlen, unsigned char *ikm,
+                   size_t ikmlen, const unsigned char *ikm,
                    size_t *publen, unsigned char *pub,
                    size_t *privlen, unsigned char *priv)
 {
@@ -3544,29 +3534,32 @@ err:
 #ifdef TESTVECTORS
 int OSSL_HPKE_enc(OSSL_LIB_CTX *libctx, const char *propq,
                   unsigned int mode, OSSL_HPKE_SUITE suite,
-                  char *pskid, size_t psklen, unsigned char *psk,
-                  size_t publen, unsigned char *pub,
-                  size_t authprivlen, unsigned char *authpriv,
+                  const char *pskid,
+                  const unsigned char *psk, size_t psklen,
+                  const unsigned char *pub, size_t publen,
+                  const unsigned char *authpriv, size_t authprivlen,
                   EVP_PKEY *authpriv_evp,
-                  size_t clearlen, unsigned char *clear,
-                  size_t aadlen, unsigned char *aad,
-                  size_t infolen, unsigned char *info,
-                  size_t seqlen, unsigned char *seq,
-                  size_t *senderpublen, unsigned char *senderpub,
-                  size_t *cipherlen, unsigned char *cipher, void *tv)
+                  const unsigned char *clear, size_t clearlen,
+                  const unsigned char *aad, size_t aadlen,
+                  const unsigned char *info, size_t infolen,
+                  const unsigned char *seq, size_t seqlen,
+                  unsigned char *senderpub,size_t *senderpublen,
+                  unsigned char *cipher, size_t *cipherlen,
+                  void *tv)
 #else
 int OSSL_HPKE_enc(OSSL_LIB_CTX *libctx, const char *propq,
                   unsigned int mode, OSSL_HPKE_SUITE suite,
-                  char *pskid, size_t psklen, unsigned char *psk,
-                  size_t publen, unsigned char *pub,
-                  size_t authprivlen, unsigned char *authpriv,
+                  const char *pskid,
+                  const unsigned char *psk, size_t psklen,
+                  const unsigned char *pub, size_t publen,
+                  const unsigned char *authpriv, size_t authprivlen,
                   EVP_PKEY *authpriv_evp,
-                  size_t clearlen, unsigned char *clear,
-                  size_t aadlen, unsigned char *aad,
-                  size_t infolen, unsigned char *info,
-                  size_t seqlen, unsigned char *seq,
-                  size_t *senderpublen, unsigned char *senderpub,
-                  size_t *cipherlen, unsigned char *cipher)
+                  const unsigned char *clear, size_t clearlen,
+                  const unsigned char *aad, size_t aadlen,
+                  const unsigned char *info, size_t infolen,
+                  const unsigned char *seq, size_t seqlen,
+                  unsigned char *senderpub,size_t *senderpublen,
+                  unsigned char *cipher, size_t *cipherlen)
 #endif
 {
 #ifdef TESTVECTORS
@@ -3637,31 +3630,33 @@ int OSSL_HPKE_enc(OSSL_LIB_CTX *libctx, const char *propq,
 #ifdef TESTVECTORS
 int OSSL_HPKE_enc_evp(OSSL_LIB_CTX *libctx, const char *propq,
                       unsigned int mode, OSSL_HPKE_SUITE suite,
-                      char *pskid, size_t psklen, unsigned char *psk,
-                      size_t publen, unsigned char *pub,
-                      size_t authprivlen, unsigned char *authpriv,
+                      const char *pskid,
+                      const unsigned char *psk, size_t psklen,
+                      const unsigned char *pub, size_t publen,
+                      const unsigned char *authpriv, size_t authprivlen,
                       EVP_PKEY *authpriv_evp,
-                      size_t clearlen, unsigned char *clear,
-                      size_t aadlen, unsigned char *aad,
-                      size_t infolen, unsigned char *info,
-                      size_t seqlen, unsigned char *seq,
-                      size_t senderpublen, unsigned char *senderpub,
+                      const unsigned char *clear, size_t clearlen,
+                      const unsigned char *aad, size_t aadlen,
+                      const unsigned char *info, size_t infolen,
+                      const unsigned char *seq, size_t seqlen,
+                      const unsigned char *senderpub, size_t senderpublen,
                       EVP_PKEY *senderpriv,
-                      size_t *cipherlen, unsigned char *cipher, void *tv)
+                      unsigned char *cipher, size_t *cipherlen, void *tv)
 #else
 int OSSL_HPKE_enc_evp(OSSL_LIB_CTX *libctx, const char *propq,
                       unsigned int mode, OSSL_HPKE_SUITE suite,
-                      char *pskid, size_t psklen, unsigned char *psk,
-                      size_t publen, unsigned char *pub,
-                      size_t authprivlen, unsigned char *authpriv,
+                      const char *pskid,
+                      const unsigned char *psk, size_t psklen,
+                      const unsigned char *pub, size_t publen,
+                      const unsigned char *authpriv, size_t authprivlen,
                       EVP_PKEY *authpriv_evp,
-                      size_t clearlen, unsigned char *clear,
-                      size_t aadlen, unsigned char *aad,
-                      size_t infolen, unsigned char *info,
-                      size_t seqlen, unsigned char *seq,
-                      size_t senderpublen, unsigned char *senderpub,
+                      const unsigned char *clear, size_t clearlen,
+                      const unsigned char *aad, size_t aadlen,
+                      const unsigned char *info, size_t infolen,
+                      const unsigned char *seq, size_t seqlen,
+                      const unsigned char *senderpub, size_t senderpublen,
                       EVP_PKEY *senderpriv,
-                      size_t *cipherlen, unsigned char *cipher)
+                      unsigned char *cipher, size_t *cipherlen)
 #endif
 {
 #ifdef TESTVECTORS
@@ -3724,16 +3719,15 @@ int OSSL_HPKE_enc_evp(OSSL_LIB_CTX *libctx, const char *propq,
  */
 int OSSL_HPKE_dec(OSSL_LIB_CTX *libctx, const char *propq,
                   unsigned int mode, OSSL_HPKE_SUITE suite,
-                  char *pskid, size_t psklen, unsigned char *psk,
-                  size_t publen, unsigned char *pub,
-                  size_t privlen, unsigned char *priv,
-                  EVP_PKEY *evppriv,
-                  size_t enclen, unsigned char *enc,
-                  size_t cipherlen, unsigned char *cipher,
-                  size_t aadlen, unsigned char *aad,
-                  size_t infolen, unsigned char *info,
-                  size_t seqlen, unsigned char *seq,
-                  size_t *clearlen, unsigned char *clear)
+                  const char *pskid, const unsigned char *psk, size_t psklen,
+                  const unsigned char *pub, size_t publen,
+                  const unsigned char *priv, size_t privlen, EVP_PKEY *evppriv,
+                  const unsigned char *enc, size_t enclen,
+                  const unsigned char *cipher, size_t cipherlen,
+                  const unsigned char *aad, size_t aadlen,
+                  const unsigned char *info, size_t infolen,
+                  const unsigned char *seq, size_t seqlen,
+                  unsigned char *clear, size_t *clearlen)
 {
     return (hpke_dec_int(libctx, propq, mode, suite,
                          pskid, psklen, psk,
@@ -3761,11 +3755,11 @@ int OSSL_HPKE_dec(OSSL_LIB_CTX *libctx, const char *propq,
  * @param priv is the private key
  * @return 1 for good (OpenSSL style), not-1 for error
  */
-int OSSL_HPKE_kg(OSSL_LIB_CTX *libctx, const char *propq,
-                 unsigned int mode, OSSL_HPKE_SUITE suite,
-                 size_t ikmlen, unsigned char *ikm,
-                 size_t *publen, unsigned char *pub,
-                 size_t *privlen, unsigned char *priv)
+int OSSL_HPKE_keygen(OSSL_LIB_CTX *libctx, const char *propq,
+                     unsigned int mode, OSSL_HPKE_SUITE suite,
+                     const unsigned char *ikm, size_t ikmlen,
+                     unsigned char *pub, size_t *publen,
+                     unsigned char *priv, size_t *privlen)
 {
     return (hpke_kg(libctx, propq, mode, suite, ikmlen, ikm,
                     publen, pub, privlen, priv));
@@ -3784,11 +3778,11 @@ int OSSL_HPKE_kg(OSSL_LIB_CTX *libctx, const char *propq,
  * @param priv is the private key handle
  * @return 1 for good (OpenSSL style), not-1 for error
  */
-int OSSL_HPKE_kg_evp(OSSL_LIB_CTX *libctx, const char *propq,
-                     unsigned int mode, OSSL_HPKE_SUITE suite,
-                     size_t ikmlen, unsigned char *ikm,
-                     size_t *publen, unsigned char *pub,
-                     EVP_PKEY **priv)
+int OSSL_HPKE_keygen_evp(OSSL_LIB_CTX *libctx, const char *propq,
+                         unsigned int mode, OSSL_HPKE_SUITE suite,
+                         const unsigned char *ikm, size_t ikmlen,
+                         unsigned char *pub, size_t *publen,
+                         EVP_PKEY **priv)
 {
     return (hpke_kg_evp(libctx, propq, mode, suite,
                         ikmlen, ikm, publen, pub, priv));
