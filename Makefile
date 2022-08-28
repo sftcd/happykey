@@ -81,14 +81,14 @@ copy2lib: forlib
 	- cp hpke.h-forlib ${INCL}/openssl/hpke.h
 	- ./dosub.sh ${OSSL}/test/evp_extra_test.c
 
-os2evp: os2evp.o hpke.o 
-	LD_LIBRARY_PATH=${OSSL} ${CC} ${CFLAGS} -g -o $@ os2evp.o hpke.o -L ${OSSL} -lcrypto -L ${NSSL} -lnss3 -lnspr4
+os2evp: os2evp.o hpke.o packet.o
+	LD_LIBRARY_PATH=${OSSL} ${CC} ${CFLAGS} -g -o $@ os2evp.o hpke.o packet.o -L ${OSSL} -lcrypto -L ${NSSL} -lnss3 -lnspr4
 
 os2evp.o: os2evp.c
 	${CC} ${CFLAGS} -g -I ${INCL} -c $<
 
-kgikm: kgikm.o hpke.o 
-	LD_LIBRARY_PATH=${OSSL} ${CC} ${CFLAGS} -g -o $@ kgikm.o hpke.o -L ${OSSL} -lcrypto -L ${NSSL} -lnss3 -lnspr4
+kgikm: kgikm.o hpke.o packet.o
+	LD_LIBRARY_PATH=${OSSL} ${CC} ${CFLAGS} -g -o $@ kgikm.o hpke.o packet.o -L ${OSSL} -lcrypto -L ${NSSL} -lnss3 -lnspr4
 
 kgikm.o: kgikm.c
 	${CC} ${CFLAGS} -g -I ${INCL} -c $<
@@ -102,8 +102,8 @@ osslplayground.o: osslplayground.c
 # This is a round-trip test with NSS encrypting and my code decrypting
 # (no parameters for now)
 
-neod: neod.o hpke.o neod_nss.o
-	if [ -d ${NSSL} ]; then LD_LIBRARY_PATH=${OSSL}:${NSSL} ${CC} ${CFLAGS}  -g -o $@ neod.o hpke.o neod_nss.o -L ${OSSL} -lssl -lcrypto -L ${NSSL} -lnss3 -lnspr4 ; fi
+neod: neod.o hpke.o neod_nss.o packet.o
+	if [ -d ${NSSL} ]; then LD_LIBRARY_PATH=${OSSL}:${NSSL} ${CC} ${CFLAGS}  -g -o $@ neod.o hpke.o packet.o neod_nss.o -L ${OSSL} -lssl -lcrypto -L ${NSSL} -lnss3 -lnspr4 ; fi
 
 neod.o: neod.c
 	${CC} ${CFLAGS} -g -I ${INCL} -c $<
@@ -116,20 +116,22 @@ neodtest: neod
 
 # A round-trip to test EVP mode for sender public
 #
-oeod: oeod.o hpke.o 
-	${CC} ${CFLAGS} -g -o $@ oeod.o hpke.o -L ${OSSL} -lssl -lcrypto 
+oeod: oeod.o hpke.o packet.o 
+	${CC} ${CFLAGS} -g -o $@ oeod.o hpke.o packet.o -L ${OSSL} -lssl -lcrypto 
 
 oeod.o: oeod.c
 	${CC} ${CFLAGS} -g -I ${INCL} -c $<
 
 # A test of a buffer->EVP_PKEY problem
 
-test2evp: test2evp.o hpke.o
-	LD_LIBRARY_PATH=${OSSL} ${CC} ${CFLAGS} -g -o $@ test2evp.o hpke.o -L ${OSSL} -lssl -lcrypto 
+test2evp: test2evp.o hpke.o packet.o
+	LD_LIBRARY_PATH=${OSSL} ${CC} ${CFLAGS} -g -o $@ test2evp.o hpke.o packet.o -L ${OSSL} -lssl -lcrypto 
 
 test2evp.o: test2evp.c
 	${CC} ${CFLAGS} -g -I ${INCL} -c $<
 
+packet.o: packet.c
+	${CC} ${CFLAGS} -g -I ${INCL} -c $<
 
 # do a test run
 test: hpkemain
@@ -145,11 +147,11 @@ apitest.o: apitest.c hpke.h hpke.c
 	${CC} ${CFLAGS} -I ${INCL} -c $<
 
 ifdef uselibcrypto
-apitest: apitest.o ${OSSL}/libssl.so
+apitest: apitest.o packet.o ${OSSL}/libssl.so
 	${CC} ${CFLAGS} -o $@ apitest.o -L ${OSSL} -lssl -lcrypto
 else
-apitest: apitest.o
-	${CC} ${CFLAGS} -o $@ apitest.o hpke.o -L ${OSSL} -lssl -lcrypto
+apitest: apitest.o packet.o
+	${CC} ${CFLAGS} -o $@ apitest.o hpke.o packet.o -L ${OSSL} -lssl -lcrypto
 endif
 
 ifdef testvectors
@@ -158,15 +160,15 @@ hpketv.o: hpketv.c hpketv.h hpke.h
 endif
 
 ifdef testvectors
-hpkemain: hpkemain.o hpke.o hpketv.o
-	${CC} ${CFLAGS} -o $@ hpkemain.o hpke.o hpketv.o -L ${OSSL} -lssl -lcrypto -L ../json-c/.libs -ljson-c
+hpkemain: hpkemain.o hpke.o hpketv.o packet.o
+	${CC} ${CFLAGS} -o $@ hpkemain.o hpke.o packet.o hpketv.o -L ${OSSL} -lssl -lcrypto -L ../json-c/.libs -ljson-c
 else
 ifdef uselibcrypto
-hpkemain: hpkemain.o
-	${CC} ${CFLAGS} -o $@ hpkemain.o -L ${OSSL} -lssl -lcrypto
+hpkemain: hpkemain.o packet.o
+	${CC} ${CFLAGS} -o $@ hpkemain.o packet.o -L ${OSSL} -lssl -lcrypto
 else
-hpkemain: hpkemain.o hpke.o 
-	${CC} ${CFLAGS} -o $@ hpkemain.o hpke.o -L ${OSSL} -lssl -lcrypto
+hpkemain: hpkemain.o hpke.o packet.o
+	${CC} ${CFLAGS} -o $@ hpkemain.o hpke.o packet.o -L ${OSSL} -lssl -lcrypto
 endif
 endif
 

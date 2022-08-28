@@ -27,6 +27,11 @@ High level notes:
 
 ## Recent Changes
 
+- 20220828: made quite a few changes based on review of our 
+  [OpenSSL HPKE PR](https://github.com/openssl/openssl/pull/17172). Many
+  fairly trivial, but one required adding a shim for the otherwise
+  internal ``WPAKCET_*()`` APIs.
+
 - 20220618: added a (possibly temporary, possibly not) proposal for
   a higher level API that better matches the RFC text - idea is to
   see if OpenSSL devs prefer that (or something derived from that).

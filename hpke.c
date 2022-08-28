@@ -23,6 +23,10 @@
 #include <openssl/params.h>
 #include <openssl/param_build.h>
 #include <openssl/core_names.h>
+#define TRYPACKET
+#ifdef TRYPACKET
+#include <internal/packet.h>
+#endif
 #ifdef HAPPYKEY
 /* if you don't have an openssl development tree you may need this */
 #ifndef OSSL_NELEM
@@ -834,7 +838,12 @@ static int hpke_extract(OSSL_LIB_CTX *libctx,
     size_t lsecretlen = 0;
     uint16_t kem_ind = 0;
     uint16_t kdf_ind = 0;
+#ifdef TRYPACKET
+    WPACKET pkt;
 
+    if (!WPACKET_init_static_len(&pkt, labeled_ikmbuf, sizeof(labeled_ikmbuf), 0)) 
+        goto err;
+#endif
     /* Handle oddities of HPKE labels (or not) */
     switch (mode5869) {
 
@@ -844,6 +853,17 @@ static int hpke_extract(OSSL_LIB_CTX *libctx,
         break;
 
     case OSSL_HPKE_5869_MODE_KEM:
+
+#ifdef TRYPACKET
+        if (!WPACKET_memcpy(&pkt, OSSL_HPKE_VERLABEL, strlen(OSSL_HPKE_VERLABEL))
+            || !WPACKET_memcpy(&pkt, OSSL_HPKE_SEC41LABEL, strlen(OSSL_HPKE_SEC41LABEL))
+            || !WPACKET_put_bytes_u16(&pkt, suite.kem_id)
+            || !WPACKET_memcpy(&pkt, label, labellen)
+            || !WPACKET_memcpy(&pkt, ikm, ikmlen)
+            || !WPACKET_get_total_written(&pkt, &labeled_ikmlen)
+            || !WPACKET_finish(&pkt))
+            goto err;
+#else
         concat_offset = 0;
         memcpy(labeled_ikm, OSSL_HPKE_VERLABEL, strlen(OSSL_HPKE_VERLABEL));
         concat_offset += strlen(OSSL_HPKE_VERLABEL);
@@ -889,9 +909,22 @@ static int hpke_extract(OSSL_LIB_CTX *libctx,
             goto err;
         }
         labeled_ikmlen = concat_offset;
+#endif
         break;
 
     case OSSL_HPKE_5869_MODE_FULL:
+#ifdef TRYPACKET
+        if (!WPACKET_memcpy(&pkt, OSSL_HPKE_VERLABEL, strlen(OSSL_HPKE_VERLABEL))
+            || !WPACKET_memcpy(&pkt, OSSL_HPKE_SEC51LABEL, strlen(OSSL_HPKE_SEC51LABEL))
+            || !WPACKET_put_bytes_u16(&pkt, suite.kem_id)
+            || !WPACKET_put_bytes_u16(&pkt, suite.kdf_id)
+            || !WPACKET_put_bytes_u16(&pkt, suite.aead_id)
+            || !WPACKET_memcpy(&pkt, label, labellen)
+            || !WPACKET_memcpy(&pkt, ikm, ikmlen)
+            || !WPACKET_get_total_written(&pkt, &labeled_ikmlen)
+            || !WPACKET_finish(&pkt))
+            goto err;
+#else
         concat_offset = 0;
         memcpy(labeled_ikm, OSSL_HPKE_VERLABEL, strlen(OSSL_HPKE_VERLABEL));
         concat_offset += strlen(OSSL_HPKE_VERLABEL);
@@ -966,6 +999,7 @@ static int hpke_extract(OSSL_LIB_CTX *libctx,
             goto err;
         }
         labeled_ikmlen = concat_offset;
+#endif
         break;
     default:
         erv = 0;
@@ -1034,6 +1068,9 @@ static int hpke_extract(OSSL_LIB_CTX *libctx,
     *secretlen = lsecretlen;
 
 err:
+#ifdef TRYPACKET
+    WPACKET_cleanup(&pkt);
+#endif
     EVP_KDF_free(kdf);
     EVP_KDF_CTX_free(kctx);
     memset(labeled_ikmbuf, 0, OSSL_HPKE_MAXSIZE);
@@ -1078,7 +1115,12 @@ static int hpke_expand(OSSL_LIB_CTX *libctx, const char *propq,
     const char *mdname = NULL;
     uint16_t kem_ind = 0;
     uint16_t kdf_ind = 0;
+#ifdef TRYPACKET
+    WPACKET pkt;
 
+    if (!WPACKET_init_static_len(&pkt, libuf, sizeof(libuf), 0)) 
+        goto err;
+#endif
     if (L > *outlen) {
         erv = 0;
         ERR_raise(ERR_LIB_CRYPTO, ERR_R_INTERNAL_ERROR);
@@ -1087,6 +1129,13 @@ static int hpke_expand(OSSL_LIB_CTX *libctx, const char *propq,
     /* Handle oddities of HPKE labels (or not) */
     switch (mode5869) {
     case OSSL_HPKE_5869_MODE_PURE:
+#ifdef TYPACKET
+        if (!WPACKET_memcpy(&pkt, label, labellen)
+            || !WPACKET_memcpy(&pkt, info, infolen)
+            || !WPACKET_get_total_written(&pkt, &concat_offset)
+            || !WPACKET_finish(&pkt))
+            goto err;
+#else
         if ((labellen + infolen) >= INT_MAXSIZE) {
             erv = 0;
             ERR_raise(ERR_LIB_CRYPTO, ERR_R_INTERNAL_ERROR);
@@ -1095,9 +1144,21 @@ static int hpke_expand(OSSL_LIB_CTX *libctx, const char *propq,
         memcpy(lip, label, labellen);
         memcpy(lip + labellen, info, infolen);
         concat_offset = labellen + infolen;
+#endif
         break;
 
     case OSSL_HPKE_5869_MODE_KEM:
+#ifdef TYPACKET
+        if (!WPACKET_put_bytes_u16(&pkt, L)
+            || !WPACKET_memcpy(&pkt, OSSL_HPKE_VERLABEL, strlen(OSSL_HPKE_VERLABEL))
+            || !WPACKET_memcpy(&pkt, OSSL_HPKE_SEC41LABEL, strlen(OSSL_HPKE_SEC41LABEL))
+            || !WPACKET_put_bytes_u16(&pkt, suite.kem_id)
+            || !WPACKET_memcpy(&pkt, label, labellen)
+            || !WPACKET_memcpy(&pkt, info, infolen)
+            || !WPACKET_get_total_written(&pkt, &concat_offset)
+            || !WPACKET_finish(&pkt))
+            goto err;
+#else
         lip[0] = (L / 256) % 256;
         lip[1] = L % 256;
         concat_offset = 2;
@@ -1146,9 +1207,23 @@ static int hpke_expand(OSSL_LIB_CTX *libctx, const char *propq,
             ERR_raise(ERR_LIB_CRYPTO, ERR_R_INTERNAL_ERROR);
             goto err;
         }
+#endif
         break;
 
     case OSSL_HPKE_5869_MODE_FULL:
+#ifdef TYPACKET
+        if (!WPACKET_put_bytes_u16(&pkt, L)
+            || !WPACKET_memcpy(&pkt, OSSL_HPKE_VERLABEL, strlen(OSSL_HPKE_VERLABEL))
+            || !WPACKET_memcpy(&pkt, OSSL_HPKE_SEC51LABEL, strlen(OSSL_HPKE_SEC51LABEL))
+            || !WPACKET_put_bytes_u16(&pkt, suite.kem_id)
+            || !WPACKET_put_bytes_u16(&pkt, suite.kdf_id)
+            || !WPACKET_put_bytes_u16(&pkt, suite.aead_id)
+            || !WPACKET_memcpy(&pkt, label, labellen)
+            || !WPACKET_memcpy(&pkt, info, infolen)
+            || !WPACKET_get_total_written(&pkt, &concat_offset)
+            || !WPACKET_finish(&pkt))
+            goto err;
+#else
         lip[0] = (L / 256) % 256;
         lip[1] = L % 256;
         concat_offset = 2;
@@ -1219,6 +1294,7 @@ static int hpke_expand(OSSL_LIB_CTX *libctx, const char *propq,
             ERR_raise(ERR_LIB_CRYPTO, ERR_R_INTERNAL_ERROR);
             goto err;
         }
+#endif
         break;
 
     default:
