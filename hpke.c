@@ -1282,10 +1282,10 @@ static int hpke_test_expand_extract(void)
  * @param suite is the ciphersuite
  * @param key1 is the first key, for which we have the private value
  * @param key1enclen is the length of the encoded form of key1
- * @param key1en is the encoded form of key1
+ * @param key1enc is the encoded form of key1
  * @param key2 is the peer's key
  * @param key2enclen is the length of the encoded form of key1
- * @param key2en is the encoded form of key1
+ * @param key2enc is the encoded form of key1
  * @param akey is the authentication private key
  * @param apublen is the length of the encoded the authentication public key
  * @param apub is the encoded form of the authentication public key
@@ -1926,6 +1926,66 @@ static int hpke_enc_int(OSSL_LIB_CTX *libctx, const char *propq,
         ERR_raise(ERR_LIB_CRYPTO, ERR_R_INTERNAL_ERROR);
         goto err;
     }
+
+#define ECXDHKEM
+#ifdef ECXDHKEM
+    /* 
+     * try slontis' new thing, just for x25519 for now and
+     * without authentication just yet
+     * starting point was copying from slontis' 
+     * test/evp_pkey_kem_test.c
+     */
+    if (suite.kem_id == OSSL_HPKE_KEM_ID_25519 && mode == OSSL_HPKE_MODE_BASE) {
+        OSSL_PARAM params[3], *p = params;
+        unsigned char lss[OSSL_HPKE_MAXSIZE];
+        size_t lsslen=OSSL_HPKE_MAXSIZE;
+        unsigned char lenc[OSSL_HPKE_MAXSIZE];
+        size_t lenclen=OSSL_HPKE_MAXSIZE;
+
+        *p++ = OSSL_PARAM_construct_utf8_string(
+                            OSSL_KEM_PARAM_OPERATION,
+                            (char *)OSSL_KEM_PARAM_OPERATION_DHKEM,
+                            0);
+        /* this seems to make no diff for now */
+        *p++ = OSSL_PARAM_construct_octet_string(OSSL_KEM_PARAM_IKME,
+                                                 NULL, 0);
+        *p = OSSL_PARAM_construct_end();
+        pkR = EVP_PKEY_new_raw_public_key_ex(libctx, "X25519", propq,
+                                                        pub, publen);
+        if (pkR == NULL) {
+            erv = 0;
+            ERR_raise(ERR_LIB_CRYPTO, ERR_R_INTERNAL_ERROR);
+            goto err;
+        }
+        pctx = EVP_PKEY_CTX_new_from_pkey(libctx, pkR, propq);
+        if (pctx == NULL) {
+            erv = 0;
+            ERR_raise(ERR_LIB_CRYPTO, ERR_R_INTERNAL_ERROR);
+            goto err;
+        }
+        if (EVP_PKEY_encapsulate_init(pctx, params) != 1) {
+            erv = 0;
+            ERR_raise(ERR_LIB_CRYPTO, ERR_R_INTERNAL_ERROR);
+            goto err;
+        }
+        erv=EVP_PKEY_encapsulate(pctx, NULL, &lenclen, NULL, &lsslen);
+        if (erv != 1) {
+            ERR_raise(ERR_LIB_CRYPTO, ERR_R_INTERNAL_ERROR);
+            goto err;
+        }
+        /* 
+         * with no ikm this fails at
+         * providers/implementations/kem/ecx_kem.c:329
+         */
+        erv=EVP_PKEY_encapsulate(pctx, lenc, &lenclen, lss, &lsslen);
+        if (erv != 1) {
+            ERR_raise(ERR_LIB_CRYPTO, ERR_R_INTERNAL_ERROR);
+            goto err;
+        }
+        EVP_PKEY_CTX_free(pctx); pctx = NULL;
+        EVP_PKEY_free(pkR); pkR = NULL;
+    } 
+#endif
     /*
      * Depending on who called us, we may want to generate this key pair
      * or we may have had it handed to us via extsender inputs
