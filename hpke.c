@@ -42,7 +42,7 @@
  * Define this for LOADS of printing of intermediate cryptographic values
  * Really only needed when new crypto added (hopefully)
  */
-# undef SUPERVERBOSE
+# define SUPERVERBOSE
 # ifdef TESTVECTORS
 #  include "hpketv.h"
 # endif
@@ -235,7 +235,7 @@ const char *hpke_kdf_strtab[] = {
     OSSL_HPKE_KDFSTR_512};
 #endif
 
-/* 
+/*
  * very temporary exporter context while new API in-work
  * this'll disappear in a week or less
  */
@@ -381,7 +381,7 @@ static int hpke_ah_decode(size_t ahlen, const char *ah,
  * @param blen is the length of the buffer
  * @return 1 for success
  */
-static int hpke_pbuf(FILE *fout, char *msg, unsigned char *buf, size_t blen)
+static int hpke_pbuf(FILE *fout, const char *msg, const unsigned char *buf, size_t blen)
 {
     size_t i = 0;
 
@@ -836,7 +836,7 @@ static int hpke_extract(OSSL_LIB_CTX *libctx, const char *propq,
     WPACKET pkt;
 
     if (!WPACKET_init_static_len(&pkt, labeled_ikmbuf,
-                                 sizeof(labeled_ikmbuf), 0)) 
+                                 sizeof(labeled_ikmbuf), 0))
         goto err;
     /* Handle oddities of HPKE labels (or not) */
     switch (mode5869) {
@@ -986,7 +986,7 @@ static int hpke_expand(OSSL_LIB_CTX *libctx, const char *propq,
     uint16_t kdf_ind = 0;
     WPACKET pkt;
 
-    if (!WPACKET_init_static_len(&pkt, libuf, sizeof(libuf), 0)) 
+    if (!WPACKET_init_static_len(&pkt, libuf, sizeof(libuf), 0))
         goto err;
     if (L > *outlen) {
         erv = 0;
@@ -1481,7 +1481,7 @@ static int hpke_psk_check(unsigned int mode,
 {
     if (mode == OSSL_HPKE_MODE_BASE || mode == OSSL_HPKE_MODE_AUTH)
         return 1;
-    if (pskid == NULL || psklen == 0 || psk == NULL) 
+    if (pskid == NULL || psklen == 0 || psk == NULL)
         return 0;
     return 1;
 }
@@ -1927,65 +1927,6 @@ static int hpke_enc_int(OSSL_LIB_CTX *libctx, const char *propq,
         goto err;
     }
 
-#define ECXDHKEM
-#ifdef ECXDHKEM
-    /* 
-     * try slontis' new thing, just for x25519 for now and
-     * without authentication just yet
-     * starting point was copying from slontis' 
-     * test/evp_pkey_kem_test.c
-     */
-    if (suite.kem_id == OSSL_HPKE_KEM_ID_25519 && mode == OSSL_HPKE_MODE_BASE) {
-        OSSL_PARAM params[3], *p = params;
-        unsigned char lss[OSSL_HPKE_MAXSIZE];
-        size_t lsslen=OSSL_HPKE_MAXSIZE;
-        unsigned char lenc[OSSL_HPKE_MAXSIZE];
-        size_t lenclen=OSSL_HPKE_MAXSIZE;
-
-        *p++ = OSSL_PARAM_construct_utf8_string(
-                            OSSL_KEM_PARAM_OPERATION,
-                            (char *)OSSL_KEM_PARAM_OPERATION_DHKEM,
-                            0);
-        /* this seems to make no diff for now */
-        *p++ = OSSL_PARAM_construct_octet_string(OSSL_KEM_PARAM_IKME,
-                                                 NULL, 0);
-        *p = OSSL_PARAM_construct_end();
-        pkR = EVP_PKEY_new_raw_public_key_ex(libctx, "X25519", propq,
-                                                        pub, publen);
-        if (pkR == NULL) {
-            erv = 0;
-            ERR_raise(ERR_LIB_CRYPTO, ERR_R_INTERNAL_ERROR);
-            goto err;
-        }
-        pctx = EVP_PKEY_CTX_new_from_pkey(libctx, pkR, propq);
-        if (pctx == NULL) {
-            erv = 0;
-            ERR_raise(ERR_LIB_CRYPTO, ERR_R_INTERNAL_ERROR);
-            goto err;
-        }
-        if (EVP_PKEY_encapsulate_init(pctx, params) != 1) {
-            erv = 0;
-            ERR_raise(ERR_LIB_CRYPTO, ERR_R_INTERNAL_ERROR);
-            goto err;
-        }
-        erv=EVP_PKEY_encapsulate(pctx, NULL, &lenclen, NULL, &lsslen);
-        if (erv != 1) {
-            ERR_raise(ERR_LIB_CRYPTO, ERR_R_INTERNAL_ERROR);
-            goto err;
-        }
-        /* 
-         * with no ikm this fails at
-         * providers/implementations/kem/ecx_kem.c:329
-         */
-        erv=EVP_PKEY_encapsulate(pctx, lenc, &lenclen, lss, &lsslen);
-        if (erv != 1) {
-            ERR_raise(ERR_LIB_CRYPTO, ERR_R_INTERNAL_ERROR);
-            goto err;
-        }
-        EVP_PKEY_CTX_free(pctx); pctx = NULL;
-        EVP_PKEY_free(pkR); pkR = NULL;
-    } 
-#endif
     /*
      * Depending on who called us, we may want to generate this key pair
      * or we may have had it handed to us via extsender inputs
@@ -2172,7 +2113,7 @@ static int hpke_enc_int(OSSL_LIB_CTX *libctx, const char *propq,
                 ERR_raise(ERR_LIB_CRYPTO, ERR_R_INTERNAL_ERROR);
                 goto err;
             }
-            erv = hpke_prbuf2evp(libctx, propq, suite.kem_id, authpriv, 
+            erv = hpke_prbuf2evp(libctx, propq, suite.kem_id, authpriv,
                                  authprivlen, bin_pkS, bin_pkSlen, &skI);
         } else {
             erv = hpke_prbuf2evp(libctx, propq, suite.kem_id, authpriv,
@@ -2215,6 +2156,90 @@ static int hpke_enc_int(OSSL_LIB_CTX *libctx, const char *propq,
     }
     OPENSSL_free(mypub);
     mypub = NULL;
+
+#define ECXDHKEM
+#ifdef ECXDHKEM
+    /*
+     * try slontis' new thing, just for x25519 for now and
+     * without authentication just yet
+     * starting point was copying from slontis'
+     * test/evp_pkey_kem_test.c
+     */
+    if (suite.kem_id == OSSL_HPKE_KEM_ID_25519 && mode == OSSL_HPKE_MODE_BASE) {
+        OSSL_PARAM params[3], *p = params;
+        unsigned char lss[OSSL_HPKE_MAXSIZE];
+        size_t lsslen=OSSL_HPKE_MAXSIZE;
+        unsigned char lenc[OSSL_HPKE_MAXSIZE];
+        size_t lenclen=OSSL_HPKE_MAXSIZE;
+        unsigned char ikm[32];
+        size_t ikmlen=32;
+
+#ifdef SUPERVERBOSE
+        printf("Using ECXDHKEM api\n");
+#endif
+        if (RAND_bytes_ex(libctx, ikm, ikmlen, OSSL_HPKE_RSTRENGTH) <= 0) {
+            erv = 0;
+            ERR_raise(ERR_LIB_CRYPTO, ERR_R_INTERNAL_ERROR);
+            goto err;
+        }
+        *p++ = OSSL_PARAM_construct_utf8_string(
+                            OSSL_KEM_PARAM_OPERATION,
+                            (char *)OSSL_KEM_PARAM_OPERATION_DHKEM,
+                            0);
+        *p++ = OSSL_PARAM_construct_octet_string(OSSL_KEM_PARAM_IKME,
+                                                 ikm, ikmlen);
+        *p = OSSL_PARAM_construct_end();
+        pkR = EVP_PKEY_new_raw_public_key_ex(libctx, "X25519", propq,
+                                                        pub, publen);
+        if (pkR == NULL) {
+            erv = 0;
+            ERR_raise(ERR_LIB_CRYPTO, ERR_R_INTERNAL_ERROR);
+            goto err;
+        }
+        pctx = EVP_PKEY_CTX_new_from_pkey(libctx, pkR, propq);
+        if (pctx == NULL) {
+            erv = 0;
+            ERR_raise(ERR_LIB_CRYPTO, ERR_R_INTERNAL_ERROR);
+            goto err;
+        }
+        if (EVP_PKEY_encapsulate_init(pctx, params) != 1) {
+            erv = 0;
+            ERR_raise(ERR_LIB_CRYPTO, ERR_R_INTERNAL_ERROR);
+            goto err;
+        }
+        erv=EVP_PKEY_encapsulate(pctx, NULL, &lenclen, NULL, &lsslen);
+        if (erv != 1) {
+            ERR_raise(ERR_LIB_CRYPTO, ERR_R_INTERNAL_ERROR);
+            goto err;
+        }
+        /*
+         * without any ikm this fails for now at
+         * providers/implementations/kem/ecx_kem.c:329
+         */
+        erv=EVP_PKEY_encapsulate(pctx, lenc, &lenclen, lss, &lsslen);
+        if (erv != 1) {
+            ERR_raise(ERR_LIB_CRYPTO, ERR_R_INTERNAL_ERROR);
+            goto err;
+        }
+        EVP_PKEY_CTX_free(pctx); pctx = NULL;
+        //EVP_PKEY_free(pkR); pkR = NULL;
+        shared_secret = OPENSSL_malloc(lsslen);
+        if (shared_secret == NULL) {
+            erv = 0;
+            ERR_raise(ERR_LIB_CRYPTO, ERR_R_INTERNAL_ERROR);
+            goto err;
+        }
+        shared_secretlen = lsslen;
+        memcpy(shared_secret,lss,lsslen);
+        if (lenclen > OSSL_HPKE_MAXSIZE) {
+            erv = 0;
+            ERR_raise(ERR_LIB_CRYPTO, ERR_R_INTERNAL_ERROR);
+            goto err;
+        }
+        memcpy(enc, lenc, lenclen);
+        enclen = lenclen;
+    }
+#endif
 
     /* step 3. create context buffer starting with key_schedule_context */
     memset(ks_context, 0, OSSL_HPKE_MAXSIZE);
