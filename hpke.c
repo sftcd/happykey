@@ -74,9 +74,15 @@
 #define OSSL_HPKE_5869_MODE_PURE   0 /**< Do "pure" RFC5869 */
 #define OSSL_HPKE_5869_MODE_KEM    1 /**< Abide by HPKE section 4.1 */
 #define OSSL_HPKE_5869_MODE_FULL   2 /**< Abide by HPKE section 5.1 */
+/*
+ * note that the "PURE" mode is not used in RFC9180 but having that
+ * option allows us to verify our implementation using test vectors
+ * for RFC5869 - that was useful in initial development and could be
+ * again if we somehow break interop or the spec changes
+ */
 
 /* An internal max size, based on the extenal */
-#define INT_MAXSIZE (4 * OSSL_HPKE_MAXSIZE)
+#define INT_MAXSIZE (2 * OSSL_HPKE_MAXSIZE)
 
 /*
  * PEM header/footer for private keys
@@ -235,7 +241,7 @@ const char *hpke_kdf_strtab[] = {
     OSSL_HPKE_KDFSTR_512};
 #endif
 
-/* 
+/*
  * very temporary exporter context while new API in-work
  * this'll disappear in a week or less
  */
@@ -836,7 +842,7 @@ static int hpke_extract(OSSL_LIB_CTX *libctx, const char *propq,
     WPACKET pkt;
 
     if (!WPACKET_init_static_len(&pkt, labeled_ikmbuf,
-                                 sizeof(labeled_ikmbuf), 0)) 
+                                 sizeof(labeled_ikmbuf), 0))
         goto err;
     /* Handle oddities of HPKE labels (or not) */
     switch (mode5869) {
@@ -986,7 +992,7 @@ static int hpke_expand(OSSL_LIB_CTX *libctx, const char *propq,
     uint16_t kdf_ind = 0;
     WPACKET pkt;
 
-    if (!WPACKET_init_static_len(&pkt, libuf, sizeof(libuf), 0)) 
+    if (!WPACKET_init_static_len(&pkt, libuf, sizeof(libuf), 0))
         goto err;
     if (L > *outlen) {
         erv = 0;
@@ -1481,7 +1487,7 @@ static int hpke_psk_check(unsigned int mode,
 {
     if (mode == OSSL_HPKE_MODE_BASE || mode == OSSL_HPKE_MODE_AUTH)
         return 1;
-    if (pskid == NULL || psklen == 0 || psk == NULL) 
+    if (pskid == NULL || psklen == 0 || psk == NULL)
         return 0;
     return 1;
 }
@@ -2112,7 +2118,7 @@ static int hpke_enc_int(OSSL_LIB_CTX *libctx, const char *propq,
                 ERR_raise(ERR_LIB_CRYPTO, ERR_R_INTERNAL_ERROR);
                 goto err;
             }
-            erv = hpke_prbuf2evp(libctx, propq, suite.kem_id, authpriv, 
+            erv = hpke_prbuf2evp(libctx, propq, suite.kem_id, authpriv,
                                  authprivlen, bin_pkS, bin_pkSlen, &skI);
         } else {
             erv = hpke_prbuf2evp(libctx, propq, suite.kem_id, authpriv,
