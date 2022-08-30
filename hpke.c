@@ -2360,7 +2360,7 @@ err:
     BIO_free_all(bfp);
     EVP_PKEY_free(pkR);
     if (!evpcaller) { EVP_PKEY_free(pkE); }
-    EVP_PKEY_free(skI);
+    if (authpriv_evp == NULL) EVP_PKEY_free(skI);
     EVP_PKEY_CTX_free(pctx);
     OPENSSL_free(shared_secret);
     OPENSSL_free(enc);
