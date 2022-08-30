@@ -211,6 +211,8 @@ int OSSL_HPKE_CTX_get0_seq(OSSL_HPKE_CTX *ctx, unsigned *seq);
  *
  * If both octets and an EVP_PKEY are suppplied, the latter
  * will be preferred.
+ *
+ * This can be called once, or multiple, times.
  */
 int OSSL_HPKE_sender_seal(OSSL_HPKE_CTX *ctx,
                           unsigned char *enc, size_t *enclen,
@@ -223,7 +225,7 @@ int OSSL_HPKE_sender_seal(OSSL_HPKE_CTX *ctx,
                           const unsigned char *pt, size_t ptlen);
 
 /**
- * @brief sender open function 
+ * @brief recipient open function 
  * @param ctx is the pointer for the HPKE context
  * @param pt is the plaintext
  * @param ptlen is the size the above
@@ -247,6 +249,8 @@ int OSSL_HPKE_sender_seal(OSSL_HPKE_CTX *ctx,
  *
  * If both octets and an EVP_PKEY are suppplied, the latter
  * will be preferred.
+ *
+ * This can be called once, or multiple, times.
  */
 int OSSL_HPKE_recipient_open(OSSL_HPKE_CTX *ctx,
                              unsigned char *pt, size_t *ptlen,
