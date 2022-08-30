@@ -3542,19 +3542,6 @@ err:
 }
 
 /**
- * @brief set initial key material (IKM) for an HPKE key generation
- * @param ctx is the pointer for the HPKE context
- * @param ikm is the IKM buffer
- * @param ikmlen is the size of the IKM
- * @return 1 for success, 0 for error
- */
-int OSSL_HPKE_CTX_set1_ikm(OSSL_HPKE_CTX *ctx,
-                           const unsigned char *ikm, size_t ikmlen)
-{
-    return 1;
-}
-
-/**
  * @brief set a private key for HPKE authenticated modes
  * @param ctx is the pointer for the HPKE context
  * @param priv is the private key octets
