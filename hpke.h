@@ -10,143 +10,16 @@
 /**
  * @file
  * APIs and data structures for HPKE (RFC9180).
- *
- * There is only one significant data structure defined here
- * (OSSL_HPKE_SUITE) to represent the KEM, KDF and AEAD algs
- * used. Otherwise, the approach taken is to provide all the
- * API inputs using existing types (buffers, lengths and a few
- * cases of strings or EVP_PKEY pointers.
- *
- * HPKE key generation functions (``OSSL_HPKE_keygen()`` and
- * ``OSSL_HPKE_keygen_evp()``) require a suite as input (though
- * only the KEM is currently significant), take an optional
- * initial key material value (if detereministic key gen is
- * desired) and return public and private components of the key.
- *
- * HPKE (and hence our APIs) allow the caller to choose a
- * ``mode`` that can optionally bind a pre-shared key (PSK)
- * and/or an authenticating private value, also generared via
- * ``OSSL_HPKE_keygen()``, to the encryption operation -
- * ``OSSL_HPKE_MODE_BASE`` is the basic mode with neither, while
- * ``OSSL_HPKE_MODE_PSKAUTH`` calls for both.
- *
- * An ``info`` value, known to both encryptor and decryptor
- * can be combined into the key agreement operation.  Similarly,
- * additional authenticated data (``aad``) can be combined into
- * the AEAD operation. Applications/protocols using HPKE can
- * use these to bind information that wouldn't otherwise be
- * part of the encryption.
- *
- * Where non-ephemeral encryptor-chosen public/private Diffie-Hellman
- * values are used for more than one encryption operation, a
- * sequence number (``seq``) will generally need to be mixed
- * into the key agreement operation. (HPKE defines how to handle
- * mixing in the sequence.)
- *
- * Single-shot encryption (``OSSL_HPKE_enc()``), with
- * ephemeral encryptor-chosen public/private values, requires the
- * ``mode``, ``suite``, recipient's public value and cleartext inputs
- * and produces the ciphertext output. The other optional inputs
- * (``info``, ``aad``, etc.) are as described above.
- *
- * An ``OSSL_HPKE_enc_evp()`` variant allows the encryptor to
- * re-use its Diffie-Hellman public and private values used in a
- * previous call. The ``seq`` option is likely also needed
- * in such cases, e.g. as part of some protocol re-try mechanism
- * such as the TLS HelloRetryRequest (HRR) case for Encrypted Client
- * Hello.
- *
- * ``OSSL_HPKE_dec()`` supports the decryption operation and
- * takes the same kinds of inputs as for encryption with the
- * obvious role-swaps of public and private values.
- *
- * ``OSSL_HPKE_prbuf2evp()`` converts a buffer containing a
- * private value into an EVP_PKEY * pointer.
- *
- * ``OSSL_HPKE_suite_check()`` can be used to determine if
- * an HPKE suite is supported or not.
- *
- * ``OSSL_HPKE_str2suite()`` maps from comma-separated strings,
- * e.g. "x25519,hkdf-sha256,aes-128-gcm", to an ``OSSL_HPKE_SUITE``.
- *
- * So-called GREASEing (see RFC8701) is a protocol mechanism
- * where phoney values are sent in order to make it less likely
- * that (especially) middleboxes are deployed that only know
- * about "current" protocol options. Protocols using HPKE (such
- * as ECH) make use of this mechanism, but in that case need to
- * produce realistic-looking, though still phoney, values. The
- * ``OSSL_HPKE_good4grease()`` API can be used to generate such
- * values.
- *
- * As HPKE encryption uses an AEAD cipher, there is the usual
- * expansion of ciphertext due to the authentication tag.
- * Applications/protocols needing to know the degree of such
- * expansion (whether for GREASEing or memory management) can
- * use the ``OSSL_HPKE_expansion()`` API.
- *
- * Many of the APIs defined here also take an ``OSSL_LIB_CTX``
- * pointer and ``propq`` as input for cases where the default 
- * library context is not in use. Return values are always 1 
- * in the case of success, or something else otherwise - note 
- * that non-zero failure return values will be seen by callers.
- *
- * ## Some Uses of HPKE
- *
- * ### Encrypted Client Hello (ECH)
- *
- * Based on implementing
- * [ECH](https://datatracker.ietf.org/doc/draft-ietf-tls-esni/)
- * using this API, the following APIs are used for ECH:
- * the EVP flavour of key generation is used on the cilent,
- * the multi-shot variant of encryption on the client, using both
- * info and AAD, and the BASE mode (so no PSK or AUTH). In the event
- * of HRR, the seq input is also used. The AAD is mainly used to bind
- * the outer ClientHello to the ciphertext form of the inner
- * ClientHello.  ECH client-side GREASEing uses both GREASE-related
- * APIs. On the server-side the non-EVP key generation funcction is
- * used by a command line tool. Public keys are exported to the DNS
- * and private/public pairs are read (from files) by the server
- * with the private keys mapped to EVP_PKEY pointers using the
- * prbuf2evp API. HPKE decryption is used as one would expect.
- *
- * ## Message Layer Security (MLS)
- *
- * Based on a reading of the
- * [MLS](https://datatracker.ietf.org/doc/html/draft-ietf-mls-protocol)
- * specifiation draft, the following HPKE APIs would seem to be
- * required: key generation likely requires export to storage of
- * the private key (so the non-EVP key generation variant). MLS
- * also requires the deterministic DeriveKeyPair() operation
- * (implementation still *TBD*). Encryption again uses the info
- * and AAD parameters. The context.export API (from RFC9180, and
- * also still *TBD*) is used.
- *
- * ## COSE + HPKE
- *
- * A [COSE](https://datatracker.ietf.org/doc/html/draft-ietf-cose-hpke-01)
- * draft (less mature than ECH or MLS) defines a way to use HPKE
- * with COSE (RFC8152). The SealBase API is used and maps to our HPKE single
- * shot encryption API.
- */
-
-/**
- * @file APIs and data structures for HPKE (RFC9180).
  */
 
 #ifndef OSSL_HPKE_H
 # define OSSL_HPKE_H
+# pragma once
 
 # include <openssl/ssl.h>
 
-# ifdef HAPPYKEY
-/** default plaintext/ciphertext buffer size e.g. if processing stdin */
-#  ifndef OSSL_HPKE_DEFSIZE
-#   define OSSL_HPKE_DEFSIZE (40 * 1024)
-#  endif
-# endif
-/** biggest/default buffer for keys and internal buffers we use */
-# ifndef OSSL_HPKE_MAXSIZE
-#  define OSSL_HPKE_MAXSIZE (2 * 1024) /* 2k: enough for anyone :-) */
+# ifdef __cplusplus
+extern "C" {
 # endif
 
 /*
@@ -217,258 +90,221 @@ typedef struct {
     }
 
 /**
- * @brief HPKE single-shot encryption function
- *
- * This function generates an ephemeral ECDH value internally and
- * provides the public component as an output that can be sent to
- * the relevant private key holder along with the ciphertext.
- *
- * Note that the sender's public value is an output here in contrast
- * to the case of OSSL_HPKE_enc_evp where the sender's public value
- * is an input (along with the sender's private value).
- *
- * @param libctx is the context to use (normally NULL)
- * @param propq is a properties string
- * @param mode is the HPKE mode
- * @param suite is the ciphersuite to use
- * @param pskid is the pskid string for a PSK mode (can be NULL)
- * @param psk is the psk
- * @param psklen is the psk length
- * @param pub is the encoded public key
- * @param publen is the length of the public key
- * @param authpriv is the encoded private (authentication) key
- * @param authprivlen is the length of the private (authentication) key
- * @param authpriv_evp is the EVP_PKEY* form of private (authentication) key
- * @param clear is the encoded cleartext
- * @param clearlen is the length of the cleartext
- * @param aad is the encoded additional data
- * @param aadlen is the length of the additional data
- * @param info is the encoded info data (can be NULL)
- * @param infolen is the length of the info data (can be zero)
- * @param seq is the encoded sequence data (can be NULL)
- * @param seqlen is the length of the sequence data (can be zero)
- * @param senderpub is the input buffer for sender public key
- * @param senderpublen length of the input buffer for sender's public key
- * @param cipher is the input buffer for ciphertext
- * @param cipherlen is the length of the input buffer for ciphertext
- * @return 1 for success, other for error (error returns can be non-zero)
+ * @brief opaque type for HPKE contexts
  */
-# ifdef TESTVECTORS
-int OSSL_HPKE_enc(OSSL_LIB_CTX *libctx, const char *propq,
-                  unsigned int mode, OSSL_HPKE_SUITE suite,
-                  const char *pskid,
-                  const unsigned char *psk, size_t psklen,
-                  const unsigned char *pub, size_t publen,
-                  const unsigned char *authpriv, size_t authprivlen,
-                  EVP_PKEY *authpriv_evp,
-                  const unsigned char *clear, size_t clearlen,
-                  const unsigned char *aad, size_t aadlen,
-                  const unsigned char *info, size_t infolen,
-                  const unsigned char *seq, size_t seqlen,
-                  unsigned char *senderpub,size_t *senderpublen,
-                  unsigned char *cipher, size_t *cipherlen,
-                  void *tv);
-# else
-int OSSL_HPKE_enc(OSSL_LIB_CTX *libctx, const char *propq,
-                  unsigned int mode, OSSL_HPKE_SUITE suite,
-                  const char *pskid,
-                  const unsigned char *psk, size_t psklen,
-                  const unsigned char *pub, size_t publen,
-                  const unsigned char *authpriv, size_t authprivlen,
-                  EVP_PKEY *authpriv_evp,
-                  const unsigned char *clear, size_t clearlen,
-                  const unsigned char *aad, size_t aadlen,
-                  const unsigned char *info, size_t infolen,
-                  const unsigned char *seq, size_t seqlen,
-                  unsigned char *senderpub,size_t *senderpublen,
-                  unsigned char *cipher, size_t *cipherlen);
-# endif
+typedef struct ossl_hpke_ctx_st OSSL_HPKE_CTX;
 
 /**
- * @brief HPKE multi-shot encryption function
- *
- * This function generates a non-ephemeral ECDH value internally and
- * provides the public and private components as outputs. The public
- * part can be sent to the relevant private key holder along with the
- * ciphertext. The private part can be re-used in subequent calls.
- *
- * Note that the sender's public value is an input here (as is the
- * sender's private value), in contrast to the case of OSSL_HPKE_enc
- * where the sender's public value is an output.
- *
+ * @brief contex creator
+ * @param mode is the desired HPKE mode
+ * @param suite specifies the KEM, KDF and AEAD to use
  * @param libctx is the context to use
  * @param propq is a properties string
- * @param mode is the HPKE mode
- * @param suite is the ciphersuite to use
- * @param pskid is the pskid string for a PSK mode (can be NULL)
- * @param psk is the psk
- * @param psklen is the psk length
- * @param pub is the encoded public key
- * @param publen is the length of the public key
- * @param authpriv is the encoded private (authentication) key
- * @param authprivlen is the length of the private (authentication) key
- * @param authpriv_evp is the EVP_PKEY* form of private (authentication) key
- * @param clear is the encoded cleartext
- * @param clearlen is the length of the cleartext
- * @param aad is the encoded additional data
- * @param aadlen is the length of the additional data
- * @param info is the encoded info data (can be NULL)
- * @param infolen is the length of the info data (can be zero)
- * @param seq is the encoded sequence data (can be NULL)
- * @param seqlen is the length of the sequence data (can be zero)
- * @param senderpub is the input buffer for sender public key
- * @param senderpublen length of the input buffer for sender's public key
- * @param senderpriv is the EVP_PKEY* form of sender key pair
- * @param cipher is the input buffer for ciphertext
- * @param cipherlen is the length of the input buffer for ciphertext
- * @return 1 for success, other for error (error returns can be non-zero)
+ * @return pointer to new context or NULL if error
  */
-# ifdef TESTVECTORS
-int OSSL_HPKE_enc_evp(OSSL_LIB_CTX *libctx, const char *propq,
-                      unsigned int mode, OSSL_HPKE_SUITE suite,
-                      const char *pskid,
-                      const unsigned char *psk, size_t psklen,
-                      const unsigned char *pub, size_t publen,
-                      const unsigned char *authpriv, size_t authprivlen,
-                      EVP_PKEY *authpriv_evp,
-                      const unsigned char *clear, size_t clearlen,
-                      const unsigned char *aad, size_t aadlen,
-                      const unsigned char *info, size_t infolen,
-                      const unsigned char *seq, size_t seqlen,
-                      const unsigned char *senderpub, size_t senderpublen,
-                      EVP_PKEY *senderpriv,
-                      unsigned char *cipher, size_t *cipherlen,
-                      void *tv);
-# else
-int OSSL_HPKE_enc_evp(OSSL_LIB_CTX *libctx, const char *propq,
-                      unsigned int mode, OSSL_HPKE_SUITE suite,
-                      const char *pskid,
-                      const unsigned char *psk, size_t psklen,
-                      const unsigned char *pub, size_t publen,
-                      const unsigned char *authpriv, size_t authprivlen,
-                      EVP_PKEY *authpriv_evp,
-                      const unsigned char *clear, size_t clearlen,
-                      const unsigned char *aad, size_t aadlen,
-                      const unsigned char *info, size_t infolen,
-                      const unsigned char *seq, size_t seqlen,
-                      const unsigned char *senderpub, size_t senderpublen,
-                      EVP_PKEY *senderpriv,
-                      unsigned char *cipher, size_t *cipherlen);
-# endif
+OSSL_HPKE_CTX *OSSL_HPKE_CTX_new(int mode, OSSL_HPKE_SUITE suite,
+                                 OSSL_LIB_CTX *libctx, const char *propq);
+
+/** 
+ * @brief free up storage for a HPKE context
+ * @param ctx is the pointer to be free'd (can be NULL)
+ */
+void OSSL_HPKE_CTX_free(OSSL_HPKE_CTX *ctx);
 
 /**
- * @brief HPKE single-shot decryption function
- *
- * @param libctx is the context to use (normally NULL)
- * @param propq is a properties string
- * @param mode is the HPKE mode
- * @param suite is the ciphersuite to use
- * @param pskid is the pskid string for a PSK mode (can be NULL)
- * @param psk is the psk
- * @param psklen is the psk length
- * @param pub is the encoded public (authentication) key
- * @param publen is the length of the public (authentication) key
- * @param priv is the encoded private key
- * @param privlen is the length of the private key
- * @param evppriv is a pointer to an internal form of private key
- * @param enc is the peer's public value
- * @param enclen is the length of the peer's public value
- * @param cipher is the ciphertext
- * @param cipherlen is the length of the ciphertext
- * @param aad is the encoded additional data
- * @param aadlen is the length of the additional data
- * @param info is the encoded info data (can be NULL)
- * @param infolen is the length of the info data (can be zero)
- * @param seq is the encoded sequence data (can be NULL)
- * @param seqlen is the length of the sequence data (can be zero)
- * @param clear is the encoded cleartext
- * @param clearlen length of the input buffer for cleartext
- * @return 1 for success, other for error (error returns can be non-zero)
+ * @brief set a PSK for an HPKE context
+ * @param ctx is the pointer for the HPKE context
+ * @param pskid is a string identifying the PSK
+ * @param psk is the PSK buffer
+ * @param psklen is the size of the PSK
+ * @return 1 for success, 0 for error
  */
-int OSSL_HPKE_dec(OSSL_LIB_CTX *libctx, const char *propq,
-                  unsigned int mode, OSSL_HPKE_SUITE suite,
-                  const char *pskid, const unsigned char *psk, size_t psklen,
-                  const unsigned char *pub, size_t publen,
-                  const unsigned char *priv, size_t privlen, EVP_PKEY *evppriv,
-                  const unsigned char *enc, size_t enclen,
-                  const unsigned char *cipher, size_t cipherlen,
-                  const unsigned char *aad, size_t aadlen,
-                  const unsigned char *info, size_t infolen,
-                  const unsigned char *seq, size_t seqlen,
-                  unsigned char *clear, size_t *clearlen);
+ *
+int OSSL_HPKE_CTX_set1_psk(OSSL_HPKE_CTX *ctx,
+                           const char *pskid,
+                           const unsigned char *psk, size_t psklen);
+
+/**
+ * @brief set initial key material (IKM) for an HPKE key generation
+ * @param ctx is the pointer for the HPKE context
+ * @param ikm is the IKM buffer
+ * @param ikmlen is the size of the IKM
+ * @return 1 for success, 0 for error
+ */
+int OSSL_HPKE_CTX_set1_ikm(OSSL_HPKE_CTX *ctx,
+                           const unsigned char *ikm, size_t ikmlen);
+
+/**
+ * @brief set a private key for HPKE authenticated modes
+ * @param ctx is the pointer for the HPKE context
+ * @param priv is the private key octets
+ * @param privlen is the size of priv
+ * @param privp is an EVP_PKEY form of the private key
+ * @return 1 for success, 0 for error
+ *
+ * If both octets and an EVP_PKEY are suppplied, the latter
+ * will be preferred.
+ */
+int OSSL_HPKE_CTX_set1_auth_priv(OSSL_HPKE_CTX *ctx,
+                                 const unsigned char *priv, size_t privlen,
+                                 EVP_PKEY *privp);
+
+/**
+ * @brief set a public key for HPKE authenticated modes
+ * @param ctx is the pointer for the HPKE context
+ * @param pub is the public key octets
+ * @param publen is the size of pub
+ * @param pubp is an EVP_PKEY form of the public key
+ * @return 1 for success, 0 for error
+ *
+ * If both octets and an EVP_PKEY are suppplied, the latter
+ * will be preferred.
+ */
+int OSSL_HPKE_CTX_set1_auth_pub(OSSL_HPKE_CTX *ctx,
+                                const unsigned char *pub, size_t publen,
+                                EVP_PKEY *pubp);
+
+/**
+ * @brief set a exporter length and context for HPKE 
+ * @param ctx is the pointer for the HPKE context
+ * @param exp_ctx is the exporter context octets
+ * @param exp_ctxlen is the size of exp_ctx
+ * @param explen is the desired exporter output size
+ * @return 1 for success, 0 for error
+ */
+int OSSL_HPKE_CTX_set1_exporter(OSSL_HPKE_CTX *ctx,
+                                const unsigned char *exp_ctx, size_t exp_ctxlen,
+                                size_t explen);
+
+/**
+ * @brief ask for the state of the sequence of seal/open calls
+ * @param ctx is the pointer for the HPKE context
+ * @return seq returns the positive integer sequence number
+ * @return 1 for success, 0 for error
+ *
+ * The value returned is the most recent used when sealing
+ * or opening (successfully)
+ */
+int OSSL_HPKE_CTX_get0_seq(OSSL_HPKE_CTX *ctx, unsigned *seq);
+
+/**
+ * @brief sender seal function 
+ * @param ctx is the pointer for the HPKE context
+ * @param enc is the sender's ephemeral public value
+ * @param enclen is the size the above
+ * @param ct is the ciphertext output
+ * @param ctlen is the size the above
+ * @param exp is the exporter octets
+ * @param explen is the size the above
+ * @param recippub is the recipient public key
+ * @param recippublen is the size of the above
+ * @param recip is the EVP_PKEY form of recipient public value
+ * @param info is the key schedule info parameter
+ * @param infolen is the size the above
+ * @param info is the info parameter
+ * @param infolen is the size the above
+ * @param aad is the aad parameter
+ * @param aadlen is the size the above
+ * @param pt is the plaintext
+ * @param ptlen is the size the above
+ * @return 1 for success, 0 for error
+ *
+ * If both octets and an EVP_PKEY are suppplied, the latter
+ * will be preferred.
+ */
+int OSSL_HPKE_sender_seal(OSSL_HPKE_CTX *ctx,
+                          unsigned char *enc, size_t *enclen,
+                          unsigned char *ct, size_t *ctlen,
+                          unsigned char *exp, size_t *explen,
+                          const unsigned char *recippub, size_t recippublen,
+                          EVP_PKEY *recip,
+                          const unsigned char *info, size_t infolen,
+                          const unsigned char *aad, size_t aadlen,
+                          const unsigned char *pt, size_t ptlen);
+
+/**
+ * @brief sender open function 
+ * @param ctx is the pointer for the HPKE context
+ * @param pt is the plaintext
+ * @param ptlen is the size the above
+ * @param enc is the sender's ephemeral public value
+ * @param enclen is the size the above
+ * @param senderpub is an EVP_PKEY form of the above
+ * @param exp is the exporter octets
+ * @param explen is the size the above
+ * @param priv is the recipient private key
+ * @param privlen is the size of the above
+ * @param recippriv is the EVP_PKEY form of recipient private value
+ * @param info is the key schedule info parameter
+ * @param infolen is the size the above
+ * @param info is the info parameter
+ * @param infolen is the size the above
+ * @param aad is the aad parameter
+ * @param aadlen is the size the above
+ * @param ct is the ciphertext output
+ * @param ctlen is the size the above
+ * @return 1 for success, 0 for error
+ *
+ * If both octets and an EVP_PKEY are suppplied, the latter
+ * will be preferred.
+ */
+int OSSL_HPKE_recipient_open(OSSL_HPKE_CTX *ctx,
+                             unsigned char *pt, size_t *ptlen,
+                             const unsigned char *enc, size_t enclen,
+                             EVP_PKEY *senderpub,
+                             const unsigned char *priv, size_t privlen,
+                             EVP_PKEY *recippriv,
+                             const unsigned char *info, size_t infolen,
+                             const unsigned char *aad, size_t aadlen,
+                             const unsigned char *ct, size_t ctlen);
 
 /**
  * @brief generate a key pair
- *
- * Used for entities that will later receive HPKE values to
- * decrypt. Only the KEM from the suite is significant here.
- * The ``pub` output will typically be published so that
- * others can encrypt to the private key holder using HPKE.
- * The ``priv`` output contains the raw private value and
- * hence is sensitive.
- *
- * @param libctx is the context to use (normally NULL)
- * @param propq is a properties string
- * @param mode is the mode (currently unused)
- * @param suite is the ciphersuite (currently unused)
+ * @param ctx is an HPKE context
  * @param ikm is IKM, if supplied
  * @param ikmlen is the length of IKM, if supplied
  * @param pub is the public value
  * @param publen is the size of the public key buffer (exact length on output)
  * @param priv is the private key
- * @param privlen is the size of the private key buffer (exact length on output)
  * @return 1 for success, other for error (error returns can be non-zero)
- */
-int OSSL_HPKE_keygen(OSSL_LIB_CTX *libctx, const char *propq,
-                     unsigned int mode, OSSL_HPKE_SUITE suite,
-                     const unsigned char *ikm, size_t ikmlen,
-                     unsigned char *pub, size_t *publen,
-                     unsigned char *priv, size_t *privlen);
-
-/**
- * @brief generate a key pair but keep private inside API
  *
  * Used for entities that will later receive HPKE values to
  * decrypt. Only the KEM from the suite is significant here.
- * The ``pub`` output will typically be published so that
+ * The ``pub` output will typically be published so that
  * others can encrypt to the private key holder using HPKE.
- * The ``priv`` output here is in the form of an EVP_PKEY and
- * so the raw private value need not be exposed to the
- * application.
- *
- * @param libctx is the context to use (normally NULL)
- * @param propq is a properties string
- * @param mode is the mode (currently unused)
- * @param suite is the ciphersuite (currently unused)
+ * The priv output contains the raw private value and
+ * hence is sensitive.
+ */
+int OSSL_HPKE_keygen(OSSL_HPKE_CTX *ctx,
+                     const unsigned char *ikm, size_t ikmlen,
+                     unsigned char *pub, size_t *publen,
+                     EVP_PKEY **priv);
+
+/**
+ * @brief generate a key pair
+ * @param ctx is an HPKE context
  * @param ikm is IKM, if supplied
  * @param ikmlen is the length of IKM, if supplied
  * @param pub is the public value
  * @param publen is the size of the public key buffer (exact length on output)
- * @param priv is the private key handle
+ * @param priv is the private key
+ * @param privlen is the size of the above
  * @return 1 for success, other for error (error returns can be non-zero)
+ *
+ * Used for entities that will later receive HPKE values to
+ * decrypt. Only the KEM from the suite is significant here.
+ * The ``pub` output will typically be published so that
+ * others can encrypt to the private key holder using HPKE.
+ * The priv output contains the raw private value and
+ * hence is sensitive.
  */
-int OSSL_HPKE_keygen_evp(OSSL_LIB_CTX *libctx, const char *propq,
-                         unsigned int mode, OSSL_HPKE_SUITE suite,
+int OSSL_HPKE_keygen_buf(OSSL_HPKE_CTX *ctx,
                          const unsigned char *ikm, size_t ikmlen,
                          unsigned char *pub, size_t *publen,
-                         EVP_PKEY **priv);
-
-/**
- * @brief check if a suite is supported locally
- *
- * @param suite is the suite to check
- * @return 1 for success, other for error (error returns can be non-zero)
- */
-int OSSL_HPKE_suite_check(OSSL_HPKE_SUITE suite);
+                         unsigned char *priv, size_t *privlen);
 
 /**
  * @brief: map a kem_id and a private key buffer into an EVP_PKEY
- *
- * Note that the buffer is expected to be some form of probably-PEM encoded
- * private key, but could be missing the PEM header or not, and might
- * or might not be base64 encoded. We try handle those options as best
- * we can.
- *
  * @param libctx is the context to use (normally NULL)
  * @param propq is a properties string
  * @param kem_id is what'd you'd expect (using the HPKE registry values)
@@ -478,18 +314,27 @@ int OSSL_HPKE_suite_check(OSSL_HPKE_SUITE suite);
  * @param pubuf_len is the length of that buffer
  * @param priv is a pointer to an EVP_PKEY * for the result
  * @return 1 for success, other for error (error returns can be non-zero)
+ *
+ * Note that the buffer is expected to be some form of probably-PEM encoded
+ * private key, but could be missing the PEM header or not, and might
+ * or might not be base64 encoded. We try handle those options as best
+ * we can.
  */
 int OSSL_HPKE_prbuf2evp(OSSL_LIB_CTX *libctx, const char *propq,
                         unsigned int kem_id,
-                        unsigned char *prbuf,
-                        size_t prbuf_len,
-                        unsigned char *pubuf,
-                        size_t pubuf_len,
+                        unsigned char *pub, size_t *publen,
+                        unsigned char *priv, size_t *privlen,
                         EVP_PKEY **priv);
 
 /**
+ * @brief check if a suite is supported locally
+ * @param suite is the suite to check
+ * @return 1 for success, other for error (error returns can be non-zero)
+ */
+int OSSL_HPKE_suite_check(OSSL_HPKE_SUITE suite);
+
+/**
  * @brief get a (possibly) random suite, public key and ciphertext for GREASErs
- *
  * @param libctx is the context to use (normally NULL)
  * @param propq is a properties string
  * @param suite_in specifies the preferred suite or NULL for a random choice
@@ -510,6 +355,9 @@ int OSSL_HPKE_good4grease(OSSL_LIB_CTX *libctx, const char *propq,
 
 /**
  * @brief map a string to a HPKE suite
+ * @param str is the string value
+ * @param suite is the resulting suite
+ * @return 1 for success, otherwise failure
  *
  * An example good string is "x25519,hkdf-sha256,aes-128-gcm"
  * Symbols are #define'd for the relevant labels, e.g.
@@ -517,34 +365,21 @@ int OSSL_HPKE_good4grease(OSSL_LIB_CTX *libctx, const char *propq,
  * the relevant IANA codepoint valus may also be used,
  * e.g., "0x20,1,1" represents the same suite as the first
  * example.
- *
- * @param str is the string value
- * @param suite is the resulting suite
- * @return 1 for success, otherwise failure
  */
-int OSSL_HPKE_str2suite(const char *str,
-                        OSSL_HPKE_SUITE *suite);
-
+int OSSL_HPKE_str2suite(const char *str, OSSL_HPKE_SUITE *suite);
+ 
 /**
- * @brief tell the caller how big the cipertext will be
- *
+ * @brief tell the caller how big things will be
  * @param suite is the suite to be used
  * @param enclen points to what'll be enc length
  * @param clearlen is the length of plaintext
  * @param cipherlen points to what'll be ciphertext length
  * @return 1 for success, otherwise failure
  */
-int OSSL_HPKE_expansion(OSSL_HPKE_SUITE suite,
-                        size_t *enclen,
-                        size_t clearlen,
-                        size_t *cipherlen);
+int OSSL_HPKE_expansion(OSSL_HPKE_CTX *ctx, size_t *enclen,
+                        size_t clearlen, size_t *cipherlen);
 
-int OSSL_HPKE_export(OSSL_LIB_CTX *libctx, const char *propq,
-                     OSSL_HPKE_SUITE suite,
-                     unsigned char *inp,
-                     size_t inp_len,
-                     size_t L,
-                     unsigned char *exporter,
-                     size_t *exporter_len);
-
+# ifdef __cplusplus
+}
+# endif
 #endif

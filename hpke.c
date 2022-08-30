@@ -52,6 +52,11 @@
 #include <openssl/err.h>
 #endif
 
+/** biggest/default buffer for keys and internal buffers we use */
+# ifndef OSSL_HPKE_MAXSIZE
+#  define OSSL_HPKE_MAXSIZE (2 * 1024) /* 2k: enough for anyone :-) */
+# endif
+
 /* constants defined in RFC9180 */
 #define OSSL_HPKE_VERLABEL        "HPKE-v1"  /**< version string label */
 #define OSSL_HPKE_SEC41LABEL      "KEM"      /**< "suite_id" label for 4.1 */
