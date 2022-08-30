@@ -29,6 +29,13 @@
 #include "hpketv.h"
 #endif
 
+#ifndef OSSL_HPKE_MAXSIZE
+#define OSSL_HPKE_MAXSIZE 1024
+#endif
+#ifndef OSSL_HPKE_DEFSIZE
+#define OSSL_HPKE_DEFSIZE (4 * 1024)
+#endif
+
 static int verbose=0; ///< global var for verbosity
 
 static void usage(char *prog,char *errmsg) 
@@ -199,7 +206,7 @@ static int map_input(const char *inp, size_t *outlen, unsigned char **outbuf, in
         if (!feof(stdin)) return(__LINE__);
     } else {
         toutlen=strlen(inp);
-        if (toutlen>OSSL_HPKE_MAXSIZE) return(__LINE__);
+        if (toutlen>OSSL_HPKE_DEFSIZE) return(__LINE__);
         FILE *fp=fopen(inp,"r"); /* check if inp is file name */
         if (fp) {
             /* that worked - so read file up to max into buffer */
@@ -772,7 +779,7 @@ int main(int argc, char **argv)
     if (generate) {
         size_t publen=OSSL_HPKE_MAXSIZE; unsigned char pub[OSSL_HPKE_MAXSIZE];
         size_t privlen=OSSL_HPKE_MAXSIZE; unsigned char priv[OSSL_HPKE_MAXSIZE];
-        int rv=OSSL_HPKE_keygen(
+        int rv=OSSL_HPKE_keygen_buf(
             NULL, NULL, hpke_mode, hpke_suite,
             NULL, 0, pub, &publen, priv, &privlen);
         if (rv!=1) {

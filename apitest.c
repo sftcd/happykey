@@ -83,6 +83,13 @@ static void usage(char *prog, char *errmsg)
 # define OSSL_HPKE_TEST_false(__x__, __str__) TEST_false(__x__)
 #endif
 
+#ifndef OSSL_HPKE_MAXSIZE
+#define OSSL_HPKE_MAXSIZE 1024
+#endif
+#ifndef OSSL_HPKE_DEFSIZE
+#define OSSL_HPKE_DEFSIZE (4 * 1024)
+#endif
+
 /*
  * Randomly toss a coin
  */
@@ -252,13 +259,15 @@ static int test_hpke_modes_suites(void)
             /* can only set AUTH key pair when we know KEM */
             if ((hpke_mode == OSSL_HPKE_MODE_AUTH) ||
                 (hpke_mode == OSSL_HPKE_MODE_PSKAUTH)) {
-                if (OSSL_HPKE_TEST_true(OSSL_HPKE_keygen(testctx, NULL,
-                                                         hpke_mode, hpke_suite,
-                                                         NULL, 0,
-                                                         authpub, &authpublen,
-                                                         authpriv,
-                                                         &authprivlen),
-                                        "OSS_OSSL_HPKE_keygen") != 1) {
+                if (OSSL_HPKE_TEST_true(OSSL_HPKE_keygen_buf(testctx, NULL,
+                                                             hpke_mode,
+                                                             hpke_suite,
+                                                             NULL, 0,
+                                                             authpub,
+                                                             &authpublen,
+                                                             authpriv,
+                                                             &authprivlen),
+                                        "OSS_OSSL_HPKE_keygen_buf") != 1) {
                     overallresult = 0;
                 }
                 authpubp = authpub;
@@ -302,13 +311,15 @@ static int test_hpke_modes_suites(void)
 #ifdef HAPPYKEY
                         if (verbose) { printf("not using EVP variant\n"); }
 #endif
-                        if (OSSL_HPKE_TEST_true(OSSL_HPKE_keygen(testctx, NULL,
-                                                                 hpke_mode,
-                                                                 hpke_suite,
-                                                                 NULL, 0,
-                                                                 pub, &publen,
-                                                                 priv,
-                                                                 &privlen),
+                        if (OSSL_HPKE_TEST_true(OSSL_HPKE_keygen_buf(testctx,
+                                                                     NULL,
+                                                                     hpke_mode,
+                                                                     hpke_suite,
+                                                                     NULL, 0,
+                                                                     pub, 
+                                                                     &publen,
+                                                                     priv,
+                                                                     &privlen),
                                                 "OSSL_HPKE_keygen") != 1) {
                             overallresult = 0;
                         }
@@ -316,15 +327,15 @@ static int test_hpke_modes_suites(void)
 #ifdef HAPPYKEY
                         if (verbose) { printf("using EVP variant\n"); }
 #endif
-                        if (OSSL_HPKE_TEST_true(OSSL_HPKE_keygen_evp(testctx,
-                                                                     NULL,
-                                                                     hpke_mode,
-                                                                     hpke_suite,
-                                                                     NULL, 0,
-                                                                     pub,
-                                                                     &publen,
-                                                                     &privp),
-                                                "OSSL_HPKE_keygen_evp") != 1) {
+                        if (OSSL_HPKE_TEST_true(OSSL_HPKE_keygen(testctx,
+                                                                 NULL,
+                                                                 hpke_mode,
+                                                                 hpke_suite,
+                                                                 NULL, 0,
+                                                                 pub,
+                                                                 &publen,
+                                                                 &privp),
+                                                "OSSL_HPKE_keygen") != 1) {
                             overallresult = 0;
                         }
                     }
@@ -544,12 +555,12 @@ static int test_hpke_badcalls(void)
     size_t authprivlen = 0;
     unsigned char *authprivp = NULL;
 
-    if (OSSL_HPKE_TEST_false(OSSL_HPKE_keygen(testctx, NULL,
-                                              hpke_mode, hpke_suite,
-                                              NULL, 0,
-                                              pub, &publen,
-                                          priv, &privlen),
-                             "OSSL_HPKE_keygen") != 1) {
+    if (OSSL_HPKE_TEST_false(OSSL_HPKE_keygen_buf(testctx, NULL,
+                                                  hpke_mode, hpke_suite,
+                                                  NULL, 0,
+                                                  pub, &publen,
+                                                  priv, &privlen),
+                             "OSSL_HPKE_keygen_buf") != 1) {
         overallresult = 0;
     }
     if (OSSL_HPKE_TEST_false(OSSL_HPKE_enc(testctx, NULL, hpke_mode, hpke_suite,
@@ -582,12 +593,12 @@ static int test_hpke_badcalls(void)
     pub = buf1;
     priv = buf2;
     publen = privlen = OSSL_HPKE_MAXSIZE;
-    if (OSSL_HPKE_TEST_true(OSSL_HPKE_keygen(testctx, NULL,
-                                             hpke_mode, hpke_suite,
-                                             NULL, 0,
-                                             pub, &publen,
-                                             priv, &privlen),
-                            "OSSL_HPKE_keygen") != 1) {
+    if (OSSL_HPKE_TEST_true(OSSL_HPKE_keygen_buf(testctx, NULL,
+                                                 hpke_mode, hpke_suite,
+                                                 NULL, 0,
+                                                 pub, &publen,
+                                                 priv, &privlen),
+                            "OSSL_HPKE_keygen_buf") != 1) {
         overallresult = 0;
     }
     if (OSSL_HPKE_TEST_false(OSSL_HPKE_enc(testctx, NULL, hpke_mode, hpke_suite,
@@ -620,24 +631,24 @@ static int test_hpke_badcalls(void)
     /* same pub & priv buffers won't make for happiness */
     pub = priv = buf1;
     publen = privlen = OSSL_HPKE_MAXSIZE;
-    if (OSSL_HPKE_TEST_true(OSSL_HPKE_keygen(testctx, NULL,
-                                             hpke_mode, hpke_suite,
-                                             NULL, 0,
-                                             pub, &publen,
-                                             priv, &privlen),
-                            "OSSL_HPKE_keygen") != 1) {
+    if (OSSL_HPKE_TEST_true(OSSL_HPKE_keygen_buf(testctx, NULL,
+                                                 hpke_mode, hpke_suite,
+                                                 NULL, 0,
+                                                 pub, &publen,
+                                                 priv, &privlen),
+                            "OSSL_HPKE_keygen_buf") != 1) {
         overallresult = 0;
     }
     /* gen a usuable key pair to use in the enc/dec call below */
     pub = buf1;
     priv = buf2;
     publen = privlen = OSSL_HPKE_MAXSIZE;
-    if (OSSL_HPKE_TEST_true(OSSL_HPKE_keygen(testctx, NULL,
-                                             hpke_mode, hpke_suite,
-                                             NULL, 0,
-                                             pub, &publen,
-                                             priv, &privlen),
-                            "OSSL_HPKE_keygen") != 1) {
+    if (OSSL_HPKE_TEST_true(OSSL_HPKE_keygen_buf(testctx, NULL,
+                                                 hpke_mode, hpke_suite,
+                                                 NULL, 0,
+                                                 pub, &publen,
+                                                 priv, &privlen),
+                            "OSSL_HPKE_keygen_buf") != 1) {
         overallresult = 0;
     }
     plain = buf3;
@@ -902,8 +913,8 @@ static int test_hpke_one_ikm_gen(uint16_t kem_id,
     EVP_PKEY *sk = NULL;
 
     hpke_suite.kem_id = kem_id;
-    if (OSSL_HPKE_keygen_evp(testctx, NULL, hpke_mode, hpke_suite,
-                             ikm, ikmlen, lpub, &lpublen, &sk) != 1) {
+    if (OSSL_HPKE_keygen(testctx, NULL, hpke_mode, hpke_suite,
+                         ikm, ikmlen, lpub, &lpublen, &sk) != 1) {
         return - __LINE__;
     }
     if (sk == NULL)
@@ -956,11 +967,13 @@ static int test_hpke_exporters(void)
     OSSL_HPKE_SUITE suite = OSSL_HPKE_SUITE_DEFAULT;
     char *tstr="test";
 
+#ifdef TBD
     res = OSSL_HPKE_export(testctx, NULL, suite,
                            (unsigned char *)tstr, strlen(tstr), 240,
                            exportval, &exportval_len);
     if (res != 1)
         return res;
+#endif
 
     return res;
 }

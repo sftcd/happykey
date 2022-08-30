@@ -19,6 +19,13 @@
 #include <openssl/ssl.h>
 #include "hpke.h"
 
+#ifndef OSSL_HPKE_MAXSIZE
+#define OSSL_HPKE_MAXSIZE 1024
+#endif
+#ifndef OSSL_HPKE_DEFSIZE
+#define OSSL_HPKE_DEFSIZE (4 * 1024)
+#endif
+
 int main()
 {
     int testresult = 0;
@@ -38,12 +45,12 @@ int main()
 #ifdef TRYDET
     hpke_suite.kem_id=OSSL_HPKE_KEM_ID_P521;
     memset(ikm,0,ikmlen);
-    if (OSSL_HPKE_keygen(NULL, NULL, hpke_mode, hpke_suite,
-                         ikm, ikmlen, pub, &publen, priv, &privlen)!=1)
+    if (OSSL_HPKE_keygen_buf(NULL, NULL, hpke_mode, hpke_suite,
+                             ikm, ikmlen, pub, &publen, priv, &privlen)!=1)
         goto err;
 #else
-    if (OSSL_HPKE_keygen(NULL, NULL, hpke_mode, hpke_suite,
-                         NULL, 0, pub, &publen, priv, &privlen)!=1)
+    if (OSSL_HPKE_keygen_buf(NULL, NULL, hpke_mode, hpke_suite,
+                             NULL, 0, pub, &publen, priv, &privlen)!=1)
         goto err;
 #endif
     memset(plain,0,OSSL_HPKE_MAXSIZE);
