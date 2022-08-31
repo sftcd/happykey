@@ -35,7 +35,7 @@ int main()
     OSSL_HPKE_SUITE hpke_suite = OSSL_HPKE_SUITE_DEFAULT;
     /* we'll alloc all these on the stack for simplicity */
     size_t publen=OSSL_HPKE_MAXSIZE; unsigned char pub[OSSL_HPKE_MAXSIZE];
-    size_t privlen=OSSL_HPKE_MAXSIZE; unsigned char priv[OSSL_HPKE_MAXSIZE];
+    EVP_PKEY *privp = NULL;
     size_t senderpublen=OSSL_HPKE_MAXSIZE; unsigned char senderpub[OSSL_HPKE_MAXSIZE];
     size_t plainlen=OSSL_HPKE_MAXSIZE; unsigned char plain[OSSL_HPKE_MAXSIZE];
     size_t cipherlen=OSSL_HPKE_MAXSIZE; unsigned char cipher[OSSL_HPKE_MAXSIZE];
@@ -49,8 +49,8 @@ int main()
                              ikm, ikmlen, pub, &publen, priv, &privlen)!=1)
         goto err;
 #else
-    if (OSSL_HPKE_keygen_buf(NULL, NULL, hpke_mode, hpke_suite,
-                             NULL, 0, pub, &publen, priv, &privlen)!=1)
+    if (OSSL_HPKE_keygen(NULL, NULL, hpke_mode, hpke_suite,
+                         NULL, 0, pub, &publen, &privp)!=1)
         goto err;
 #endif
     memset(plain,0,OSSL_HPKE_MAXSIZE);
@@ -74,7 +74,7 @@ int main()
     if (OSSL_HPKE_dec(NULL, NULL, hpke_mode, hpke_suite,
                 NULL, NULL, 0, /* psk */
                 NULL, 0, /* authpub */
-                priv, privlen, NULL,
+                NULL, 0, privp,
                 senderpub, senderpublen,
                 cipher, cipherlen,
                 NULL, 0, /* aad */

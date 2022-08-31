@@ -126,32 +126,24 @@ int OSSL_HPKE_CTX_set1_psk(OSSL_HPKE_CTX *ctx,
 /**
  * @brief set a private key for HPKE authenticated modes
  * @param ctx is the pointer for the HPKE context
- * @param priv is the private key octets
- * @param privlen is the size of priv
  * @param privp is an EVP_PKEY form of the private key
  * @return 1 for success, 0 for error
  *
  * If both octets and an EVP_PKEY are suppplied, the latter
  * will be preferred.
  */
-int OSSL_HPKE_CTX_set1_auth_priv(OSSL_HPKE_CTX *ctx,
-                                 const unsigned char *priv, size_t privlen,
-                                 EVP_PKEY *privp);
+int OSSL_HPKE_CTX_set1_auth_priv(OSSL_HPKE_CTX *ctx, EVP_PKEY *privp);
 
 /**
  * @brief set a public key for HPKE authenticated modes
  * @param ctx is the pointer for the HPKE context
- * @param pub is the public key octets
- * @param publen is the size of pub
  * @param pubp is an EVP_PKEY form of the public key
  * @return 1 for success, 0 for error
  *
  * If both octets and an EVP_PKEY are suppplied, the latter
  * will be preferred.
  */
-int OSSL_HPKE_CTX_set1_auth_pub(OSSL_HPKE_CTX *ctx,
-                                const unsigned char *pub, size_t publen,
-                                EVP_PKEY *pubp);
+int OSSL_HPKE_CTX_set1_auth_pub(OSSL_HPKE_CTX *ctx, EVP_PKEY *pubp);
 
 /**
  * @brief set a exporter length and context for HPKE 
@@ -174,7 +166,7 @@ int OSSL_HPKE_CTX_set1_exporter(OSSL_HPKE_CTX *ctx,
  * The value returned is the most recent used when sealing
  * or opening (successfully)
  */
-int OSSL_HPKE_CTX_get0_seq(OSSL_HPKE_CTX *ctx, unsigned *seq);
+int OSSL_HPKE_CTX_get0_seq(OSSL_HPKE_CTX *ctx, unsigned int *seq);
 
 /**
  * @brief sender seal function 
@@ -185,8 +177,6 @@ int OSSL_HPKE_CTX_get0_seq(OSSL_HPKE_CTX *ctx, unsigned *seq);
  * @param ctlen is the size the above
  * @param exp is the exporter octets
  * @param explen is the size the above
- * @param recippub is the recipient public key
- * @param recippublen is the size of the above
  * @param recip is the EVP_PKEY form of recipient public value
  * @param info is the key schedule info parameter
  * @param infolen is the size the above
@@ -207,7 +197,6 @@ int OSSL_HPKE_sender_seal(OSSL_HPKE_CTX *ctx,
                           unsigned char *enc, size_t *enclen,
                           unsigned char *ct, size_t *ctlen,
                           unsigned char *exp, size_t *explen,
-                          const unsigned char *recippub, size_t recippublen,
                           EVP_PKEY *recip,
                           const unsigned char *info, size_t infolen,
                           const unsigned char *aad, size_t aadlen,
@@ -223,8 +212,6 @@ int OSSL_HPKE_sender_seal(OSSL_HPKE_CTX *ctx,
  * @param senderpub is an EVP_PKEY form of the above
  * @param exp is the exporter octets
  * @param explen is the size the above
- * @param priv is the recipient private key
- * @param privlen is the size of the above
  * @param recippriv is the EVP_PKEY form of recipient private value
  * @param info is the key schedule info parameter
  * @param infolen is the size the above
@@ -244,8 +231,8 @@ int OSSL_HPKE_sender_seal(OSSL_HPKE_CTX *ctx,
 int OSSL_HPKE_recipient_open(OSSL_HPKE_CTX *ctx,
                              unsigned char *pt, size_t *ptlen,
                              const unsigned char *enc, size_t enclen,
+                             unsigned char *exp, size_t *explen,
                              EVP_PKEY *senderpub,
-                             const unsigned char *priv, size_t privlen,
                              EVP_PKEY *recippriv,
                              const unsigned char *info, size_t infolen,
                              const unsigned char *aad, size_t aadlen,
@@ -276,56 +263,6 @@ int OSSL_HPKE_keygen(OSSL_LIB_CTX *libctx, const char *propq,
                          const unsigned char *ikm, size_t ikmlen,
                          unsigned char *pub, size_t *publen,
                          EVP_PKEY **priv);
-
-/**
- * @brief generate a key pair
- * @param libctx is the context to use (normally NULL)
- * @param propq is a properties string
- * @param mode is the mode (currently unused)
- * @param suite is the ciphersuite (currently unused)
- * @param ikm is IKM, if supplied
- * @param ikmlen is the length of IKM, if supplied
- * @param pub is the public value
- * @param publen is the size of the public key buffer (exact length on output)
- * @param priv is the private key
- * @param privlen is the size of the private key buffer (exact length on output)
- * @return 1 for success, other for error (error returns can be non-zero)
- *
- * Used for entities that will later receive HPKE values to
- * decrypt. Only the KEM from the suite is significant here.
- * The ``pub` output will typically be published so that
- * others can encrypt to the private key holder using HPKE.
- * The ``priv`` output contains the raw private value and
- * hence is sensitive.
- */
-int OSSL_HPKE_keygen_buf(OSSL_LIB_CTX *libctx, const char *propq,
-                         unsigned int mode, OSSL_HPKE_SUITE suite,
-                         const unsigned char *ikm, size_t ikmlen,
-                         unsigned char *pub, size_t *publen,
-                         unsigned char *priv, size_t *privlen);
-
-/**
- * @brief: map a kem_id and a private key buffer into an EVP_PKEY
- * @param libctx is the context to use (normally NULL)
- * @param propq is a properties string
- * @param kem_id is what'd you'd expect (using the HPKE registry values)
- * @param priv is the private key buffer
- * @param privlen is the length of that buffer
- * @param pub is the public key buffer (if available)
- * @param publen is the length of that buffer
- * @param privp is a pointer to an EVP_PKEY * for the result
- * @return 1 for success, other for error (error returns can be non-zero)
- *
- * Note that the buffer is expected to be some form of probably-PEM encoded
- * private key, but could be missing the PEM header or not, and might
- * or might not be base64 encoded. We try handle those options as best
- * we can.
- */
-int OSSL_HPKE_prbuf2evp(OSSL_LIB_CTX *libctx, const char *propq,
-                        unsigned int kem_id,
-                        const unsigned char *priv, size_t privlen,
-                        const unsigned char *pub, size_t publen,
-                        EVP_PKEY **privp);
 
 /**
  * @brief check if a suite is supported locally

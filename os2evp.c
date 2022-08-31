@@ -4,6 +4,12 @@
 #include <openssl/param_build.h>
 #include "hpke.h"
 
+
+extern int OSSL_HPKE_prbuf2evp(OSSL_LIB_CTX *libctx, const char *propq,
+                        unsigned int kem_id,
+                        const unsigned char *prbuf, size_t prbuf_len,
+                        const unsigned char *pubuf, size_t pubuf_len,
+                        EVP_PKEY **priv);
 /*
  * Generate keys using private key only - now integrated into apitest.c so
  * DON'T EDIT THIS EDIT THAT
