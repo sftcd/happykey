@@ -71,12 +71,6 @@ extern "C" {
 # define OSSL_HPKE_AEADSTR_CP         LN_chacha20_poly1305 /**< AEAD id 3 */
 
 /**
- * our maximum sequence number is the maximum number of seal (or open)
- * operations allowed by this implementation
- */
-#define OSSL_HPKE_MAX_SEQ           0xffffff
-
-/**
  * @brief ciphersuite combination
  */
 typedef struct {
@@ -178,7 +172,7 @@ int OSSL_HPKE_CTX_set1_exporter(OSSL_HPKE_CTX *ctx,
  * The value returned is the most recent used when sealing
  * or opening (successfully)
  */
-int OSSL_HPKE_CTX_get0_seq(OSSL_HPKE_CTX *ctx, unsigned int *seq);
+int OSSL_HPKE_CTX_get0_seq(OSSL_HPKE_CTX *ctx, uint64_t *seq);
 
 /**
  * @brief set the sequence value for seal/open calls
@@ -189,7 +183,7 @@ int OSSL_HPKE_CTX_get0_seq(OSSL_HPKE_CTX *ctx, unsigned int *seq);
  * The value returned is the most recent used when sealing
  * or opening (successfully)
  */
-int OSSL_HPKE_CTX_set1_seq(OSSL_HPKE_CTX *ctx, unsigned int seq);
+int OSSL_HPKE_CTX_set1_seq(OSSL_HPKE_CTX *ctx, uint64_t seq);
 
 /**
  * @brief sender seal function 

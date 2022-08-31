@@ -257,7 +257,7 @@ struct ossl_hpke_ctx_st
     char *propq; /**< properties */
     int mode; /**< HPKE mode */
     OSSL_HPKE_SUITE suite; /**< suite */
-    unsigned int seq;
+    uint64_t seq;
     unsigned char *exporter_ctx; size_t exporter_ctxlen; /**< exporter string */
     unsigned char *exporter; size_t exporterlen; /**< most recent exporter */
     char *pskid; unsigned char *psk; size_t psklen; /**< PSK */
@@ -3682,7 +3682,7 @@ err:
  * The value returned is the most recent used when sealing
  * or opening (successfully)
  */
-int OSSL_HPKE_CTX_get0_seq(OSSL_HPKE_CTX *ctx, unsigned int *seq)
+int OSSL_HPKE_CTX_get0_seq(OSSL_HPKE_CTX *ctx, uint64_t *seq)
 {
     if (ctx == NULL || seq == NULL)
         return 0;
@@ -3699,30 +3699,26 @@ int OSSL_HPKE_CTX_get0_seq(OSSL_HPKE_CTX *ctx, unsigned int *seq)
  * The value returned is the most recent used when sealing
  * or opening (successfully)
  */
-int OSSL_HPKE_CTX_set1_seq(OSSL_HPKE_CTX *ctx, unsigned int seq)
+int OSSL_HPKE_CTX_set1_seq(OSSL_HPKE_CTX *ctx, uint64_t seq)
 {
 #ifdef HAPPYKEY
     int erv = 1;
 #endif
     if (ctx == NULL)
         return 0;
-    if (seq >= OSSL_HPKE_MAX_SEQ) {
-        ERR_raise(ERR_LIB_CRYPTO, ERR_R_INTERNAL_ERROR);
-        return 0;
-    }
     ctx->seq = seq;
     return 1;
 }
 
-static int hpke_seq2buf(unsigned int seq, unsigned char *buf, size_t blen)
+static int hpke_seq2buf(uint64_t seq, unsigned char *buf, size_t blen)
 {
 #ifdef HAPPYKEY
     int erv = 1;
 #endif
-    unsigned int nbo_seq = 0;
+    uint64_t nbo_seq = 0;
     size_t nbo_seq_len = sizeof(nbo_seq);
 
-    if (nbo_seq_len > 12) {
+    if (nbo_seq_len > 12 || blen < nbo_seq_len) {
         /* it'll be some time before we have such a wide int:-) */
         ERR_raise(ERR_LIB_CRYPTO, ERR_R_INTERNAL_ERROR);
         return 0;
@@ -3818,7 +3814,7 @@ int OSSL_HPKE_sender_seal(OSSL_HPKE_CTX *ctx,
                        ctlen, ct);
     if (erv == 1) 
         ctx->seq++;
-    if (ctx->seq >= OSSL_HPKE_MAX_SEQ) {
+    if (ctx->seq == 0) { /* error wrap around 64 bits */
         ERR_raise(ERR_LIB_CRYPTO, ERR_R_INTERNAL_ERROR);
         return 0;
     }
@@ -3887,6 +3883,10 @@ int OSSL_HPKE_recipient_open(OSSL_HPKE_CTX *ctx,
                        ptlen, pt);
     if (erv == 1) 
         ctx->seq++;
+    if (ctx->seq == 0) { /* error wrap around 64 bits */
+        ERR_raise(ERR_LIB_CRYPTO, ERR_R_INTERNAL_ERROR);
+        return 0;
+    }
     return erv;
 }
 

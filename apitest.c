@@ -195,7 +195,7 @@ static int test_hpke_modes_suites(void)
 #define NEWAPI_DEC
 #endif
 #ifdef NEWAPI
-        unsigned int startseq = 0;
+        uint64_t startseq = 0;
 #endif
 
         memset(plain, 0x00, OSSL_HPKE_MAXSIZE);
@@ -336,9 +336,8 @@ static int test_hpke_modes_suites(void)
                     if (COIN_IS_HEADS) {
                         RAND_bytes_ex(testctx, (unsigned char*)&startseq, sizeof(startseq),
                                       RAND_DRBG_STRENGTH);
-                        startseq = startseq % OSSL_HPKE_MAX_SEQ;
 #ifdef HAPPYKEY
-                        if (verbose) printf("setting seq = 0x%x\n",startseq);
+                        if (verbose) printf("setting seq = 0x%lx\n",startseq);
 #endif
                         erv = OSSL_HPKE_CTX_set1_seq(ctx,startseq);
                         if (erv != 1) {
@@ -347,7 +346,7 @@ static int test_hpke_modes_suites(void)
                     } else {
                         startseq = 0;
 #ifdef HAPPYKEY
-                        if (verbose) printf("setting seq = 0x%x\n",startseq);
+                        if (verbose) printf("setting seq = 0x%lx\n",startseq);
 #endif
                     }
                     erv = OSSL_HPKE_sender_seal(ctx,
