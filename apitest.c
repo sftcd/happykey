@@ -153,6 +153,7 @@ static char *bogus_suite_strs[] = {
 static int test_hpke_modes_suites(void)
 {
     int overallresult = 1;
+    int encfail = 0;
     int mind = 0; /* index into hpke_mode_list */
     int kemind = 0; /* index into hpke_kem_list */
     int kdfind = 0; /* index into hpke_kdf_list */
@@ -237,7 +238,7 @@ static int test_hpke_modes_suites(void)
         }
         /* iterate over the kems, kdfs and aeads */
         for (kemind = 0;
-             overallresult == 1 &&
+             //overallresult == 1 &&
              kemind != (sizeof(hpke_kem_list) / sizeof(uint16_t));
              kemind++) {
             uint16_t kem_id = hpke_kem_list[kemind];
@@ -268,14 +269,14 @@ static int test_hpke_modes_suites(void)
                 authprivlen = 0;
             }
             for (kdfind = 0;
-                 overallresult == 1 &&
+                 //overallresult == 1 &&
                  kdfind != (sizeof(hpke_kdf_list) / sizeof(uint16_t));
                  kdfind++) {
                 uint16_t kdf_id = hpke_kdf_list[kdfind];
 
                 hpke_suite.kdf_id = kdf_id;
                 for (aeadind = 0;
-                     overallresult == 1 &&
+                     //overallresult == 1 &&
                      aeadind != (sizeof(hpke_aead_list) / sizeof(uint16_t));
                      aeadind++) {
                     uint16_t aead_id = hpke_aead_list[aeadind];
@@ -344,9 +345,13 @@ static int test_hpke_modes_suites(void)
                                                           cipher, &cipherlen),
                                             "OSSL_HPKE_enc") != 1) {
                         overallresult = 0;
+                        encfail = 1;
+#ifdef HAPPYKey
+                        printf("encfail for kem_id %d\n",hpke_suite.kem_id);
+#endif
                     }
 
-                    if (privp == NULL) { /* non-EVP variant */
+                    if (encfail == 0 && privp == NULL) { 
                         if (OSSL_HPKE_TEST_true(OSSL_HPKE_dec(testctx, NULL,
                                                               hpke_mode,
                                                               hpke_suite,
@@ -368,7 +373,7 @@ static int test_hpke_modes_suites(void)
                                                 "OSSL_HPKE_dec") != 1) {
                             overallresult = 0;
                         }
-                    } else { /* EVP variant */
+                    } else if (encfail == 0 && privp != NULL) {
                         if (OSSL_HPKE_TEST_true(OSSL_HPKE_dec(testctx, NULL,
                                                               hpke_mode,
                                                               hpke_suite,

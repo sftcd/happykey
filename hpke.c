@@ -1997,10 +1997,9 @@ static int hpke_enc_int(OSSL_LIB_CTX *libctx, const char *propq,
     }
     if (hpke_kem_id_nist_curve(suite.kem_id) == 1) {
         pkR = hpke_EVP_PKEY_new_raw_nist_public_key(libctx, propq,
-                                                    hpke_kem_tab[kem_ind].
-                                                    groupid,
-                                                    hpke_kem_tab[kem_ind].
-                                                    groupname, pub, publen);
+                                            hpke_kem_tab[kem_ind].groupid,
+                                            hpke_kem_tab[kem_ind].groupname,
+                                            pub, publen);
     } else {
         pkR = EVP_PKEY_new_raw_public_key_ex(libctx,
                                              hpke_kem_tab[kem_ind].keytype,
@@ -2160,22 +2159,19 @@ static int hpke_enc_int(OSSL_LIB_CTX *libctx, const char *propq,
 #define ECXDHKEM
 #ifdef ECXDHKEM
     /*
-     * try slontis' new thing, just for x25519 for now and
-     * without authentication just yet
-     * starting point was copying from slontis'
-     * test/evp_pkey_kem_test.c
+     * try slontis' new thing, just for base mode for now
      */
-    if (suite.kem_id == OSSL_HPKE_KEM_ID_25519 && mode == OSSL_HPKE_MODE_BASE) {
+    if (mode == OSSL_HPKE_MODE_BASE) {
         OSSL_PARAM params[3], *p = params;
         unsigned char lss[OSSL_HPKE_MAXSIZE];
         size_t lsslen=OSSL_HPKE_MAXSIZE;
         unsigned char lenc[OSSL_HPKE_MAXSIZE];
         size_t lenclen=OSSL_HPKE_MAXSIZE;
-        unsigned char ikm[32];
-        size_t ikmlen=32;
+        unsigned char ikm[OSSL_HPKE_MAXSIZE];
+        size_t ikmlen=hpke_kem_tab[kem_ind].Npriv;
 
 #ifdef SUPERVERBOSE
-        printf("Using ECXDHKEM api\n");
+        printf("Using ECXDHKEM api: kem_ind: %d\n",kem_ind);
 #endif
         if (RAND_bytes_ex(libctx, ikm, ikmlen, OSSL_HPKE_RSTRENGTH) <= 0) {
             erv = 0;
@@ -2186,11 +2182,18 @@ static int hpke_enc_int(OSSL_LIB_CTX *libctx, const char *propq,
                             OSSL_KEM_PARAM_OPERATION,
                             (char *)OSSL_KEM_PARAM_OPERATION_DHKEM,
                             0);
-        *p++ = OSSL_PARAM_construct_octet_string(OSSL_KEM_PARAM_IKME,
-                                                 ikm, ikmlen);
+        *p++ = OSSL_PARAM_construct_octet_string(OSSL_KEM_PARAM_IKME, ikm, ikmlen);
         *p = OSSL_PARAM_construct_end();
-        pkR = EVP_PKEY_new_raw_public_key_ex(libctx, "X25519", propq,
-                                                        pub, publen);
+        if (hpke_kem_id_nist_curve(suite.kem_id) == 1) {
+            pkR = hpke_EVP_PKEY_new_raw_nist_public_key(libctx, propq,
+                                                hpke_kem_tab[kem_ind].groupid,
+                                                hpke_kem_tab[kem_ind].groupname,
+                                                pub, publen);
+        } else {
+            pkR = EVP_PKEY_new_raw_public_key_ex(libctx,
+                                                 hpke_kem_tab[kem_ind].keytype,
+                                                 propq, pub, publen);
+        }
         if (pkR == NULL) {
             erv = 0;
             ERR_raise(ERR_LIB_CRYPTO, ERR_R_INTERNAL_ERROR);
@@ -2222,7 +2225,6 @@ static int hpke_enc_int(OSSL_LIB_CTX *libctx, const char *propq,
             goto err;
         }
         EVP_PKEY_CTX_free(pctx); pctx = NULL;
-        //EVP_PKEY_free(pkR); pkR = NULL;
         shared_secret = OPENSSL_malloc(lsslen);
         if (shared_secret == NULL) {
             erv = 0;
@@ -2395,7 +2397,8 @@ static int hpke_enc_int(OSSL_LIB_CTX *libctx, const char *propq,
 err:
 #if defined(SUPERVERBOSE) || defined(TESTVECTORS)
     printf("\tmode: %s (%d), kem: %s (%d), kdf: %s (%d), aead: %s (%d)\n",
-           hpke_mode_strtab[mode], mode, hpke_kem_strtab[kem_ind], suite.kem_id,
+           hpke_mode_strtab[mode], mode,
+           hpke_kem_strtab[kem_ind], suite.kem_id,
            hpke_kdf_strtab[kdf_ind], suite.kdf_id,
            hpke_aead_strtab[aead_ind], suite.aead_id);
     if (pkE) {
@@ -2439,7 +2442,7 @@ err:
     BIO_free_all(bfp);
     EVP_PKEY_free(pkR);
     if (!evpcaller) { EVP_PKEY_free(pkE); }
-    EVP_PKEY_free(skI);
+    if (authpriv_evp == NULL) EVP_PKEY_free(skI);
     EVP_PKEY_CTX_free(pctx);
     OPENSSL_free(shared_secret);
     OPENSSL_free(enc);

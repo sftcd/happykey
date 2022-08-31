@@ -94,7 +94,7 @@ kgikm.o: kgikm.c
 	${CC} ${CFLAGS} -g -I ${INCL} -c $<
 
 osslplayground: osslplayground.o
-	LD_LIBRARY_PATH=${OSSL} ${CC} ${CFLAGS} -g -o $@ osslplayground.o -L ${OSSL} -lcrypto -L ${NSSL} -lnss3 -lnspr4
+	LD_LIBRARY_PATH=${OSSL} ${CC} ${CFLAGS} -g -o $@ osslplayground.o hpke.o packet.o -L ${OSSL} -lcrypto -L ${NSSL} -lnss3 -lnspr4
 
 osslplayground.o: osslplayground.c
 	${CC} ${CFLAGS} -g -I ${INCL} -c $<
