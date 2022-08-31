@@ -318,14 +318,16 @@ static int test_hpke_modes_suites(void)
 #define NEWAPI
 #ifdef NEWAPI
                     int erv = 1;
-                    erv = OSSL_HPKE_sender_seal(OSSL_HPKE_CTX *ctx,
-                          unsigned char *enc, size_t *enclen,
-                          unsigned char *ct, size_t *ctlen,
-                          unsigned char *exp, size_t *explen,
-                          EVP_PKEY *recip,
-                          const unsigned char *info, size_t infolen,
-                          const unsigned char *aad, size_t aadlen,
-                          const unsigned char *pt, size_t ptlen);
+                    OSSL_HPKE_CTX *ctx = NULL;
+
+                    erv = OSSL_HPKE_sender_seal(ctx,
+                          senderpub, &senderpublen,
+                          cipher, &cipherlen,
+                          NULL, 0, // exporter
+                          privp,
+                          info, infolen,
+                          aad, aadlen,
+                          plain, plainlen);
 #else
                     if (OSSL_HPKE_TEST_true(OSSL_HPKE_enc(testctx, NULL,
                                                           hpke_mode, hpke_suite,

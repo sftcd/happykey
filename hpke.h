@@ -49,6 +49,7 @@ extern "C" {
 # define OSSL_HPKE_AEAD_ID_AES_GCM_128     0x0001 /**< AES-GCM-128 */
 # define OSSL_HPKE_AEAD_ID_AES_GCM_256     0x0002 /**< AES-GCM-256 */
 # define OSSL_HPKE_AEAD_ID_CHACHA_POLY1305 0x0003 /**< Chacha20-Poly1305 */
+# define OSSL_HPKE_AEAD_ID_EXPORTONLY      0xFFFF /**< export-only fake ID */
 
 /* strings for modes */
 # define OSSL_HPKE_MODESTR_BASE       "base"    /**< base mode (1) */
@@ -57,17 +58,17 @@ extern "C" {
 # define OSSL_HPKE_MODESTR_PSKAUTH    "pskauth" /**< psk+sender-key pair (4) */
 
 /* strings for suite components - ideally these'd be defined elsewhere */
-# define OSSL_HPKE_KEMSTR_P256        "P-256"                /**< KEM id 0x10 */
-# define OSSL_HPKE_KEMSTR_P384        "P-384"                /**< KEM id 0x11 */
-# define OSSL_HPKE_KEMSTR_P521        "P-521"                /**< KEM id 0x12 */
-# define OSSL_HPKE_KEMSTR_X25519      SN_X25519              /**< KEM id 0x20 */
-# define OSSL_HPKE_KEMSTR_X448        SN_X448                /**< KEM id 0x21 */
-# define OSSL_HPKE_KDFSTR_256         "hkdf-sha256"          /**< KDF id 1 */
-# define OSSL_HPKE_KDFSTR_384         "hkdf-sha384"          /**< KDF id 2 */
-# define OSSL_HPKE_KDFSTR_512         "hkdf-sha512"          /**< KDF id 3 */
-# define OSSL_HPKE_AEADSTR_AES128GCM  LN_aes_128_gcm         /**< AEAD id 1 */
-# define OSSL_HPKE_AEADSTR_AES256GCM  LN_aes_256_gcm         /**< AEAD id 2 */
-# define OSSL_HPKE_AEADSTR_CP         LN_chacha20_poly1305   /**< AEAD id 3 */
+# define OSSL_HPKE_KEMSTR_P256        "P-256"              /**< KEM id 0x10 */
+# define OSSL_HPKE_KEMSTR_P384        "P-384"              /**< KEM id 0x11 */
+# define OSSL_HPKE_KEMSTR_P521        "P-521"              /**< KEM id 0x12 */
+# define OSSL_HPKE_KEMSTR_X25519      SN_X25519            /**< KEM id 0x20 */
+# define OSSL_HPKE_KEMSTR_X448        SN_X448              /**< KEM id 0x21 */
+# define OSSL_HPKE_KDFSTR_256         "hkdf-sha256"        /**< KDF id 1 */
+# define OSSL_HPKE_KDFSTR_384         "hkdf-sha384"        /**< KDF id 2 */
+# define OSSL_HPKE_KDFSTR_512         "hkdf-sha512"        /**< KDF id 3 */
+# define OSSL_HPKE_AEADSTR_AES128GCM  LN_aes_128_gcm       /**< AEAD id 1 */
+# define OSSL_HPKE_AEADSTR_AES256GCM  LN_aes_256_gcm       /**< AEAD id 2 */
+# define OSSL_HPKE_AEADSTR_CP         LN_chacha20_poly1305 /**< AEAD id 3 */
 
 /**
  * @brief ciphersuite combination
@@ -178,8 +179,6 @@ int OSSL_HPKE_CTX_get0_seq(OSSL_HPKE_CTX *ctx, unsigned int *seq);
  * @param exp is the exporter octets
  * @param explen is the size the above
  * @param recip is the EVP_PKEY form of recipient public value
- * @param info is the key schedule info parameter
- * @param infolen is the size the above
  * @param info is the info parameter
  * @param infolen is the size the above
  * @param aad is the aad parameter
@@ -209,12 +208,9 @@ int OSSL_HPKE_sender_seal(OSSL_HPKE_CTX *ctx,
  * @param ptlen is the size the above
  * @param enc is the sender's ephemeral public value
  * @param enclen is the size the above
- * @param senderpub is an EVP_PKEY form of the above
  * @param exp is the exporter octets
  * @param explen is the size the above
  * @param recippriv is the EVP_PKEY form of recipient private value
- * @param info is the key schedule info parameter
- * @param infolen is the size the above
  * @param info is the info parameter
  * @param infolen is the size the above
  * @param aad is the aad parameter
@@ -232,11 +228,62 @@ int OSSL_HPKE_recipient_open(OSSL_HPKE_CTX *ctx,
                              unsigned char *pt, size_t *ptlen,
                              const unsigned char *enc, size_t enclen,
                              unsigned char *exp, size_t *explen,
-                             EVP_PKEY *senderpub,
                              EVP_PKEY *recippriv,
                              const unsigned char *info, size_t infolen,
                              const unsigned char *aad, size_t aadlen,
                              const unsigned char *ct, size_t ctlen);
+
+/**
+ * @brief sender export-only function 
+ * @param ctx is the pointer for the HPKE context
+ * @param enc is the sender's ephemeral public value
+ * @param enclen is the size the above
+ * @param ct is the ciphertext output
+ * @param ctlen is the size the above
+ * @param exp is the exporter octets
+ * @param explen is the size the above
+ * @param recip is the EVP_PKEY form of recipient public value
+ * @param info is the key schedule info parameter
+ * @param infolen is the size the above
+ * @return 1 for success, 0 for error
+ *
+ * If both octets and an EVP_PKEY are suppplied, the latter
+ * will be preferred.
+ *
+ * This can be called once, or multiple, times.
+ */
+int OSSL_HPKE_export_only_sender(OSSL_HPKE_CTX *ctx,
+                                 unsigned char *enc, size_t *enclen,
+                                 unsigned char *ct, size_t *ctlen,
+                                 unsigned char *exp, size_t *explen,
+                                 EVP_PKEY *recip,
+                                 const unsigned char *info, size_t infolen);
+
+/**
+ * @brief receiver export-only function 
+ * @param ctx is the pointer for the HPKE context
+ * @param enc is the sender's ephemeral public value
+ * @param enclen is the size the above
+ * @param ct is the ciphertext output
+ * @param ctlen is the size the above
+ * @param exp is the exporter octets
+ * @param explen is the size the above
+ * @param recippriv is the EVP_PKEY form of recipient private value
+ * @param info is the key schedule info parameter
+ * @param infolen is the size the above
+ * @return 1 for success, 0 for error
+ *
+ * If both octets and an EVP_PKEY are suppplied, the latter
+ * will be preferred.
+ *
+ * This can be called once, or multiple, times.
+ */
+int OSSL_HPKE_export_only_recip(OSSL_HPKE_CTX *ctx,
+                                unsigned char *enc, size_t *enclen,
+                                unsigned char *ct, size_t *ctlen,
+                                unsigned char *exp, size_t *explen,
+                                EVP_PKEY *recippriv,
+                                const unsigned char *info, size_t infolen);
 
 /**
  * @brief generate a key pair

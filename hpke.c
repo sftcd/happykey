@@ -522,6 +522,10 @@ static EVP_PKEY* hpke_EVP_PKEY_new_raw_nist_public_key(OSSL_LIB_CTX *libctx,
     }
     if (EVP_PKEY_set1_encoded_public_key(ret, buf, buflen) != 1) {
         EVP_PKEY_free(ret);
+#if defined(SUPERVERBOSE) || defined(TESTVECTORS)
+        /* needed for printing below */
+        ret = NULL;
+#endif
         erv = 0;
         ERR_raise(ERR_LIB_CRYPTO, ERR_R_INTERNAL_ERROR);
         goto err;
@@ -529,9 +533,13 @@ static EVP_PKEY* hpke_EVP_PKEY_new_raw_nist_public_key(OSSL_LIB_CTX *libctx,
 
 err:
 #if defined(SUPERVERBOSE) || defined(TESTVECTORS)
-    pblen = EVP_PKEY_get1_encoded_public_key(ret, &pbuf);
-    hpke_pbuf(stdout, "EARLY public", pbuf, pblen);
-    OPENSSL_free(pbuf);
+    if (ret != NULL) {
+        pblen = EVP_PKEY_get1_encoded_public_key(ret, &pbuf);
+        hpke_pbuf(stdout, "EARLY public", pbuf, pblen);
+        OPENSSL_free(pbuf);
+    } else {
+        printf("no EARLY public");
+    }
 #endif
     EVP_PKEY_CTX_free(cctx);
     if (erv == 1)
@@ -3672,6 +3680,11 @@ int OSSL_HPKE_sender_seal(OSSL_HPKE_CTX *ctx,
     unsigned char *lpub = NULL;
     size_t lpublen=OSSL_HPKE_MAXSIZE;
 
+    if (ctx == NULL || enc == NULL || enclen == NULL
+            || ct == NULL || ctlen == NULL || recip == NULL)
+        return 0;
+
+
     seq = ctx->seq;
     lpublen = EVP_PKEY_get1_encoded_public_key(recip, &lpub);
 
@@ -3694,6 +3707,99 @@ int OSSL_HPKE_sender_seal(OSSL_HPKE_CTX *ctx,
 
 
     return erv;
+}
+
+/**
+ * @brief recipient open function 
+ * @param ctx is the pointer for the HPKE context
+ * @param pt is the plaintext
+ * @param ptlen is the size the above
+ * @param enc is the sender's ephemeral public value
+ * @param enclen is the size the above
+ * @param exp is the exporter octets
+ * @param explen is the size the above
+ * @param recippriv is the EVP_PKEY form of recipient private value
+ * @param info is the info parameter
+ * @param infolen is the size the above
+ * @param aad is the aad parameter
+ * @param aadlen is the size the above
+ * @param ct is the ciphertext output
+ * @param ctlen is the size the above
+ * @return 1 for success, 0 for error
+ *
+ * If both octets and an EVP_PKEY are suppplied, the latter
+ * will be preferred.
+ *
+ * This can be called once, or multiple, times.
+ */
+int OSSL_HPKE_recipient_open(OSSL_HPKE_CTX *ctx,
+                             unsigned char *pt, size_t *ptlen,
+                             const unsigned char *enc, size_t enclen,
+                             unsigned char *exp, size_t *explen,
+                             EVP_PKEY *recippriv,
+                             const unsigned char *info, size_t infolen,
+                             const unsigned char *aad, size_t aadlen,
+                             const unsigned char *ct, size_t ctlen)
+{
+    return 0;
+}
+
+/**
+ * @brief sender export-only function 
+ * @param ctx is the pointer for the HPKE context
+ * @param enc is the sender's ephemeral public value
+ * @param enclen is the size the above
+ * @param ct is the ciphertext output
+ * @param ctlen is the size the above
+ * @param exp is the exporter octets
+ * @param explen is the size the above
+ * @param recip is the EVP_PKEY form of recipient public value
+ * @param info is the key schedule info parameter
+ * @param infolen is the size the above
+ * @return 1 for success, 0 for error
+ *
+ * If both octets and an EVP_PKEY are suppplied, the latter
+ * will be preferred.
+ *
+ * This can be called once, or multiple, times.
+ */
+int OSSL_HPKE_export_only_sender(OSSL_HPKE_CTX *ctx,
+                                 unsigned char *enc, size_t *enclen,
+                                 unsigned char *ct, size_t *ctlen,
+                                 unsigned char *exp, size_t *explen,
+                                 EVP_PKEY *recip,
+                                 const unsigned char *info, size_t infolen)
+{
+    return 0;
+}
+
+/**
+ * @brief receiver export-only function 
+ * @param ctx is the pointer for the HPKE context
+ * @param enc is the sender's ephemeral public value
+ * @param enclen is the size the above
+ * @param ct is the ciphertext output
+ * @param ctlen is the size the above
+ * @param exp is the exporter octets
+ * @param explen is the size the above
+ * @param recippriv is the EVP_PKEY form of recipient private value
+ * @param info is the key schedule info parameter
+ * @param infolen is the size the above
+ * @return 1 for success, 0 for error
+ *
+ * If both octets and an EVP_PKEY are suppplied, the latter
+ * will be preferred.
+ *
+ * This can be called once, or multiple, times.
+ */
+int OSSL_HPKE_export_only_recip(OSSL_HPKE_CTX *ctx,
+                                unsigned char *enc, size_t *enclen,
+                                unsigned char *ct, size_t *ctlen,
+                                unsigned char *exp, size_t *explen,
+                                EVP_PKEY *recippriv,
+                                const unsigned char *info, size_t infolen)
+{
+    return 0;
 }
 
 /*
