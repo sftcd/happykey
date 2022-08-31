@@ -16,6 +16,8 @@
 #include <stdint.h>
 #include <string.h>
 
+#include <arpa/inet.h>
+
 #include <openssl/ssl.h>
 #include <openssl/rand.h>
 #include <openssl/kdf.h>
@@ -3699,10 +3701,36 @@ int OSSL_HPKE_CTX_get0_seq(OSSL_HPKE_CTX *ctx, unsigned int *seq)
  */
 int OSSL_HPKE_CTX_set1_seq(OSSL_HPKE_CTX *ctx, unsigned int seq)
 {
+#ifdef HAPPYKEY
+    int erv = 1;
+#endif
     if (ctx == NULL)
         return 0;
+    if (seq >= OSSL_HPKE_MAX_SEQ) {
+        ERR_raise(ERR_LIB_CRYPTO, ERR_R_INTERNAL_ERROR);
+        return 0;
+    }
     ctx->seq = seq;
     return 1;
+}
+
+static int hpke_seq2buf(unsigned int seq, unsigned char *buf, size_t blen)
+{
+#ifdef HAPPYKEY
+    int erv = 1;
+#endif
+    unsigned int nbo_seq = 0;
+    size_t nbo_seq_len = sizeof(nbo_seq);
+
+    if (nbo_seq_len > 12) {
+        /* it'll be some time before we have such a wide int:-) */
+        ERR_raise(ERR_LIB_CRYPTO, ERR_R_INTERNAL_ERROR);
+        return 0;
+    }
+    memset(buf,0,blen);
+    nbo_seq = htonl(seq);
+    memcpy(buf+blen-nbo_seq_len,&nbo_seq,nbo_seq_len);
+    return nbo_seq_len;
 }
 
 /**
@@ -3742,7 +3770,15 @@ int OSSL_HPKE_sender_seal(OSSL_HPKE_CTX *ctx,
                           const unsigned char *pt, size_t ptlen)
 {
     int erv =1;
-    unsigned char seq;
+    /* 
+     * 12 octets is the max nonce, there's probably some better way
+     * to produce a big endian form of the sequence number than this
+     * but we'll see.
+     *
+     * seqbuf is XOR'd with the nonce so it's ok for it to be longer
+     * and left-zero padded
+     */
+    unsigned char seqbuf[12];
     size_t seqlen = 1;
 
     if (ctx == NULL || enc == NULL || enclen == NULL
@@ -3750,7 +3786,12 @@ int OSSL_HPKE_sender_seal(OSSL_HPKE_CTX *ctx,
         ERR_raise(ERR_LIB_CRYPTO, ERR_R_INTERNAL_ERROR);
         return 0;
     }
-    seq = ctx->seq;
+    seqlen = hpke_seq2buf(ctx->seq, seqbuf, 12);
+    if (seqlen == 0) {
+        ERR_raise(ERR_LIB_CRYPTO, ERR_R_INTERNAL_ERROR);
+        return 0;
+    }
+
     if (ctx->senderpriv == NULL) {
         /* generate a key pair for ephemeral, or repeaated, use */
         size_t mypublen = OSSL_HPKE_MAXSIZE;
@@ -3770,13 +3811,17 @@ int OSSL_HPKE_sender_seal(OSSL_HPKE_CTX *ctx,
                        ptlen, pt,
                        aadlen, aad,
                        infolen, info,
-                       seqlen, &seq,
+                       seqlen, seqbuf,
                        0, NULL,  ctx->senderpriv,
                        0, NULL,
                        enclen, enc,
                        ctlen, ct);
     if (erv == 1) 
         ctx->seq++;
+    if (ctx->seq >= OSSL_HPKE_MAX_SEQ) {
+        ERR_raise(ERR_LIB_CRYPTO, ERR_R_INTERNAL_ERROR);
+        return 0;
+    }
     return erv;
 }
 
@@ -3813,7 +3858,7 @@ int OSSL_HPKE_recipient_open(OSSL_HPKE_CTX *ctx,
                              const unsigned char *ct, size_t ctlen)
 {
     int erv =1;
-    unsigned char seq;
+    unsigned char seqbuf[12];
     size_t seqlen = 1;
 
     if (ctx == NULL
@@ -3825,7 +3870,11 @@ int OSSL_HPKE_recipient_open(OSSL_HPKE_CTX *ctx,
         ERR_raise(ERR_LIB_CRYPTO, ERR_R_INTERNAL_ERROR);
         return 0;
     }
-    seq = ctx->seq;
+    seqlen = hpke_seq2buf(ctx->seq, seqbuf, 12);
+    if (seqlen == 0) {
+        ERR_raise(ERR_LIB_CRYPTO, ERR_R_INTERNAL_ERROR);
+        return 0;
+    }
     erv = hpke_dec_int(ctx->libctx, ctx->propq, ctx->mode, ctx->suite,
                        ctx->pskid,  ctx->psklen,  ctx->psk,
                        ctx->authpublen, ctx->authpub,
@@ -3834,7 +3883,7 @@ int OSSL_HPKE_recipient_open(OSSL_HPKE_CTX *ctx,
                        ctlen, ct,
                        aadlen, aad,
                        infolen, info,
-                       seqlen, &seq,
+                       seqlen, seqbuf,
                        ptlen, pt);
     if (erv == 1) 
         ctx->seq++;

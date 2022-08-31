@@ -71,6 +71,12 @@ extern "C" {
 # define OSSL_HPKE_AEADSTR_CP         LN_chacha20_poly1305 /**< AEAD id 3 */
 
 /**
+ * our maximum sequence number is the maximum number of seal (or open)
+ * operations allowed by this implementation
+ */
+#define OSSL_HPKE_MAX_SEQ           0xffffff
+
+/**
  * @brief ciphersuite combination
  */
 typedef struct {

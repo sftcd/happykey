@@ -189,6 +189,14 @@ static int test_hpke_modes_suites(void)
         OSSL_HPKE_SUITE hpke_suite = OSSL_HPKE_SUITE_DEFAULT;
         size_t plainlen = OSSL_HPKE_MAXSIZE;
         unsigned char plain[OSSL_HPKE_MAXSIZE];
+#define NEWAPI
+#ifdef NEWAPI
+#define NEWAPI_ENC
+#define NEWAPI_DEC
+#endif
+#ifdef NEWAPI
+        unsigned int startseq = 0;
+#endif
 
         memset(plain, 0x00, OSSL_HPKE_MAXSIZE);
         strcpy((char *)plain, "a message not in a bottle");
@@ -301,7 +309,6 @@ static int test_hpke_modes_suites(void)
                     }
 
                     /* to maintain interop we can vary NEWAPI_ENC and NEWAPI_DEC */
-#define NEWAPI_ENC
 #ifdef NEWAPI_ENC
 
                     int erv = 1;
@@ -324,6 +331,24 @@ static int test_hpke_modes_suites(void)
                         if (erv != 1) {
                             overallresult = 0;
                         }
+                    }
+                    /* randomly use a non zero sequnce */
+                    if (COIN_IS_HEADS) {
+                        RAND_bytes_ex(testctx, (unsigned char*)&startseq, sizeof(startseq),
+                                      RAND_DRBG_STRENGTH);
+                        startseq = startseq % OSSL_HPKE_MAX_SEQ;
+#ifdef HAPPYKEY
+                        if (verbose) printf("setting seq = 0x%x\n",startseq);
+#endif
+                        erv = OSSL_HPKE_CTX_set1_seq(ctx,startseq);
+                        if (erv != 1) {
+                            overallresult = 0;
+                        }
+                    } else {
+                        startseq = 0;
+#ifdef HAPPYKEY
+                        if (verbose) printf("setting seq = 0x%x\n",startseq);
+#endif
                     }
                     erv = OSSL_HPKE_sender_seal(ctx,
                                 senderpub, &senderpublen,
@@ -357,7 +382,6 @@ static int test_hpke_modes_suites(void)
 #endif
 
                     memset(clear,0,clearlen);
-#define NEWAPI_DEC
 #ifdef NEWAPI_DEC
                     OSSL_HPKE_CTX *rctx = NULL;
 
@@ -376,6 +400,12 @@ static int test_hpke_modes_suites(void)
                     if (hpke_mode == OSSL_HPKE_MODE_AUTH
                         || hpke_mode == OSSL_HPKE_MODE_PSKAUTH) {
                         erv = OSSL_HPKE_CTX_set1_authpub(rctx, authpub, authpublen);
+                        if (erv != 1) {
+                            overallresult = 0;
+                        }
+                    }
+                    if (startseq != 0) {
+                        erv = OSSL_HPKE_CTX_set1_seq(rctx,startseq);
                         if (erv != 1) {
                             overallresult = 0;
                         }
