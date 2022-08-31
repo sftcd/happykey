@@ -44,7 +44,7 @@
  * Define this for LOADS of printing of intermediate cryptographic values
  * Really only needed when new crypto added (hopefully)
  */
-# define SUPERVERBOSE
+# undef SUPERVERBOSE
 # ifdef TESTVECTORS
 #  include "hpketv.h"
 # endif

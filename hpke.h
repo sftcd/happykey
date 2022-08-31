@@ -171,6 +171,9 @@ int OSSL_HPKE_CTX_set1_exporter(OSSL_HPKE_CTX *ctx,
  *
  * The value returned is the most recent used when sealing
  * or opening (successfully)
+ *
+ * seq is a uint64_t as that's what two other implementations
+ * chose
  */
 int OSSL_HPKE_CTX_get0_seq(OSSL_HPKE_CTX *ctx, uint64_t *seq);
 
