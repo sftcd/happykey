@@ -178,6 +178,8 @@ int OSSL_HPKE_CTX_get0_seq(OSSL_HPKE_CTX *ctx, unsigned int *seq);
  * @param ctlen is the size the above
  * @param exp is the exporter octets
  * @param explen is the size the above
+ * @param pub is the recipient public key octets
+ * @param publen is the size the above
  * @param recip is the EVP_PKEY form of recipient public value
  * @param info is the info parameter
  * @param infolen is the size the above
@@ -196,7 +198,7 @@ int OSSL_HPKE_sender_seal(OSSL_HPKE_CTX *ctx,
                           unsigned char *enc, size_t *enclen,
                           unsigned char *ct, size_t *ctlen,
                           unsigned char *exp, size_t *explen,
-                          EVP_PKEY *recip,
+                          unsigned char *pub, size_t publen,
                           const unsigned char *info, size_t infolen,
                           const unsigned char *aad, size_t aadlen,
                           const unsigned char *pt, size_t ptlen);
@@ -242,7 +244,8 @@ int OSSL_HPKE_recipient_open(OSSL_HPKE_CTX *ctx,
  * @param ctlen is the size the above
  * @param exp is the exporter octets
  * @param explen is the size the above
- * @param recip is the EVP_PKEY form of recipient public value
+ * @param pub is the recipient public key octets
+ * @param publen is the size the above
  * @param info is the key schedule info parameter
  * @param infolen is the size the above
  * @return 1 for success, 0 for error
@@ -256,7 +259,7 @@ int OSSL_HPKE_export_only_sender(OSSL_HPKE_CTX *ctx,
                                  unsigned char *enc, size_t *enclen,
                                  unsigned char *ct, size_t *ctlen,
                                  unsigned char *exp, size_t *explen,
-                                 EVP_PKEY *recip,
+                                 unsigned char *pub, size_t publen,
                                  const unsigned char *info, size_t infolen);
 
 /**

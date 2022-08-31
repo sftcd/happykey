@@ -256,7 +256,7 @@ struct ossl_hpke_ctx_st
     int mode; /**< HPKE mode */
     OSSL_HPKE_SUITE suite; /**< suite */
     unsigned int seq;
-    unsigned char *exporter_ctx; size_t xporter_ctxlen; /**< exporter string */
+    unsigned char *exporter_ctx; size_t exporter_ctxlen; /**< exporter string */
     unsigned char *exporter; size_t exporterlen; /**< most recent exporter */
     char *pskid; unsigned char *psk; size_t psklen; /**< PSK */
     EVP_PKEY *authpriv; /**< sender's authentication private key */
@@ -538,7 +538,7 @@ err:
         hpke_pbuf(stdout, "EARLY public", pbuf, pblen);
         OPENSSL_free(pbuf);
     } else {
-        printf("no EARLY public");
+        printf("no EARLY public\n");
     }
 #endif
     EVP_PKEY_CTX_free(cctx);
@@ -635,10 +635,6 @@ static int hpke_aead_dec(OSSL_LIB_CTX *libctx, const char *propq,
             goto err;
         }
     }
-    /*
-     * Provide the message to be decrypted, and obtain cleartext output.
-     * EVP_DecryptUpdate can be called multiple times if necessary
-     */
     if (EVP_DecryptUpdate(ctx, plaintext, &len, cipher,
                           cipherlen - taglen) != 1) {
         erv = 0;
@@ -3505,8 +3501,10 @@ void OSSL_HPKE_CTX_free(OSSL_HPKE_CTX *ctx)
     OPENSSL_free(ctx->propq);
     OPENSSL_free(ctx->exporter_ctx);
     OPENSSL_cleanse(ctx->exporter, ctx->exporterlen);
+    OPENSSL_free(ctx->exporter);
     OPENSSL_free(ctx->pskid);
     OPENSSL_cleanse(ctx->psk, ctx->psklen);
+    OPENSSL_free(ctx->psk);
     EVP_PKEY_free(ctx->authpriv);
     EVP_PKEY_free(ctx->authpub);
     EVP_PKEY_free(ctx->recippriv);
@@ -3534,6 +3532,7 @@ int OSSL_HPKE_CTX_set1_psk(OSSL_HPKE_CTX *ctx,
     /* free previous value if any */
     OPENSSL_free(ctx->pskid);
     OPENSSL_cleanse(ctx->psk, ctx->psklen);
+    OPENSSL_free(ctx->psk);
     ctx->pskid = OPENSSL_strdup(pskid);
     if (ctx->pskid == NULL) 
         goto err;
@@ -3547,6 +3546,7 @@ err:
     /* zap any new or old psk */
     OPENSSL_free(ctx->pskid);
     OPENSSL_cleanse(ctx->psk, ctx->psklen);
+    OPENSSL_free(ctx->psk);
     ctx->psklen = 0;
     return 0;
 }
@@ -3601,8 +3601,9 @@ int OSSL_HPKE_CTX_set1_exporter(OSSL_HPKE_CTX *ctx,
 {
     if (ctx == NULL)
         return 0;
-    if (ctx->exporter != NULL) 
+    if (ctx->exporter != NULL)
         OPENSSL_cleanse(ctx->exporter, ctx->exporterlen);
+    OPENSSL_free(ctx->exporter);
     if (ctx->exporter_ctx != NULL) 
         OPENSSL_free(ctx->exporter_ctx);
     ctx->exporter = NULL;
@@ -3611,9 +3612,11 @@ int OSSL_HPKE_CTX_set1_exporter(OSSL_HPKE_CTX *ctx,
     if (ctx->exporter_ctx == NULL)
         goto err;
     memcpy(ctx->exporter_ctx, exp_ctx, exp_ctxlen);
+    ctx->exporter_ctxlen = exp_ctxlen;
     return 1;
 err:
     OPENSSL_cleanse(ctx->exporter, ctx->exporterlen);
+    OPENSSL_free(ctx->exporter);
     OPENSSL_free(ctx->exporter_ctx);
     ctx->exporterlen = 0;
     return 0;
@@ -3645,7 +3648,9 @@ int OSSL_HPKE_CTX_get0_seq(OSSL_HPKE_CTX *ctx, unsigned int *seq)
  * @param ctlen is the size the above
  * @param exp is the exporter octets
  * @param explen is the size the above
- * @param recip is the EVP_PKEY form of recipient public value
+ * @param pub is the recipient public key octets
+ * @param publen is the size the above
+ * @param infolen is the size the above
  * @param info is the key schedule info parameter
  * @param infolen is the size the above
  * @param info is the info parameter
@@ -3665,7 +3670,7 @@ int OSSL_HPKE_sender_seal(OSSL_HPKE_CTX *ctx,
                           unsigned char *enc, size_t *enclen,
                           unsigned char *ct, size_t *ctlen,
                           unsigned char *exp, size_t *explen,
-                          EVP_PKEY *recip,
+                          unsigned char *pub, size_t publen,
                           const unsigned char *info, size_t infolen,
                           const unsigned char *aad, size_t aadlen,
                           const unsigned char *pt, size_t ptlen)
@@ -3677,20 +3682,17 @@ int OSSL_HPKE_sender_seal(OSSL_HPKE_CTX *ctx,
     int erv =1;
     unsigned char seq;
     size_t seqlen = 1;
-    unsigned char *lpub = NULL;
-    size_t lpublen=OSSL_HPKE_MAXSIZE;
 
     if (ctx == NULL || enc == NULL || enclen == NULL
-            || ct == NULL || ctlen == NULL || recip == NULL)
+            || ct == NULL || ctlen == NULL || pub == NULL)
         return 0;
 
 
     seq = ctx->seq;
-    lpublen = EVP_PKEY_get1_encoded_public_key(recip, &lpub);
 
     erv = hpke_enc_int(ctx->libctx, ctx->propq, ctx->mode, ctx->suite,
                        ctx->pskid,  ctx->psklen,  ctx->psk,
-                       lpublen, lpub,
+                       publen, pub,
                        0, NULL, ctx->authpriv,
                        ptlen, pt,
                        aadlen, aad,
@@ -3700,8 +3702,6 @@ int OSSL_HPKE_sender_seal(OSSL_HPKE_CTX *ctx,
                        0, NULL,
                        enclen, enc,
                        ctlen, ct);
-    OPENSSL_free(lpub);
-
     if (erv == 1) 
         ctx->seq++;
 
@@ -3753,7 +3753,8 @@ int OSSL_HPKE_recipient_open(OSSL_HPKE_CTX *ctx,
  * @param ctlen is the size the above
  * @param exp is the exporter octets
  * @param explen is the size the above
- * @param recip is the EVP_PKEY form of recipient public value
+ * @param pub is the recipient public key octets
+ * @param publen is the size the above
  * @param info is the key schedule info parameter
  * @param infolen is the size the above
  * @return 1 for success, 0 for error
@@ -3767,7 +3768,7 @@ int OSSL_HPKE_export_only_sender(OSSL_HPKE_CTX *ctx,
                                  unsigned char *enc, size_t *enclen,
                                  unsigned char *ct, size_t *ctlen,
                                  unsigned char *exp, size_t *explen,
-                                 EVP_PKEY *recip,
+                                 unsigned char *pub, size_t publen,
                                  const unsigned char *info, size_t infolen)
 {
     return 0;

@@ -320,14 +320,38 @@ static int test_hpke_modes_suites(void)
                     int erv = 1;
                     OSSL_HPKE_CTX *ctx = NULL;
 
+                    ctx = OSSL_HPKE_CTX_new(hpke_mode, hpke_suite,
+                                            testctx, NULL);
+                    if (ctx == NULL) {
+                        overallresult = 0;
+                    }
+                    if (hpke_mode == OSSL_HPKE_MODE_PSK
+                        || hpke_mode == OSSL_HPKE_MODE_PSKAUTH) {
+                        erv = OSSL_HPKE_CTX_set1_psk(ctx, pskidp, pskp, psklen);
+                        if (erv != 1) {
+                            overallresult = 0;
+                        }
+                    }
+
+                    if (hpke_mode == OSSL_HPKE_MODE_AUTH
+                        || hpke_mode == OSSL_HPKE_MODE_PSKAUTH) {
+                        erv = OSSL_HPKE_CTX_set1_auth_priv(ctx, authpriv_evp);
+                        if (erv != 1) {
+                            overallresult = 0;
+                        }
+                    }
+
                     erv = OSSL_HPKE_sender_seal(ctx,
                           senderpub, &senderpublen,
                           cipher, &cipherlen,
                           NULL, 0, // exporter
-                          privp,
-                          info, infolen,
-                          aad, aadlen,
+                          pub, publen,
+                          infop, infolen,
+                          aadp, aadlen,
                           plain, plainlen);
+                    if (erv != 1) {
+                        overallresult = 0;
+                    }
 #else
                     if (OSSL_HPKE_TEST_true(OSSL_HPKE_enc(testctx, NULL,
                                                           hpke_mode, hpke_suite,
@@ -346,6 +370,7 @@ static int test_hpke_modes_suites(void)
                     }
 #endif
 
+                    memset(clear,0,clearlen);
                     if (OSSL_HPKE_TEST_true(OSSL_HPKE_dec(testctx, NULL,
                                                           hpke_mode, hpke_suite,
                                                           pskidp, pskp, psklen,
@@ -356,11 +381,14 @@ static int test_hpke_modes_suites(void)
                                                           cipher, cipherlen,
                                                           aadp, aadlen,
                                                           infop, infolen,
-                                                          seqp, seqlen,
+                                                          NULL, 0, //seqp, seqlen,
                                                           clear, &clearlen),
                                                 "OSSL_HPKE_dec") != 1) {
                         overallresult = 0;
                     }
+#ifdef NEWAPI
+                    OSSL_HPKE_CTX_free(ctx);
+#endif
                     EVP_PKEY_free(privp);
                     privp = NULL;
                     /* check output */
