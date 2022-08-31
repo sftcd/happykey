@@ -259,12 +259,12 @@ struct ossl_hpke_ctx_st
     unsigned char *exporter_ctx; size_t exporter_ctxlen; /**< exporter string */
     unsigned char *exporter; size_t exporterlen; /**< most recent exporter */
     char *pskid; unsigned char *psk; size_t psklen; /**< PSK */
-    EVP_PKEY *authpriv; /**< sender's authentication private key */
-    EVP_PKEY *authpub; /**< sender's authentication public key */
-    EVP_PKEY *recippriv; /**< recipient's KEM priv key */
-    EVP_PKEY *recippub; /**< recipient's KEM pub key */
+
     EVP_PKEY *senderpriv; /**< sender's ephemeral private key */
-    EVP_PKEY *senderpub; /**< sender's ephemeral public key */
+    EVP_PKEY *authpriv; /**< sender's authentication private key */
+
+    EVP_PKEY *recippriv; /**< receiver's private key */
+    unsigned char *authpub; size_t authpublen; /**< auth public key */ 
 };
 
 
@@ -3505,12 +3505,13 @@ void OSSL_HPKE_CTX_free(OSSL_HPKE_CTX *ctx)
     OPENSSL_free(ctx->pskid);
     OPENSSL_cleanse(ctx->psk, ctx->psklen);
     OPENSSL_free(ctx->psk);
+
     EVP_PKEY_free(ctx->authpriv);
-    EVP_PKEY_free(ctx->authpub);
-    EVP_PKEY_free(ctx->recippriv);
-    EVP_PKEY_free(ctx->recippub);
     EVP_PKEY_free(ctx->senderpriv);
-    EVP_PKEY_free(ctx->senderpub);
+
+    EVP_PKEY_free(ctx->recippriv);
+    OPENSSL_free(ctx->authpub);
+
     OPENSSL_free(ctx);
     return;
 }
@@ -3527,8 +3528,18 @@ int OSSL_HPKE_CTX_set1_psk(OSSL_HPKE_CTX *ctx,
                            const char *pskid,
                            const unsigned char *psk, size_t psklen)
 {
-    if (ctx == NULL || pskid == NULL || psk == NULL || psklen == 0)
+#ifdef HAPPYKEY
+    int erv = 1;
+#endif
+    if (ctx == NULL || pskid == NULL || psk == NULL || psklen == 0) {
+        ERR_raise(ERR_LIB_CRYPTO, ERR_R_INTERNAL_ERROR);
         return 0;
+    }
+    if (ctx->mode != OSSL_HPKE_MODE_PSK
+        && ctx->mode != OSSL_HPKE_MODE_PSKAUTH) {
+        ERR_raise(ERR_LIB_CRYPTO, ERR_R_INTERNAL_ERROR);
+        return 0;
+    }
     /* free previous value if any */
     OPENSSL_free(ctx->pskid);
     OPENSSL_cleanse(ctx->psk, ctx->psklen);
@@ -3552,15 +3563,48 @@ err:
 }
 
 /**
+ * @brief set a sender private key for HPKE
+ * @param ctx is the pointer for the HPKE context
+ * @param privp is an EVP_PKEY form of the private key
+ * @return 1 for success, 0 for error
+ */
+int OSSL_HPKE_CTX_set1_senderpriv(OSSL_HPKE_CTX *ctx, EVP_PKEY *privp)
+{
+#ifdef HAPPYKEY
+    int erv = 1;
+#endif
+    if (ctx == NULL || privp == NULL) {
+        ERR_raise(ERR_LIB_CRYPTO, ERR_R_INTERNAL_ERROR);
+        return 0;
+    }
+    if (ctx->senderpriv != NULL)
+        EVP_PKEY_free(ctx->senderpriv);
+    ctx->senderpriv = EVP_PKEY_dup(privp);
+    if (ctx->senderpriv == NULL)
+       return 0; 
+    return 1;
+}
+
+/**
  * @brief set a private key for HPKE authenticated modes
  * @param ctx is the pointer for the HPKE context
  * @param privp is an EVP_PKEY form of the private key
  * @return 1 for success, 0 for error
  */
-int OSSL_HPKE_CTX_set1_auth_priv(OSSL_HPKE_CTX *ctx, EVP_PKEY *privp)
+int OSSL_HPKE_CTX_set1_authpriv(OSSL_HPKE_CTX *ctx, EVP_PKEY *privp)
 {
-    if (ctx == NULL)
+#ifdef HAPPYKEY
+    int erv = 1;
+#endif
+    if (ctx == NULL || privp == NULL) {
+        ERR_raise(ERR_LIB_CRYPTO, ERR_R_INTERNAL_ERROR);
         return 0;
+    }
+    if (ctx->mode != OSSL_HPKE_MODE_AUTH
+        && ctx->mode != OSSL_HPKE_MODE_PSKAUTH) {
+        ERR_raise(ERR_LIB_CRYPTO, ERR_R_INTERNAL_ERROR);
+        return 0;
+    }
     if (ctx->authpriv != NULL)
         EVP_PKEY_free(ctx->authpriv);
     ctx->authpriv = EVP_PKEY_dup(privp);
@@ -3572,18 +3616,23 @@ int OSSL_HPKE_CTX_set1_auth_priv(OSSL_HPKE_CTX *ctx, EVP_PKEY *privp)
 /**
  * @brief set a public key for HPKE authenticated modes
  * @param ctx is the pointer for the HPKE context
- * @param pubp is an EVP_PKEY form of the public key
+ * @param pub is an buffer form of the public key
+ * @param publen is the length of the above
  * @return 1 for success, 0 for error
  */
-int OSSL_HPKE_CTX_set1_auth_pub(OSSL_HPKE_CTX *ctx, EVP_PKEY *pubp)
+int OSSL_HPKE_CTX_set1_authpub(OSSL_HPKE_CTX *ctx,
+                                unsigned char *pub,
+                                size_t publen)
 {
     if (ctx == NULL)
         return 0;
     if (ctx->authpub != NULL)
-        EVP_PKEY_free(ctx->authpub);
-    ctx->authpub = EVP_PKEY_dup(pubp);
+        OPENSSL_free(ctx->authpub);
+    ctx->authpub = OPENSSL_malloc(publen);
     if (ctx->authpub == NULL)
        return 0; 
+    memcpy(ctx->authpub, pub, publen);
+    ctx->authpublen = publen;
     return 1;
 }
 
@@ -3625,7 +3674,7 @@ err:
 /**
  * @brief ask for the state of the sequence of seal/open calls
  * @param ctx is the pointer for the HPKE context
- * @return seq returns the positive integer sequence number
+ * @param seq returns the positive integer sequence number
  * @return 1 for success, 0 for error
  *
  * The value returned is the most recent used when sealing
@@ -3636,6 +3685,23 @@ int OSSL_HPKE_CTX_get0_seq(OSSL_HPKE_CTX *ctx, unsigned int *seq)
     if (ctx == NULL || seq == NULL)
         return 0;
     *seq = ctx->seq;
+    return 1;
+}
+
+/**
+ * @brief set the sequence value for seal/open calls
+ * @param ctx is the pointer for the HPKE context
+ * @param seq set the positive integer sequence number
+ * @return 1 for success, 0 for error
+ *
+ * The value returned is the most recent used when sealing
+ * or opening (successfully)
+ */
+int OSSL_HPKE_CTX_set1_seq(OSSL_HPKE_CTX *ctx, unsigned int seq)
+{
+    if (ctx == NULL)
+        return 0;
+    ctx->seq = seq;
     return 1;
 }
 
@@ -3675,21 +3741,28 @@ int OSSL_HPKE_sender_seal(OSSL_HPKE_CTX *ctx,
                           const unsigned char *aad, size_t aadlen,
                           const unsigned char *pt, size_t ptlen)
 {
-    /*
-     * We'll split this out in a bit, and add error handling,
-     * but for now, just to get something working...
-     */
     int erv =1;
     unsigned char seq;
     size_t seqlen = 1;
 
     if (ctx == NULL || enc == NULL || enclen == NULL
-            || ct == NULL || ctlen == NULL || pub == NULL)
+            || ct == NULL || ctlen == NULL || pub == NULL) {
+        ERR_raise(ERR_LIB_CRYPTO, ERR_R_INTERNAL_ERROR);
         return 0;
-
-
+    }
     seq = ctx->seq;
+    if (ctx->senderpriv == NULL) {
+        /* generate a key pair for ephemeral, or repeaated, use */
+        size_t mypublen = OSSL_HPKE_MAXSIZE;
+        unsigned char mypub[OSSL_HPKE_MAXSIZE];
 
+        if (OSSL_HPKE_keygen(ctx->libctx, ctx->propq, ctx->mode, ctx->suite,
+                             NULL, 0, mypub, &mypublen,
+                             &ctx->senderpriv) != 1) {
+            ERR_raise(ERR_LIB_CRYPTO, ERR_R_INTERNAL_ERROR);
+            return 0;
+        }
+    }
     erv = hpke_enc_int(ctx->libctx, ctx->propq, ctx->mode, ctx->suite,
                        ctx->pskid,  ctx->psklen,  ctx->psk,
                        publen, pub,
@@ -3704,8 +3777,6 @@ int OSSL_HPKE_sender_seal(OSSL_HPKE_CTX *ctx,
                        ctlen, ct);
     if (erv == 1) 
         ctx->seq++;
-
-
     return erv;
 }
 
@@ -3741,7 +3812,33 @@ int OSSL_HPKE_recipient_open(OSSL_HPKE_CTX *ctx,
                              const unsigned char *aad, size_t aadlen,
                              const unsigned char *ct, size_t ctlen)
 {
-    return 0;
+    int erv =1;
+    unsigned char seq;
+    size_t seqlen = 1;
+
+    if (ctx == NULL
+            || pt == NULL || ptlen == NULL || *ptlen == 0
+            || enc == NULL || enclen == 0
+            || ct == NULL || ctlen == 0
+            || recippriv == NULL
+            || ct == NULL || ctlen == 0) {
+        ERR_raise(ERR_LIB_CRYPTO, ERR_R_INTERNAL_ERROR);
+        return 0;
+    }
+    seq = ctx->seq;
+    erv = hpke_dec_int(ctx->libctx, ctx->propq, ctx->mode, ctx->suite,
+                       ctx->pskid,  ctx->psklen,  ctx->psk,
+                       ctx->authpublen, ctx->authpub,
+                       0, NULL, recippriv,
+                       enclen, enc,
+                       ctlen, ct,
+                       aadlen, aad,
+                       infolen, info,
+                       seqlen, &seq,
+                       ptlen, pt);
+    if (erv == 1) 
+        ctx->seq++;
+    return erv;
 }
 
 /**

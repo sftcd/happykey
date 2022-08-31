@@ -125,26 +125,31 @@ int OSSL_HPKE_CTX_set1_psk(OSSL_HPKE_CTX *ctx,
                            const unsigned char *psk, size_t psklen);
 
 /**
+ * @brief set a sender private key for HPKE
+ * @param ctx is the pointer for the HPKE context
+ * @param privp is an EVP_PKEY form of the private key
+ * @return 1 for success, 0 for error
+ */
+int OSSL_HPKE_CTX_set1_senderpriv(OSSL_HPKE_CTX *ctx, EVP_PKEY *privp);
+
+/**
  * @brief set a private key for HPKE authenticated modes
  * @param ctx is the pointer for the HPKE context
  * @param privp is an EVP_PKEY form of the private key
  * @return 1 for success, 0 for error
- *
- * If both octets and an EVP_PKEY are suppplied, the latter
- * will be preferred.
  */
-int OSSL_HPKE_CTX_set1_auth_priv(OSSL_HPKE_CTX *ctx, EVP_PKEY *privp);
+int OSSL_HPKE_CTX_set1_authpriv(OSSL_HPKE_CTX *ctx, EVP_PKEY *privp);
 
 /**
  * @brief set a public key for HPKE authenticated modes
  * @param ctx is the pointer for the HPKE context
- * @param pubp is an EVP_PKEY form of the public key
+ * @param pub is an buffer form of the public key
+ * @param publen is the length of the above
  * @return 1 for success, 0 for error
- *
- * If both octets and an EVP_PKEY are suppplied, the latter
- * will be preferred.
  */
-int OSSL_HPKE_CTX_set1_auth_pub(OSSL_HPKE_CTX *ctx, EVP_PKEY *pubp);
+int OSSL_HPKE_CTX_set1_authpub(OSSL_HPKE_CTX *ctx,
+                                unsigned char *pub,
+                                size_t publen);
 
 /**
  * @brief set a exporter length and context for HPKE 
@@ -170,6 +175,17 @@ int OSSL_HPKE_CTX_set1_exporter(OSSL_HPKE_CTX *ctx,
 int OSSL_HPKE_CTX_get0_seq(OSSL_HPKE_CTX *ctx, unsigned int *seq);
 
 /**
+ * @brief set the sequence value for seal/open calls
+ * @param ctx is the pointer for the HPKE context
+ * @param seq set the positive integer sequence number
+ * @return 1 for success, 0 for error
+ *
+ * The value returned is the most recent used when sealing
+ * or opening (successfully)
+ */
+int OSSL_HPKE_CTX_set1_seq(OSSL_HPKE_CTX *ctx, unsigned int seq);
+
+/**
  * @brief sender seal function 
  * @param ctx is the pointer for the HPKE context
  * @param enc is the sender's ephemeral public value
@@ -188,9 +204,6 @@ int OSSL_HPKE_CTX_get0_seq(OSSL_HPKE_CTX *ctx, unsigned int *seq);
  * @param pt is the plaintext
  * @param ptlen is the size the above
  * @return 1 for success, 0 for error
- *
- * If both octets and an EVP_PKEY are suppplied, the latter
- * will be preferred.
  *
  * This can be called once, or multiple, times.
  */

@@ -180,13 +180,10 @@ static int test_hpke_modes_suites(void)
         size_t infolen = OSSL_HPKE_MAXSIZE;
         unsigned char info[OSSL_HPKE_MAXSIZE];
         unsigned char *infop = NULL;
-        size_t seqlen = 12;
-        unsigned char seq[12];
-        unsigned char *seqp = NULL;
-        size_t psklen = OSSL_HPKE_MAXSIZE;
         unsigned char psk[OSSL_HPKE_MAXSIZE];
         unsigned char *pskp = NULL;
         char pskid[OSSL_HPKE_MAXSIZE];
+        size_t psklen = OSSL_HPKE_MAXSIZE;
         char *pskidp = NULL;
         EVP_PKEY *privp = NULL;
         OSSL_HPKE_SUITE hpke_suite = OSSL_HPKE_SUITE_DEFAULT;
@@ -225,18 +222,6 @@ static int test_hpke_modes_suites(void)
             if (verbose) { printf("not adding info,"); }
 #endif
             infolen = 0;
-        }
-        if (COIN_IS_HEADS) {
-#ifdef HAPPYKEY
-            if (verbose) { printf("adding seq\n"); }
-#endif
-            seqp = seq;
-            memset(seq, 's', seqlen);
-        } else {
-#ifdef HAPPYKEY
-            if (verbose) { printf("not adding seq\n"); }
-#endif
-            seqlen = 0;
         }
         if (hpke_mode == OSSL_HPKE_MODE_PSK
             || hpke_mode == OSSL_HPKE_MODE_PSKAUTH) {
@@ -315,11 +300,12 @@ static int test_hpke_modes_suites(void)
                         overallresult = 0;
                     }
 
-#define NEWAPI
-#ifdef NEWAPI
+                    /* to maintain interop we can vary NEWAPI_ENC and NEWAPI_DEC */
+#define NEWAPI_ENC
+#ifdef NEWAPI_ENC
+
                     int erv = 1;
                     OSSL_HPKE_CTX *ctx = NULL;
-
                     ctx = OSSL_HPKE_CTX_new(hpke_mode, hpke_suite,
                                             testctx, NULL);
                     if (ctx == NULL) {
@@ -332,26 +318,26 @@ static int test_hpke_modes_suites(void)
                             overallresult = 0;
                         }
                     }
-
                     if (hpke_mode == OSSL_HPKE_MODE_AUTH
                         || hpke_mode == OSSL_HPKE_MODE_PSKAUTH) {
-                        erv = OSSL_HPKE_CTX_set1_auth_priv(ctx, authpriv_evp);
+                        erv = OSSL_HPKE_CTX_set1_authpriv(ctx, authpriv_evp);
                         if (erv != 1) {
                             overallresult = 0;
                         }
                     }
-
                     erv = OSSL_HPKE_sender_seal(ctx,
-                          senderpub, &senderpublen,
-                          cipher, &cipherlen,
-                          NULL, 0, // exporter
-                          pub, publen,
-                          infop, infolen,
-                          aadp, aadlen,
-                          plain, plainlen);
+                                senderpub, &senderpublen,
+                                cipher, &cipherlen,
+                                NULL, NULL, // exporter
+                                pub, publen,
+                                infop, infolen,
+                                aadp, aadlen,
+                                plain, plainlen);
                     if (erv != 1) {
                         overallresult = 0;
                     }
+                    OSSL_HPKE_CTX_free(ctx);
+
 #else
                     if (OSSL_HPKE_TEST_true(OSSL_HPKE_enc(testctx, NULL,
                                                           hpke_mode, hpke_suite,
@@ -361,7 +347,7 @@ static int test_hpke_modes_suites(void)
                                                           plain, plainlen,
                                                           aadp, aadlen,
                                                           infop, infolen,
-                                                          seqp, seqlen,
+                                                          NULL, 0,
                                                           senderpub,
                                                           &senderpublen,
                                                           cipher, &cipherlen),
@@ -371,6 +357,43 @@ static int test_hpke_modes_suites(void)
 #endif
 
                     memset(clear,0,clearlen);
+#define NEWAPI_DEC
+#ifdef NEWAPI_DEC
+                    OSSL_HPKE_CTX *rctx = NULL;
+
+                    rctx = OSSL_HPKE_CTX_new(hpke_mode, hpke_suite,
+                                             testctx, NULL);
+                    if (rctx == NULL) {
+                        overallresult = 0;
+                    }
+                    if (hpke_mode == OSSL_HPKE_MODE_PSK
+                        || hpke_mode == OSSL_HPKE_MODE_PSKAUTH) {
+                        erv = OSSL_HPKE_CTX_set1_psk(rctx, pskidp, pskp, psklen);
+                        if (erv != 1) {
+                            overallresult = 0;
+                        }
+                    }
+                    if (hpke_mode == OSSL_HPKE_MODE_AUTH
+                        || hpke_mode == OSSL_HPKE_MODE_PSKAUTH) {
+                        erv = OSSL_HPKE_CTX_set1_authpub(rctx, authpub, authpublen);
+                        if (erv != 1) {
+                            overallresult = 0;
+                        }
+                    }
+                    erv = OSSL_HPKE_recipient_open(rctx,
+                            clear, &clearlen,
+                            senderpub, senderpublen,
+                            NULL, NULL,
+                            privp,
+                            infop, infolen,
+                            aadp, aadlen,
+                            cipher, cipherlen);
+                    if (erv != 1) {
+                        overallresult = 0;
+                    }
+                    OSSL_HPKE_CTX_free(rctx);
+
+#else
                     if (OSSL_HPKE_TEST_true(OSSL_HPKE_dec(testctx, NULL,
                                                           hpke_mode, hpke_suite,
                                                           pskidp, pskp, psklen,
@@ -381,13 +404,11 @@ static int test_hpke_modes_suites(void)
                                                           cipher, cipherlen,
                                                           aadp, aadlen,
                                                           infop, infolen,
-                                                          NULL, 0, //seqp, seqlen,
+                                                          NULL, 0,
                                                           clear, &clearlen),
                                                 "OSSL_HPKE_dec") != 1) {
                         overallresult = 0;
                     }
-#ifdef NEWAPI
-                    OSSL_HPKE_CTX_free(ctx);
 #endif
                     EVP_PKEY_free(privp);
                     privp = NULL;
@@ -544,6 +565,7 @@ static int test_hpke_badcalls(void)
     size_t authprivlen = 0;
     unsigned char *authprivp = NULL;
 
+    /* pub is NULL now */
     if (OSSL_HPKE_TEST_false(OSSL_HPKE_keygen(testctx, NULL,
                                               hpke_mode, hpke_suite,
                                               NULL, 0,
@@ -552,6 +574,31 @@ static int test_hpke_badcalls(void)
                              "OSSL_HPKE_keygen") != 1) {
         overallresult = 0;
     }
+
+    pub = buf1;
+    publen = sizeof(buf1);
+    /* bogus kem_id */
+    hpke_suite.kem_id = 100;
+    if (OSSL_HPKE_TEST_false(OSSL_HPKE_keygen(testctx, NULL,
+                                              hpke_mode, hpke_suite,
+                                              NULL, 0,
+                                              pub, &publen,
+                                              &privp),
+                             "OSSL_HPKE_keygen") != 1) {
+        overallresult = 0;
+    }
+
+    /* a good key to tee up bad calls below */
+    hpke_suite.kem_id = 0x20;
+    if (OSSL_HPKE_TEST_true(OSSL_HPKE_keygen(testctx, NULL,
+                                              hpke_mode, hpke_suite,
+                                              NULL, 0,
+                                              pub, &publen,
+                                              &privp),
+                             "OSSL_HPKE_keygen") != 1) {
+        overallresult = 0;
+    }
+
     if (OSSL_HPKE_TEST_false(OSSL_HPKE_enc(testctx, NULL, hpke_mode, hpke_suite,
                                            pskidp, pskp, psklen,
                                            pub, publen,
@@ -578,17 +625,6 @@ static int test_hpke_badcalls(void)
                              "OSSL_HPKE_dec") != 1) {
         overallresult = 0;
     }
-    /* gen a key pair to use in enc/dec fails */
-    pub = buf1;
-    publen = OSSL_HPKE_MAXSIZE;
-    if (OSSL_HPKE_TEST_true(OSSL_HPKE_keygen(testctx, NULL,
-                                             hpke_mode, hpke_suite,
-                                             NULL, 0,
-                                             pub, &publen,
-                                             &privp),
-                            "OSSL_HPKE_keygen") != 1) {
-        overallresult = 0;
-    }
     if (OSSL_HPKE_TEST_false(OSSL_HPKE_enc(testctx, NULL, hpke_mode, hpke_suite,
                                            pskidp, pskp, psklen,
                                            pub, publen,
@@ -604,47 +640,17 @@ static int test_hpke_badcalls(void)
     }
 
     if (overallresult != 1) {
+        EVP_PKEY_free(privp);
         return overallresult;
     }
-    /*
-     * I'm not sure what we want below - calls like these make
-     * no real sense (two output buffers at the same place in
-     * memory) but I'm not sure we should prevent it.
-     * Will leave this here for now in the hope of broader input.
-     */
-    memset(buf1, 0x01, OSSL_HPKE_MAXSIZE);
-    memset(buf2, 0x02, OSSL_HPKE_MAXSIZE);
-    memset(buf3, 0x03, OSSL_HPKE_MAXSIZE);
-    memset(buf4, 0x04, OSSL_HPKE_MAXSIZE);
-    /* same pub & priv buffers won't make for happiness */
-    pub = buf1;
-    publen = OSSL_HPKE_MAXSIZE;
-    if (OSSL_HPKE_TEST_true(OSSL_HPKE_keygen(testctx, NULL,
-                                             hpke_mode, hpke_suite,
-                                             NULL, 0,
-                                             pub, &publen,
-                                             &privp),
-                            "OSSL_HPKE_keygen") != 1) {
-        overallresult = 0;
-    }
-    /* gen a usuable key pair to use in the enc/dec call below */
-    pub = buf1;
-    publen = OSSL_HPKE_MAXSIZE;
-    if (OSSL_HPKE_TEST_true(OSSL_HPKE_keygen(testctx, NULL,
-                                                 hpke_mode, hpke_suite,
-                                                 NULL, 0,
-                                                 pub, &publen,
-                                                 &privp),
-                            "OSSL_HPKE_keygen") != 1) {
-        overallresult = 0;
-    }
-    plain = buf3;
-    plainlen = 30;
-    /* cipher and senderpub as same buffer is.. silly, but "works" */
-    cipher = buf4;
-    cipherlen = OSSL_HPKE_MAXSIZE;
-    senderpub = buf4;
-    senderpublen = OSSL_HPKE_MAXSIZE;
+
+    /* same cipher and senderpub buffer */
+    plain = buf2;
+    plainlen = sizeof(buf2) - 64; /* leave room for tag */
+    cipher = buf3;
+    cipherlen = sizeof(buf3);
+    senderpub = buf3;
+    senderpublen = sizeof(buf3);
     if (OSSL_HPKE_TEST_true(OSSL_HPKE_enc(testctx, NULL, hpke_mode, hpke_suite,
                                           pskidp, pskp, psklen,
                                           pub, publen,
@@ -658,6 +664,7 @@ static int test_hpke_badcalls(void)
                             "OSSL_HPKE_enc") != 1) {
         overallresult = 0;
     }
+    EVP_PKEY_free(privp);
     return overallresult;
 }
 
