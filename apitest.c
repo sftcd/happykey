@@ -535,6 +535,7 @@ static int test_hpke_export_only(void)
     if (overallresult == 1 && memcmp(exp, rexp, explen)) {
         overallresult = 0;
     }
+    EVP_PKEY_free(privp);
 
     return overallresult;
 }
@@ -746,8 +747,10 @@ static int test_hpke_badcalls(void)
     /* same cipher and senderpub buffer */
     plain = buf2;
     plainlen = sizeof(buf2) - 64; /* leave room for tag */
+    memset(plain, 0, plainlen);
     cipher = buf3;
     cipherlen = sizeof(buf3);
+    memset(cipher, 0, cipherlen);
     senderpub = buf3;
     senderpublen = sizeof(buf3);
     if (OSSL_HPKE_TEST_true(OSSL_HPKE_enc(testctx, NULL, hpke_mode, hpke_suite,

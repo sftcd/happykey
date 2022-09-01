@@ -2381,7 +2381,11 @@ err:
     hpke_pbuf(stdout, "\tkey", key, keylen);
     hpke_pbuf(stdout, "\texportersec", exportersec, exporterseclen);
     hpke_pbuf(stdout, "\tplaintext", clear, clearlen);
-    hpke_pbuf(stdout, "\tciphertext", cipher, *cipherlen);
+    if (*cipherlen != OSSL_HPKE_MAXSIZE) {
+        hpke_pbuf(stdout, "\tciphertext", cipher, *cipherlen);
+    } else {
+        fprintf(stdout, "\tciphertext: probably not generated\n");
+    }
     if (mode == OSSL_HPKE_MODE_PSK || mode == OSSL_HPKE_MODE_PSKAUTH) {
         fprintf(stdout, "\tpskid: %s\n", pskid);
         hpke_pbuf(stdout, "\tpsk", psk, psklen);
@@ -4028,7 +4032,7 @@ int OSSL_HPKE_export_only_sender(OSSL_HPKE_CTX *ctx,
     size_t fake_ptlen = sizeof(fake_pt);
     unsigned char fake_ct[64];
     size_t fake_ctlen = sizeof(fake_ct);
-    OSSL_HPKE_CTX expctx;
+    OSSL_HPKE_SUITE scpy;
 
     if (ctx == NULL
             || enc == NULL || enclen == 0
@@ -4041,13 +4045,19 @@ int OSSL_HPKE_export_only_sender(OSSL_HPKE_CTX *ctx,
         ERR_raise(ERR_LIB_CRYPTO, ERR_R_INTERNAL_ERROR);
         return 0;
     }
-    expctx = *ctx;
-    expctx.suite.aead_id=OSSL_HPKE_AEAD_ID_EXPORTONLY;
-    return OSSL_HPKE_sender_seal(&expctx, enc, enclen,
-                                 fake_ct, &fake_ctlen,
-                                 exp, explen, pub, publen,
-                                 info, infolen, NULL, 0, /* aad */
-                                 fake_pt, fake_ptlen);
+    /* fake the AEAD to the export only one for now */
+    scpy = ctx->suite;
+    ctx->suite.aead_id=OSSL_HPKE_AEAD_ID_EXPORTONLY;
+    erv = OSSL_HPKE_sender_seal(ctx, enc, enclen,
+                                fake_ct, &fake_ctlen,
+                                exp, explen, pub, publen,
+                                info, infolen, NULL, 0, /* aad */
+                                fake_pt, fake_ptlen);
+    /* put back the real AEAD */
+    ctx->suite = scpy;
+    if (erv != 1)
+        return 0;
+    return 1;
 }
 
 /**
@@ -4083,7 +4093,7 @@ int OSSL_HPKE_export_only_recip(OSSL_HPKE_CTX *ctx,
     size_t fake_ptlen = sizeof(fake_pt);
     unsigned char fake_ct[64];
     size_t fake_ctlen = sizeof(fake_ct);
-    OSSL_HPKE_CTX expctx;
+    OSSL_HPKE_SUITE scpy;
 
     if (ctx == NULL
             || enc == NULL || enclen == 0
@@ -4096,18 +4106,17 @@ int OSSL_HPKE_export_only_recip(OSSL_HPKE_CTX *ctx,
         ERR_raise(ERR_LIB_CRYPTO, ERR_R_INTERNAL_ERROR);
         return 0;
     }
-    expctx = *ctx;
     memset(fake_ct, 0x00, fake_ctlen);
-    expctx = *ctx;
-    expctx.suite.aead_id=OSSL_HPKE_AEAD_ID_EXPORTONLY;
+    memset(fake_pt, 0x00, fake_ptlen);
+    scpy = ctx->suite;
+    ctx->suite.aead_id=OSSL_HPKE_AEAD_ID_EXPORTONLY;
     /* this will fail but fill in exp/explen before the AEAD fails */
-    erv = OSSL_HPKE_recipient_open(&expctx, fake_pt, &fake_ptlen,
-                            enc, enclen,
-                            exp, explen,
-                            recippriv,
-                            info, infolen,
-                            NULL, 0, /* no aad */
-                            fake_ct, fake_ctlen);
+    erv = OSSL_HPKE_recipient_open(ctx, fake_pt, &fake_ptlen,
+                                   enc, enclen, exp, explen,
+                                   recippriv,
+                                   info, infolen, NULL, 0, /* no aad */
+                                   fake_ct, fake_ctlen);
+    ctx->suite = scpy;
     if (erv != 0) {
         ERR_raise(ERR_LIB_CRYPTO, ERR_R_INTERNAL_ERROR);
         return 0;
