@@ -3751,9 +3751,6 @@ static int hpke_seq2buf(uint64_t seq, unsigned char *buf, size_t blen)
  * @param ptlen is the size the above
  * @return 1 for success, 0 for error
  *
- * If both octets and an EVP_PKEY are suppplied, the latter
- * will be preferred.
- *
  * This can be called once, or multiple, times.
  */
 int OSSL_HPKE_sender_seal(OSSL_HPKE_CTX *ctx,
@@ -3840,9 +3837,6 @@ int OSSL_HPKE_sender_seal(OSSL_HPKE_CTX *ctx,
  * @param ctlen is the size the above
  * @return 1 for success, 0 for error
  *
- * If both octets and an EVP_PKEY are suppplied, the latter
- * will be preferred.
- *
  * This can be called once, or multiple, times.
  */
 int OSSL_HPKE_recipient_open(OSSL_HPKE_CTX *ctx,
@@ -3907,9 +3901,6 @@ int OSSL_HPKE_recipient_open(OSSL_HPKE_CTX *ctx,
  * @param infolen is the size the above
  * @return 1 for success, 0 for error
  *
- * If both octets and an EVP_PKEY are suppplied, the latter
- * will be preferred.
- *
  * This can be called once, or multiple, times.
  */
 int OSSL_HPKE_export_only_sender(OSSL_HPKE_CTX *ctx,
@@ -3935,9 +3926,6 @@ int OSSL_HPKE_export_only_sender(OSSL_HPKE_CTX *ctx,
  * @param info is the key schedule info parameter
  * @param infolen is the size the above
  * @return 1 for success, 0 for error
- *
- * If both octets and an EVP_PKEY are suppplied, the latter
- * will be preferred.
  *
  * This can be called once, or multiple, times.
  */
