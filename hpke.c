@@ -153,8 +153,9 @@ static hpke_aead_info_t hpke_aead_tab[] = {
     { OSSL_HPKE_AEAD_ID_AES_GCM_256, LN_aes_256_gcm, 16, 32, 12 },
 #ifndef OPENSSL_NO_CHACHA20
 # ifndef OPENSSL_NO_POLY1305
-    { OSSL_HPKE_AEAD_ID_CHACHA_POLY1305, LN_chacha20_poly1305, 16, 32, 12 }
+    { OSSL_HPKE_AEAD_ID_CHACHA_POLY1305, LN_chacha20_poly1305, 16, 32, 12 },
 # endif
+    { OSSL_HPKE_AEAD_ID_EXPORTONLY, LN_aes_128_gcm, 16, 16, 12 }
 #endif
 };
 #if defined(SUPERVERBOSE) || defined(TESTVECTORS)
@@ -3944,6 +3945,7 @@ int OSSL_HPKE_recipient_open(OSSL_HPKE_CTX *ctx,
                              const unsigned char *ct, size_t ctlen)
 {
     int erv =1;
+    int erv1 =1;
     unsigned char seqbuf[12];
     size_t seqlen = 1;
     unsigned char exportersec[OSSL_HPKE_MAXSIZE];
@@ -3974,6 +3976,13 @@ int OSSL_HPKE_recipient_open(OSSL_HPKE_CTX *ctx,
                        seqlen, seqbuf,
                        &exporterseclen, exportersec,
                        ptlen, pt);
+    /* FIXME: HACK HACK HACK - ignore result in case we're doing
+     * export only!!! */
+    erv1 = hpke_calc_exporter(ctx, exportersec, exporterseclen, exp, explen);
+    if (erv1 != 1) {
+        ERR_raise(ERR_LIB_CRYPTO, ERR_R_INTERNAL_ERROR);
+        return 0;
+    }
     if (erv != 1) {
         ERR_raise(ERR_LIB_CRYPTO, ERR_R_INTERNAL_ERROR);
         return 0;
@@ -3984,11 +3993,6 @@ int OSSL_HPKE_recipient_open(OSSL_HPKE_CTX *ctx,
             return 0;
         }
     }
-    erv = hpke_calc_exporter(ctx, exportersec, exporterseclen, exp, explen);
-    if (erv != 1) {
-        ERR_raise(ERR_LIB_CRYPTO, ERR_R_INTERNAL_ERROR);
-        return 0;
-    }
     return erv;
 }
 
@@ -3997,8 +4001,6 @@ int OSSL_HPKE_recipient_open(OSSL_HPKE_CTX *ctx,
  * @param ctx is the pointer for the HPKE context
  * @param enc is the sender's ephemeral public value
  * @param enclen is the size the above
- * @param ct is the ciphertext output
- * @param ctlen is the size the above
  * @param exp is the exporter octets
  * @param explen is the size the above
  * @param pub is the recipient public key octets
@@ -4011,12 +4013,41 @@ int OSSL_HPKE_recipient_open(OSSL_HPKE_CTX *ctx,
  */
 int OSSL_HPKE_export_only_sender(OSSL_HPKE_CTX *ctx,
                                  unsigned char *enc, size_t *enclen,
-                                 unsigned char *ct, size_t *ctlen,
                                  unsigned char *exp, size_t *explen,
                                  unsigned char *pub, size_t publen,
                                  const unsigned char *info, size_t infolen)
 {
-    return 0;
+    /* 
+     * we'll try bork the AEAD in the context and "seal"
+     * a fake message
+     */
+#ifdef HAPPYKEY
+    int erv = 1;
+#endif
+    unsigned char fake_pt[]="quick brown fox";
+    size_t fake_ptlen = sizeof(fake_pt);
+    unsigned char fake_ct[64];
+    size_t fake_ctlen = sizeof(fake_ct);
+    OSSL_HPKE_CTX expctx;
+
+    if (ctx == NULL
+            || enc == NULL || enclen == 0
+            || pub == NULL || publen == 0) {
+        ERR_raise(ERR_LIB_CRYPTO, ERR_R_INTERNAL_ERROR);
+        return 0;
+    }
+    if (ctx->exporter_ctx == NULL || ctx->expoutlen == 0 ) {
+        /* you should set those first */
+        ERR_raise(ERR_LIB_CRYPTO, ERR_R_INTERNAL_ERROR);
+        return 0;
+    }
+    expctx = *ctx;
+    expctx.suite.aead_id=OSSL_HPKE_AEAD_ID_EXPORTONLY;
+    return OSSL_HPKE_sender_seal(&expctx, enc, enclen,
+                                 fake_ct, &fake_ctlen,
+                                 exp, explen, pub, publen,
+                                 info, infolen, NULL, 0, /* aad */
+                                 fake_pt, fake_ptlen);
 }
 
 /**
@@ -4024,8 +4055,6 @@ int OSSL_HPKE_export_only_sender(OSSL_HPKE_CTX *ctx,
  * @param ctx is the pointer for the HPKE context
  * @param enc is the sender's ephemeral public value
  * @param enclen is the size the above
- * @param ct is the ciphertext output
- * @param ctlen is the size the above
  * @param exp is the exporter octets
  * @param explen is the size the above
  * @param recippriv is the EVP_PKEY form of recipient private value
@@ -4036,13 +4065,54 @@ int OSSL_HPKE_export_only_sender(OSSL_HPKE_CTX *ctx,
  * This can be called once, or multiple, times.
  */
 int OSSL_HPKE_export_only_recip(OSSL_HPKE_CTX *ctx,
-                                unsigned char *enc, size_t *enclen,
-                                unsigned char *ct, size_t *ctlen,
+                                unsigned char *enc, size_t enclen,
                                 unsigned char *exp, size_t *explen,
                                 EVP_PKEY *recippriv,
                                 const unsigned char *info, size_t infolen)
 {
-    return 0;
+    /* 
+     * we'll try bork the AEAD in the context and "open"
+     * a fake message, while ignoring the error from the
+     * AEAD decryption (for now!, that's clearly too ugly
+     * to stand:-)
+     */
+#ifdef HAPPYKEY
+    int erv = 1;
+#endif
+    unsigned char fake_pt[64];
+    size_t fake_ptlen = sizeof(fake_pt);
+    unsigned char fake_ct[64];
+    size_t fake_ctlen = sizeof(fake_ct);
+    OSSL_HPKE_CTX expctx;
+
+    if (ctx == NULL
+            || enc == NULL || enclen == 0
+            || recippriv == NULL) {
+        ERR_raise(ERR_LIB_CRYPTO, ERR_R_INTERNAL_ERROR);
+        return 0;
+    }
+    if (ctx->exporter_ctx == NULL || ctx->expoutlen == 0 ) {
+        /* you should set those first */
+        ERR_raise(ERR_LIB_CRYPTO, ERR_R_INTERNAL_ERROR);
+        return 0;
+    }
+    expctx = *ctx;
+    memset(fake_ct, 0x00, fake_ctlen);
+    expctx = *ctx;
+    expctx.suite.aead_id=OSSL_HPKE_AEAD_ID_EXPORTONLY;
+    /* this will fail but fill in exp/explen before the AEAD fails */
+    erv = OSSL_HPKE_recipient_open(&expctx, fake_pt, &fake_ptlen,
+                            enc, enclen,
+                            exp, explen,
+                            recippriv,
+                            info, infolen,
+                            NULL, 0, /* no aad */
+                            fake_ct, fake_ctlen);
+    if (erv != 0) {
+        ERR_raise(ERR_LIB_CRYPTO, ERR_R_INTERNAL_ERROR);
+        return 0;
+    }
+    return 1;
 }
 
 /*

@@ -279,8 +279,6 @@ int OSSL_HPKE_recipient_open(OSSL_HPKE_CTX *ctx,
  * @param ctx is the pointer for the HPKE context
  * @param enc is the sender's ephemeral public value
  * @param enclen is the size the above
- * @param ct is the ciphertext output
- * @param ctlen is the size the above
  * @param exp is the exporter octets
  * @param explen is the size the above
  * @param pub is the recipient public key octets
@@ -293,7 +291,6 @@ int OSSL_HPKE_recipient_open(OSSL_HPKE_CTX *ctx,
  */
 int OSSL_HPKE_export_only_sender(OSSL_HPKE_CTX *ctx,
                                  unsigned char *enc, size_t *enclen,
-                                 unsigned char *ct, size_t *ctlen,
                                  unsigned char *exp, size_t *explen,
                                  unsigned char *pub, size_t publen,
                                  const unsigned char *info, size_t infolen);
@@ -303,8 +300,6 @@ int OSSL_HPKE_export_only_sender(OSSL_HPKE_CTX *ctx,
  * @param ctx is the pointer for the HPKE context
  * @param enc is the sender's ephemeral public value
  * @param enclen is the size the above
- * @param ct is the ciphertext output
- * @param ctlen is the size the above
  * @param exp is the exporter octets
  * @param explen is the size the above
  * @param recippriv is the EVP_PKEY form of recipient private value
@@ -315,8 +310,7 @@ int OSSL_HPKE_export_only_sender(OSSL_HPKE_CTX *ctx,
  * This can be called once, or multiple, times.
  */
 int OSSL_HPKE_export_only_recip(OSSL_HPKE_CTX *ctx,
-                                unsigned char *enc, size_t *enclen,
-                                unsigned char *ct, size_t *ctlen,
+                                unsigned char *enc, size_t enclen,
                                 unsigned char *exp, size_t *explen,
                                 EVP_PKEY *recippriv,
                                 const unsigned char *info, size_t infolen);

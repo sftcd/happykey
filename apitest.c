@@ -470,6 +470,76 @@ static int test_hpke_modes_suites(void)
 }
 
 /**
+ * @brief check export only stuff
+ * @return 1 for success, other otherwise
+ */
+static int test_hpke_export_only(void)
+{
+    int overallresult = 1;
+    EVP_PKEY *privp = NULL;
+    unsigned char pub[OSSL_HPKE_MAXSIZE];
+    size_t publen=sizeof(pub);
+    unsigned char enc[OSSL_HPKE_MAXSIZE];
+    size_t enclen=sizeof(enc);
+    unsigned char exp[OSSL_HPKE_MAXSIZE];
+    size_t explen=sizeof(exp);
+    int hpke_mode = OSSL_HPKE_MODE_BASE;
+    OSSL_HPKE_SUITE hpke_suite = OSSL_HPKE_SUITE_DEFAULT;
+    OSSL_HPKE_CTX *ctx = NULL;
+    unsigned char rexp[OSSL_HPKE_MAXSIZE];
+    size_t rexplen=sizeof(rexp);
+    OSSL_HPKE_CTX *rctx = NULL;
+
+    if (OSSL_HPKE_keygen(testctx, NULL, hpke_mode, hpke_suite,
+                         NULL, 0, pub, &publen, &privp) != 1) {
+        overallresult = 0;
+    }
+    ctx = OSSL_HPKE_CTX_new(hpke_mode, hpke_suite, testctx, NULL);
+    if (ctx == NULL) {
+        overallresult = 0;
+    }
+    if (OSSL_HPKE_CTX_set1_exporter(ctx, "foo", strlen("foo"), 12) != 1) {
+        overallresult = 0;
+    }
+    if (OSSL_HPKE_TEST_true(OSSL_HPKE_export_only_sender(ctx,
+                                 enc, &enclen,
+                                 exp, &explen,
+                                 pub, publen,
+                                 NULL, 0), /* no info */
+                            "OSSL_HPKE_export_only") != 1) { 
+        overallresult = 0;
+    }
+    OSSL_HPKE_CTX_free(ctx);
+
+    rctx = OSSL_HPKE_CTX_new(hpke_mode, hpke_suite, testctx, NULL);
+    if (rctx == NULL) {
+        overallresult = 0;
+    }
+    if (OSSL_HPKE_CTX_set1_exporter(rctx, "foo", strlen("foo"), 12) != 1) {
+        overallresult = 0;
+    }
+    if (OSSL_HPKE_TEST_true(OSSL_HPKE_export_only_recip(rctx,
+                                enc, enclen,
+                                rexp, &rexplen,
+                                privp,
+                                NULL, 0), /* no info */
+                            "OSSL_HPKE_export_only_recip") != 1) {
+        overallresult = 0;
+    }
+
+    OSSL_HPKE_CTX_free(rctx);
+
+    if (overallresult == 1 && explen != rexplen) {
+        overallresult = 0;
+    }
+    if (overallresult == 1 && memcmp(exp, rexp, explen)) {
+        overallresult = 0;
+    }
+
+    return overallresult;
+}
+
+/**
  * @brief Check mapping from strings to HPKE suites
  * @return 1 for success, other otherwise
  */
@@ -1004,6 +1074,10 @@ static int test_hpke_exporters(void)
 static int test_hpke(void)
 {
     int res = 1;
+
+    res = test_hpke_export_only();
+    if (res != 1)
+        return res;
 
     res = test_hpke_modes_suites();
     if (res != 1)
