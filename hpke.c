@@ -55,9 +55,9 @@
 #endif
 
 /** biggest/default buffer for keys and internal buffers we use */
-# ifndef OSSL_HPKE_MAXSIZE
-#  define OSSL_HPKE_MAXSIZE (2 * 1024) /* 2k: enough for anyone :-) */
-# endif
+#ifndef OSSL_HPKE_MAXSIZE
+# define OSSL_HPKE_MAXSIZE (2 * 1024) /* 2k: enough for anyone :-) */
+#endif
 
 /* constants defined in RFC9180 */
 #define OSSL_HPKE_VERLABEL        "HPKE-v1"  /**< version string label */
@@ -4021,7 +4021,7 @@ int OSSL_HPKE_export_only_sender(OSSL_HPKE_CTX *ctx,
                                  unsigned char *pub, size_t publen,
                                  const unsigned char *info, size_t infolen)
 {
-    /* 
+    /*
      * we'll try bork the AEAD in the context and "seal"
      * a fake message
      */
@@ -4080,7 +4080,7 @@ int OSSL_HPKE_export_only_recip(OSSL_HPKE_CTX *ctx,
                                 EVP_PKEY *recippriv,
                                 const unsigned char *info, size_t infolen)
 {
-    /* 
+    /*
      * we'll try bork the AEAD in the context and "open"
      * a fake message, while ignoring the error from the
      * AEAD decryption (for now!, that's clearly too ugly

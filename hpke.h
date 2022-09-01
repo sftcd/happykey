@@ -106,7 +106,7 @@ typedef struct ossl_hpke_ctx_st OSSL_HPKE_CTX;
 OSSL_HPKE_CTX *OSSL_HPKE_CTX_new(int mode, OSSL_HPKE_SUITE suite,
                                  OSSL_LIB_CTX *libctx, const char *propq);
 
-/** 
+/**
  * @brief free up storage for a HPKE context
  * @param ctx is the pointer to be free'd (can be NULL)
  */
@@ -131,7 +131,7 @@ int OSSL_HPKE_CTX_set1_psk(OSSL_HPKE_CTX *ctx,
  * @return 1 for success, 0 for error
  *
  * If no key is set via this API an ephemeral one will be
- * generated in the first seal operation and used until the 
+ * generated in the first seal operation and used until the
  * context is free'd. (Or until a subsequent call to this
  * API replaces the key.) This suits senders who are typically
  * clients.
@@ -157,11 +157,11 @@ int OSSL_HPKE_CTX_set1_authpriv(OSSL_HPKE_CTX *ctx, EVP_PKEY *privp);
  * private keys as passed as EVP_PKEY pointers.
  */
 int OSSL_HPKE_CTX_set1_authpub(OSSL_HPKE_CTX *ctx,
-                                unsigned char *pub,
-                                size_t publen);
+                               unsigned char *pub,
+                               size_t publen);
 
 /**
- * @brief set an exporter length and context for HPKE 
+ * @brief set an exporter length and context for HPKE
  * @param ctx is the pointer for the HPKE context
  * @param exp_ctx is the exporter context octets
  * @param exp_ctxlen is the size of exp_ctx
@@ -198,7 +198,7 @@ int OSSL_HPKE_CTX_get0_seq(OSSL_HPKE_CTX *ctx, uint64_t *seq);
 int OSSL_HPKE_CTX_set1_seq(OSSL_HPKE_CTX *ctx, uint64_t seq);
 
 /**
- * @brief sender seal function 
+ * @brief sender seal function
  * @param ctx is the pointer for the HPKE context
  * @param enc is the sender's ephemeral public value
  * @param enclen is the size the above
@@ -224,9 +224,9 @@ int OSSL_HPKE_CTX_set1_seq(OSSL_HPKE_CTX *ctx, uint64_t seq);
  *
  * The ciphertext buffer (ct) should be big enough to include
  * the AEAD tag generated from encryptions and the ``enc`` buffer
- * (the ephemeral public key) needs to be big enough for the 
+ * (the ephemeral public key) needs to be big enough for the
  * relevant KEM. ``OSSL_HPKE_expansion`` can be used to determine
- * the sizes needed. 
+ * the sizes needed.
  */
 int OSSL_HPKE_sender_seal(OSSL_HPKE_CTX *ctx,
                           unsigned char *enc, size_t *enclen,
@@ -238,7 +238,7 @@ int OSSL_HPKE_sender_seal(OSSL_HPKE_CTX *ctx,
                           const unsigned char *pt, size_t ptlen);
 
 /**
- * @brief recipient open function 
+ * @brief recipient open function
  * @param ctx is the pointer for the HPKE context
  * @param pt is the plaintext
  * @param ptlen is the size the above
@@ -262,7 +262,7 @@ int OSSL_HPKE_sender_seal(OSSL_HPKE_CTX *ctx,
  * keys in memory at once and that may have to e.g. do trial
  * decryptions.
  *
- * The plaintext output (pt) will be smaller than the 
+ * The plaintext output (pt) will be smaller than the
  * ciphertext input for all supported suites.
  */
 int OSSL_HPKE_recipient_open(OSSL_HPKE_CTX *ctx,
@@ -275,7 +275,7 @@ int OSSL_HPKE_recipient_open(OSSL_HPKE_CTX *ctx,
                              const unsigned char *ct, size_t ctlen);
 
 /**
- * @brief sender export-only function 
+ * @brief sender export-only function
  * @param ctx is the pointer for the HPKE context
  * @param enc is the sender's ephemeral public value
  * @param enclen is the size the above
@@ -296,7 +296,7 @@ int OSSL_HPKE_export_only_sender(OSSL_HPKE_CTX *ctx,
                                  const unsigned char *info, size_t infolen);
 
 /**
- * @brief receiver export-only function 
+ * @brief receiver export-only function
  * @param ctx is the pointer for the HPKE context
  * @param enc is the sender's ephemeral public value
  * @param enclen is the size the above
@@ -336,10 +336,9 @@ int OSSL_HPKE_export_only_recip(OSSL_HPKE_CTX *ctx,
  * (Or authenticate HPKE values from that sender.)
  */
 int OSSL_HPKE_keygen(OSSL_LIB_CTX *libctx, const char *propq,
-                         unsigned int mode, OSSL_HPKE_SUITE suite,
-                         const unsigned char *ikm, size_t ikmlen,
-                         unsigned char *pub, size_t *publen,
-                         EVP_PKEY **priv);
+                     unsigned int mode, OSSL_HPKE_SUITE suite,
+                     const unsigned char *ikm, size_t ikmlen,
+                     unsigned char *pub, size_t *publen, EVP_PKEY **priv);
 
 /**
  * @brief check if a suite is supported locally
@@ -362,7 +361,7 @@ int OSSL_HPKE_suite_check(OSSL_HPKE_SUITE suite);
  *
  * If suite_in is provided that will be used (if supported). If
  * suite_in is NULL, a random suite (from those supported) will
- * be selected. In all cases the output pub and cipher values 
+ * be selected. In all cases the output pub and cipher values
  * will be appropriate random values for the selected suite.
  */
 int OSSL_HPKE_good4grease(OSSL_LIB_CTX *libctx, const char *propq,
@@ -387,7 +386,7 @@ int OSSL_HPKE_good4grease(OSSL_LIB_CTX *libctx, const char *propq,
  * example.
  */
 int OSSL_HPKE_str2suite(const char *str, OSSL_HPKE_SUITE *suite);
- 
+
 /**
  * @brief tell the caller how big the cipertext will be
  * @param suite is the suite to be used
@@ -401,7 +400,7 @@ int OSSL_HPKE_expansion(OSSL_HPKE_SUITE suite,
                         size_t clearlen,
                         size_t *cipherlen);
 
-/* 
+/*
  * below are the existing enc/dec APIs that will likely be
  * dropped, once new ones work ok
  */
@@ -455,7 +454,7 @@ int OSSL_HPKE_enc(OSSL_LIB_CTX *libctx, const char *propq,
                   const unsigned char *aad, size_t aadlen,
                   const unsigned char *info, size_t infolen,
                   const unsigned char *seq, size_t seqlen,
-                  unsigned char *senderpub,size_t *senderpublen,
+                  unsigned char *senderpub, size_t *senderpublen,
                   unsigned char *cipher, size_t *cipherlen,
                   void *tv);
 # else
@@ -470,7 +469,7 @@ int OSSL_HPKE_enc(OSSL_LIB_CTX *libctx, const char *propq,
                   const unsigned char *aad, size_t aadlen,
                   const unsigned char *info, size_t infolen,
                   const unsigned char *seq, size_t seqlen,
-                  unsigned char *senderpub,size_t *senderpublen,
+                  unsigned char *senderpub, size_t *senderpublen,
                   unsigned char *cipher, size_t *cipherlen);
 # endif
 
