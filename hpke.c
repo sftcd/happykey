@@ -249,7 +249,7 @@ const char *hpke_kdf_strtab[] = {
 #endif
 
 /**
- * @brief sender or receiver context 
+ * @brief sender or receiver context
  */
 struct ossl_hpke_ctx_st
 {
@@ -266,7 +266,7 @@ struct ossl_hpke_ctx_st
     EVP_PKEY *authpriv; /**< sender's authentication private key */
 
     EVP_PKEY *recippriv; /**< receiver's private key */
-    unsigned char *authpub; size_t authpublen; /**< auth public key */ 
+    unsigned char *authpub; size_t authpublen; /**< auth public key */
 };
 
 
@@ -2375,7 +2375,7 @@ err:
     BIO_free_all(bfp);
     EVP_PKEY_free(pkR);
     if (!evpcaller) { EVP_PKEY_free(pkE); }
-    if (authpriv_evp == NULL) 
+    if (authpriv_evp == NULL)
         EVP_PKEY_free(skI);
     EVP_PKEY_CTX_free(pctx);
     OPENSSL_free(shared_secret);
@@ -3492,7 +3492,7 @@ err:
     return NULL;
 }
 
-/** 
+/**
  * @brief free up storage for a HPKE context
  * @param ctx is the pointer to be free'd (can be NULL)
  */
@@ -3547,7 +3547,7 @@ int OSSL_HPKE_CTX_set1_psk(OSSL_HPKE_CTX *ctx,
     OPENSSL_cleanse(ctx->psk, ctx->psklen);
     OPENSSL_free(ctx->psk);
     ctx->pskid = OPENSSL_strdup(pskid);
-    if (ctx->pskid == NULL) 
+    if (ctx->pskid == NULL)
         goto err;
     ctx->psk = OPENSSL_malloc(psklen);
     if (ctx->psk == NULL)
@@ -3583,7 +3583,7 @@ int OSSL_HPKE_CTX_set1_senderpriv(OSSL_HPKE_CTX *ctx, EVP_PKEY *privp)
         EVP_PKEY_free(ctx->senderpriv);
     ctx->senderpriv = EVP_PKEY_dup(privp);
     if (ctx->senderpriv == NULL)
-       return 0; 
+       return 0;
     return 1;
 }
 
@@ -3611,7 +3611,7 @@ int OSSL_HPKE_CTX_set1_authpriv(OSSL_HPKE_CTX *ctx, EVP_PKEY *privp)
         EVP_PKEY_free(ctx->authpriv);
     ctx->authpriv = EVP_PKEY_dup(privp);
     if (ctx->authpriv == NULL)
-       return 0; 
+       return 0;
     return 1;
 }
 
@@ -3632,14 +3632,14 @@ int OSSL_HPKE_CTX_set1_authpub(OSSL_HPKE_CTX *ctx,
         OPENSSL_free(ctx->authpub);
     ctx->authpub = OPENSSL_malloc(publen);
     if (ctx->authpub == NULL)
-       return 0; 
+       return 0;
     memcpy(ctx->authpub, pub, publen);
     ctx->authpublen = publen;
     return 1;
 }
 
 /**
- * @brief set a exporter length and context for HPKE 
+ * @brief set a exporter length and context for HPKE
  * @param ctx is the pointer for the HPKE context
  * @param exp_ctx is the exporter context octets
  * @param exp_ctxlen is the size of exp_ctx
@@ -3655,7 +3655,7 @@ int OSSL_HPKE_CTX_set1_exporter(OSSL_HPKE_CTX *ctx,
     if (ctx->exporter != NULL)
         OPENSSL_cleanse(ctx->exporter, ctx->exporterlen);
     OPENSSL_free(ctx->exporter);
-    if (ctx->exporter_ctx != NULL) 
+    if (ctx->exporter_ctx != NULL)
         OPENSSL_free(ctx->exporter_ctx);
     ctx->exporter = NULL;
     ctx->exporterlen = explen;
@@ -3730,7 +3730,7 @@ static int hpke_seq2buf(uint64_t seq, unsigned char *buf, size_t blen)
 }
 
 /**
- * @brief sender seal function 
+ * @brief sender seal function
  * @param ctx is the pointer for the HPKE context
  * @param enc is the sender's ephemeral public value
  * @param enclen is the size the above
@@ -3766,7 +3766,7 @@ int OSSL_HPKE_sender_seal(OSSL_HPKE_CTX *ctx,
                           const unsigned char *pt, size_t ptlen)
 {
     int erv =1;
-    /* 
+    /*
      * 12 octets is the max nonce, there's probably some better way
      * to produce a big endian form of the sequence number than this
      * but we'll see.
@@ -3812,17 +3812,18 @@ int OSSL_HPKE_sender_seal(OSSL_HPKE_CTX *ctx,
                        0, NULL,
                        enclen, enc,
                        ctlen, ct);
-    if (erv == 1) 
+    if (erv == 1) {
         ctx->seq++;
-    if (ctx->seq == 0) { /* error wrap around 64 bits */
-        ERR_raise(ERR_LIB_CRYPTO, ERR_R_INTERNAL_ERROR);
-        return 0;
+        if (ctx->seq == 0) { /* error wrap around 64 bits */
+            ERR_raise(ERR_LIB_CRYPTO, ERR_R_INTERNAL_ERROR);
+            return 0;
+        }
     }
     return erv;
 }
 
 /**
- * @brief recipient open function 
+ * @brief recipient open function
  * @param ctx is the pointer for the HPKE context
  * @param pt is the plaintext
  * @param ptlen is the size the above
@@ -3881,17 +3882,18 @@ int OSSL_HPKE_recipient_open(OSSL_HPKE_CTX *ctx,
                        infolen, info,
                        seqlen, seqbuf,
                        ptlen, pt);
-    if (erv == 1) 
+    if (erv == 1) {
         ctx->seq++;
-    if (ctx->seq == 0) { /* error wrap around 64 bits */
-        ERR_raise(ERR_LIB_CRYPTO, ERR_R_INTERNAL_ERROR);
-        return 0;
+        if (ctx->seq == 0) { /* error wrap around 64 bits */
+            ERR_raise(ERR_LIB_CRYPTO, ERR_R_INTERNAL_ERROR);
+            return 0;
+        }
     }
     return erv;
 }
 
 /**
- * @brief sender export-only function 
+ * @brief sender export-only function
  * @param ctx is the pointer for the HPKE context
  * @param enc is the sender's ephemeral public value
  * @param enclen is the size the above
@@ -3921,7 +3923,7 @@ int OSSL_HPKE_export_only_sender(OSSL_HPKE_CTX *ctx,
 }
 
 /**
- * @brief receiver export-only function 
+ * @brief receiver export-only function
  * @param ctx is the pointer for the HPKE context
  * @param enc is the sender's ephemeral public value
  * @param enclen is the size the above

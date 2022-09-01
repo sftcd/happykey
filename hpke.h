@@ -96,11 +96,11 @@ typedef struct {
 typedef struct ossl_hpke_ctx_st OSSL_HPKE_CTX;
 
 /**
- * @brief contex creator
+ * @brief context creator
  * @param mode is the desired HPKE mode
  * @param suite specifies the KEM, KDF and AEAD to use
- * @param libctx is the context to use
- * @param propq is a properties string
+ * @param libctx is the library context to use
+ * @param propq is a properties string for the library
  * @return pointer to new context or NULL if error
  */
 OSSL_HPKE_CTX *OSSL_HPKE_CTX_new(int mode, OSSL_HPKE_SUITE suite,
@@ -125,15 +125,21 @@ int OSSL_HPKE_CTX_set1_psk(OSSL_HPKE_CTX *ctx,
                            const unsigned char *psk, size_t psklen);
 
 /**
- * @brief set a sender private key for HPKE
+ * @brief set a sender KEM private key for HPKE
  * @param ctx is the pointer for the HPKE context
  * @param privp is an EVP_PKEY form of the private key
  * @return 1 for success, 0 for error
+ *
+ * If no key is set via this API an ephemeral one will be
+ * generated in the first seal operation and used until the 
+ * context is free'd. (Or until a subsequent call to this
+ * API replaces the key.) This suits senders who are typically
+ * clients.
  */
 int OSSL_HPKE_CTX_set1_senderpriv(OSSL_HPKE_CTX *ctx, EVP_PKEY *privp);
 
 /**
- * @brief set a private key for HPKE authenticated modes
+ * @brief set a sender private key for HPKE authenticated modes
  * @param ctx is the pointer for the HPKE context
  * @param privp is an EVP_PKEY form of the private key
  * @return 1 for success, 0 for error
@@ -146,13 +152,16 @@ int OSSL_HPKE_CTX_set1_authpriv(OSSL_HPKE_CTX *ctx, EVP_PKEY *privp);
  * @param pub is an buffer form of the public key
  * @param publen is the length of the above
  * @return 1 for success, 0 for error
+ *
+ * In all these APIs public keys are passed as buffers whereas
+ * private keys as passed as EVP_PKEY pointers.
  */
 int OSSL_HPKE_CTX_set1_authpub(OSSL_HPKE_CTX *ctx,
                                 unsigned char *pub,
                                 size_t publen);
 
 /**
- * @brief set a exporter length and context for HPKE 
+ * @brief set an exporter length and context for HPKE 
  * @param ctx is the pointer for the HPKE context
  * @param exp_ctx is the exporter context octets
  * @param exp_ctxlen is the size of exp_ctx
@@ -169,8 +178,9 @@ int OSSL_HPKE_CTX_set1_exporter(OSSL_HPKE_CTX *ctx,
  * @return seq returns the positive integer sequence number
  * @return 1 for success, 0 for error
  *
- * The value returned is the most recent used when sealing
- * or opening (successfully)
+ * The value returned is the next one to be used when sealing
+ * or opening (so if we start at zero this will be 1 after the
+ * first successful call to seal)
  *
  * seq is a uint64_t as that's what two other implementations
  * chose
@@ -183,8 +193,7 @@ int OSSL_HPKE_CTX_get0_seq(OSSL_HPKE_CTX *ctx, uint64_t *seq);
  * @param seq set the positive integer sequence number
  * @return 1 for success, 0 for error
  *
- * The value returned is the most recent used when sealing
- * or opening (successfully)
+ * The next seal or open operation will use this value.
  */
 int OSSL_HPKE_CTX_set1_seq(OSSL_HPKE_CTX *ctx, uint64_t seq);
 
@@ -209,6 +218,15 @@ int OSSL_HPKE_CTX_set1_seq(OSSL_HPKE_CTX *ctx, uint64_t seq);
  * @return 1 for success, 0 for error
  *
  * This can be called once, or multiple, times.
+ *
+ * If no KEM private key has been set in the context an ephemeral
+ * key will be generated and used for the duration of the context.
+ *
+ * The ciphertext buffer (ct) should be big enough to include
+ * the AEAD tag generated from encryptions and the ``enc`` buffer
+ * (the ephemeral public key) needs to be big enough for the 
+ * relevant KEM. ``OSSL_HPKE_expansion`` can be used to determine
+ * the sizes needed. 
  */
 int OSSL_HPKE_sender_seal(OSSL_HPKE_CTX *ctx,
                           unsigned char *enc, size_t *enclen,
@@ -241,6 +259,14 @@ int OSSL_HPKE_sender_seal(OSSL_HPKE_CTX *ctx,
  * will be preferred.
  *
  * This can be called once, or multiple, times.
+ *
+ * The recipient private key is explicitly set here as recipients
+ * are likely to be servers with multiple long(ish) term private
+ * keys in memory at once and that may have to e.g. do trial
+ * decryptions.
+ *
+ * The plaintext output (pt) will be smaller than the 
+ * ciphertext input for all supported suites.
  */
 int OSSL_HPKE_recipient_open(OSSL_HPKE_CTX *ctx,
                              unsigned char *pt, size_t *ptlen,
@@ -318,11 +344,11 @@ int OSSL_HPKE_export_only_recip(OSSL_HPKE_CTX *ctx,
  * @return 1 for success, other for error (error returns can be non-zero)
  *
  * Used for entities that will later receive HPKE values to
- * decrypt. Only the KEM from the suite is significant here.
- * The ``pub` output will typically be published so that
+ * decrypt or that want a private key for an AUTH mode. Currently,
+ * only the KEM from the suite is significant here.
+ * The ``pub`` output will typically be published so that
  * others can encrypt to the private key holder using HPKE.
- * The ``priv`` output contains the raw private value and
- * hence is sensitive.
+ * (Or authenticate HPKE values from that sender.)
  */
 int OSSL_HPKE_keygen(OSSL_LIB_CTX *libctx, const char *propq,
                          unsigned int mode, OSSL_HPKE_SUITE suite,
@@ -348,6 +374,11 @@ int OSSL_HPKE_suite_check(OSSL_HPKE_SUITE suite);
  * @param cipher is a random value of the appropriate length for a ciphertext
  * @param cipher_len is the length of cipher
  * @return 1 for success, otherwise failure
+ *
+ * If suite_in is provided that will be used (if supported). If
+ * suite_in is NULL, a random suite (from those supported) will
+ * be selected. In all cases the output pub and cipher values 
+ * will be appropriate random values for the selected suite.
  */
 int OSSL_HPKE_good4grease(OSSL_LIB_CTX *libctx, const char *propq,
                           OSSL_HPKE_SUITE *suite_in,
@@ -366,7 +397,7 @@ int OSSL_HPKE_good4grease(OSSL_LIB_CTX *libctx, const char *propq,
  * An example good string is "x25519,hkdf-sha256,aes-128-gcm"
  * Symbols are #define'd for the relevant labels, e.g.
  * OSSL_HPKE_KEMSTR_X25519. Numeric (decimal or hex) values with
- * the relevant IANA codepoint valus may also be used,
+ * the relevant IANA codepoint values from RFC9180 may be used,
  * e.g., "0x20,1,1" represents the same suite as the first
  * example.
  */
