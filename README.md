@@ -27,7 +27,8 @@ High level notes:
 
 ## Recent Changes
 
-- 20220830: starting on the new API...
+- 20220831: new API seal/open working, still to-do export-only APIs
+  (and lots of tidying)
 
 - 20220828: made quite a few changes based on review of our 
   [OpenSSL HPKE PR](https://github.com/openssl/openssl/pull/17172). Many
