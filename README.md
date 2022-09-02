@@ -27,8 +27,8 @@ High level notes:
 
 ## Recent Changes
 
-- 202200901: new API seal/open working, with HACKY export-only APIs
-  that appear to work  - next step interop on those then lots of tidying
+- 202200902: new API seal/open working, with HACKY export-only API
+  implementaion that appears to work, ECH interop also fine
 
 - 20220828: made quite a few changes based on review of our 
   [OpenSSL HPKE PR](https://github.com/openssl/openssl/pull/17172). Many
