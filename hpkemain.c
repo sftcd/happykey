@@ -829,7 +829,7 @@ int main(int argc, char **argv)
                 aad, aadlen,
                 info, infolen,
                 NULL,0, /* seq */
-                senderpub, &senderpublen,
+                senderpub, &senderpublen, NULL,
                 cipher, &cipherlen
 #ifdef TESTVECTORS
                 ,tv

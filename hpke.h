@@ -90,6 +90,10 @@ typedef struct {
         OSSL_HPKE_AEAD_ID_AES_GCM_128 \
     }
 
+# ifndef OSSL_HPKE_MAXSIZE
+#  define OSSL_HPKE_MAXSIZE 512
+# endif
+
 /**
  * @brief opaque type for HPKE contexts
  */
@@ -438,6 +442,7 @@ int OSSL_HPKE_expansion(OSSL_HPKE_SUITE suite,
  * @param seqlen is the length of the sequence data (can be zero)
  * @param senderpub is the input buffer for sender public key
  * @param senderpublen length of the input buffer for sender's public key
+ * @param senderpriv is the sender's private key (if being re-used)
  * @param cipher is the input buffer for ciphertext
  * @param cipherlen is the length of the input buffer for ciphertext
  * @return 1 for success, other for error (error returns can be non-zero)
@@ -455,6 +460,7 @@ int OSSL_HPKE_enc(OSSL_LIB_CTX *libctx, const char *propq,
                   const unsigned char *info, size_t infolen,
                   const unsigned char *seq, size_t seqlen,
                   unsigned char *senderpub, size_t *senderpublen,
+                  EVP_PKEY *senderpriv,
                   unsigned char *cipher, size_t *cipherlen,
                   void *tv);
 # else
@@ -470,6 +476,7 @@ int OSSL_HPKE_enc(OSSL_LIB_CTX *libctx, const char *propq,
                   const unsigned char *info, size_t infolen,
                   const unsigned char *seq, size_t seqlen,
                   unsigned char *senderpub, size_t *senderpublen,
+                  EVP_PKEY *senderpriv,
                   unsigned char *cipher, size_t *cipherlen);
 # endif
 

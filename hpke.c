@@ -3450,7 +3450,7 @@ static int hpke_expansion(OSSL_HPKE_SUITE suite,
         ERR_raise(ERR_LIB_CRYPTO, ERR_R_INTERNAL_ERROR);
         return 0;
     }
-    if ((erv = hpke_suite_check(suite)) != 1) {
+    if (hpke_suite_check(suite) != 1) {
         ERR_raise(ERR_LIB_CRYPTO, ERR_R_INTERNAL_ERROR);
         return 0;
     }
@@ -4003,9 +4003,7 @@ int OSSL_HPKE_export_only_sender(OSSL_HPKE_CTX *ctx,
      * we'll try bork the AEAD in the context and "seal"
      * a fake message
      */
-#ifdef HAPPYKEY
     int erv = 1;
-#endif
     unsigned char fake_pt[] = "quick brown fox";
     size_t fake_ptlen = sizeof(fake_pt);
     unsigned char fake_ct[64];
@@ -4064,9 +4062,7 @@ int OSSL_HPKE_export_only_recip(OSSL_HPKE_CTX *ctx,
      * AEAD decryption (for now!, that's clearly too ugly
      * to stand:-)
      */
-#ifdef HAPPYKEY
     int erv = 1;
-#endif
     unsigned char fake_pt[64];
     size_t fake_ptlen = sizeof(fake_pt);
     unsigned char fake_ct[64];
@@ -4279,6 +4275,7 @@ int OSSL_HPKE_expansion(OSSL_HPKE_SUITE suite,
  * @param seq is the encoded sequence data (can be NULL)
  * @param senderpublen length of the input buffer for sender's public key
  * @param senderpub is the input buffer for sender public key
+ * @param senderpriv is the sender's private key (if being re-used)
  * @param cipherlen is the length of the input buffer for ciphertext
  * @param cipher is the input buffer for ciphertext
  * @return 1 for good (OpenSSL style), not-1 for error
@@ -4299,6 +4296,7 @@ int OSSL_HPKE_enc(OSSL_LIB_CTX *libctx, const char *propq,
                   const unsigned char *info, size_t infolen,
                   const unsigned char *seq, size_t seqlen,
                   unsigned char *senderpub, size_t *senderpublen,
+                  EVP_PKEY *senderpriv,
                   unsigned char *cipher, size_t *cipherlen,
                   void *tv)
 #else
@@ -4314,10 +4312,13 @@ int OSSL_HPKE_enc(OSSL_LIB_CTX *libctx, const char *propq,
                   const unsigned char *info, size_t infolen,
                   const unsigned char *seq, size_t seqlen,
                   unsigned char *senderpub, size_t *senderpublen,
+                  EVP_PKEY *senderpriv,
                   unsigned char *cipher, size_t *cipherlen)
 #endif
 {
 #ifdef TESTVECTORS
+    if (senderpublen == NULL)
+        return 0;
     return hpke_enc_int(libctx, propq, mode, suite,
                         pskid, psklen, psk,
                         publen, pub,
@@ -4326,12 +4327,15 @@ int OSSL_HPKE_enc(OSSL_LIB_CTX *libctx, const char *propq,
                         aadlen, aad,
                         infolen, info,
                         seqlen, seq,
-                        0, NULL,
-                        NULL, NULL, /* exporter sec */
-                        NULL, 0, NULL,
+                        *senderpublen, senderpub, senderpriv,
+                        0, NULL, /* raw sender priv */
+                        NULL, NULL, /* exporter */
                         senderpublen, senderpub,
                         cipherlen, cipher, tv);
+
 #else
+    if (senderpublen == NULL)
+        return 0;
     return hpke_enc_int(libctx, propq, mode, suite,
                         pskid, psklen, psk,
                         publen, pub,
@@ -4340,8 +4344,8 @@ int OSSL_HPKE_enc(OSSL_LIB_CTX *libctx, const char *propq,
                         aadlen, aad,
                         infolen, info,
                         seqlen, seq,
-                        0, NULL,
-                        NULL, 0, NULL,
+                        *senderpublen, senderpub, senderpriv,
+                        0, NULL, /* raw sender priv */
                         NULL, NULL, /* exporter sec */
                         senderpublen, senderpub,
                         cipherlen, cipher);

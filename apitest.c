@@ -29,12 +29,6 @@
 static int verbose = 0;
 static OSSL_LIB_CTX *testctx = NULL;
 
-extern int OSSL_HPKE_prbuf2evp(OSSL_LIB_CTX *libctx, const char *propq,
-                        unsigned int kem_id,
-                        const unsigned char *prbuf, size_t prbuf_len,
-                        const unsigned char *pubuf, size_t pubuf_len,
-                        EVP_PKEY **priv);
-
 /*
  * @brief mimic OpenSSL test_true function
  */
@@ -101,6 +95,12 @@ static void usage(char *prog, char *errmsg)
 #  define NEWAPI_ENC
 #  define NEWAPI_DEC
 # endif
+
+extern int OSSL_HPKE_prbuf2evp(OSSL_LIB_CTX *libctx, const char *propq,
+                               unsigned int kem_id,
+                               const unsigned char *prbuf, size_t prbuf_len,
+                               const unsigned char *pubuf, size_t pubuf_len,
+                               EVP_PKEY **priv);
 
 /*
  * Randomly toss a coin
@@ -377,6 +377,7 @@ static int test_hpke_modes_suites(void)
                                                           NULL, 0,
                                                           senderpub,
                                                           &senderpublen,
+                                                          NULL,
                                                           cipher, &cipherlen),
                                             "OSSL_HPKE_enc") != 1) {
                         overallresult = 0;
@@ -403,7 +404,7 @@ static int test_hpke_modes_suites(void)
                     if (hpke_mode == OSSL_HPKE_MODE_AUTH
                         || hpke_mode == OSSL_HPKE_MODE_PSKAUTH) {
                         erv = OSSL_HPKE_CTX_set1_authpub(rctx,
-                                                         authpub, authpublen);
+                                                         authpubp, authpublen);
                         if (erv != 1) {
                             overallresult = 0;
                         }
@@ -502,7 +503,8 @@ static int test_hpke_export_only(void)
     if (ctx == NULL) {
         overallresult = 0;
     }
-    if (OSSL_HPKE_CTX_set1_exporter(ctx, "foo", strlen("foo"), 12) != 1) {
+    if (OSSL_HPKE_CTX_set1_exporter(ctx, (unsigned char *) "foo",
+                                    strlen("foo"), 12) != 1) {
         overallresult = 0;
     }
     if (OSSL_HPKE_TEST_true(OSSL_HPKE_export_only_sender(ctx, enc, &enclen,
@@ -518,7 +520,8 @@ static int test_hpke_export_only(void)
     if (rctx == NULL) {
         overallresult = 0;
     }
-    if (OSSL_HPKE_CTX_set1_exporter(rctx, "foo", strlen("foo"), 12) != 1) {
+    if (OSSL_HPKE_CTX_set1_exporter(rctx, (unsigned char *) "foo",
+                                    strlen("foo"), 12) != 1) {
         overallresult = 0;
     }
     if (OSSL_HPKE_TEST_true(OSSL_HPKE_export_only_recip(rctx, enc, enclen,
@@ -641,7 +644,6 @@ static int test_hpke_badcalls(void)
     unsigned char buf1[OSSL_HPKE_MAXSIZE];
     unsigned char buf2[OSSL_HPKE_MAXSIZE];
     unsigned char buf3[OSSL_HPKE_MAXSIZE];
-    unsigned char buf4[OSSL_HPKE_MAXSIZE];
     size_t aadlen = 0;
     unsigned char *aadp = NULL;
     size_t infolen = 0;
@@ -709,7 +711,7 @@ static int test_hpke_badcalls(void)
                                            aadp, aadlen,
                                            infop, infolen,
                                            seqp, seqlen,
-                                           senderpub, &senderpublen,
+                                           senderpub, &senderpublen, NULL,
                                            cipher, &cipherlen),
                              "OSSL_HPKE_enc") != 1) {
         overallresult = 0;
@@ -735,7 +737,7 @@ static int test_hpke_badcalls(void)
                                            aadp, aadlen,
                                            infop, infolen,
                                            seqp, seqlen,
-                                           senderpub, &senderpublen,
+                                           senderpub, &senderpublen, NULL,
                                            cipher, &cipherlen),
                              "OSSL_HPKE_enc") != 1) {
         overallresult = 0;
@@ -763,7 +765,7 @@ static int test_hpke_badcalls(void)
                                           aadp, aadlen,
                                           infop, infolen,
                                           seqp, seqlen,
-                                          senderpub, &senderpublen,
+                                          senderpub, &senderpublen, NULL,
                                           cipher, &cipherlen),
                             "OSSL_HPKE_enc") != 1) {
         overallresult = 0;
