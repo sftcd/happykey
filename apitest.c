@@ -54,12 +54,12 @@ static int test_false(char *file, int line, int res, char *str)
 {
     if (!res) {
         if (verbose) {
-            printf("Expected fail: %s at %s:%d, res: %d\n", str, 
+            printf("Expected fail: %s at %s:%d, res: %d\n", str,
                     file, line, res);
         }
         return 1;
-    } 
-    printf("Unexpected success = Fail: %s at %s:%d, res: %d\n", str, 
+    }
+    printf("Unexpected success = Fail: %s at %s:%d, res: %d\n", str,
             file, line, res);
     return 0;
 }
@@ -89,12 +89,18 @@ static void usage(char *prog, char *errmsg)
 # define OSSL_HPKE_TEST_false(__x__, __str__) TEST_false(__x__)
 #endif
 
-#ifndef OSSL_HPKE_MAXSIZE
-#define OSSL_HPKE_MAXSIZE 1024
-#endif
-#ifndef OSSL_HPKE_DEFSIZE
-#define OSSL_HPKE_DEFSIZE (4 * 1024)
-#endif
+# ifndef OSSL_HPKE_MAXSIZE
+#  define OSSL_HPKE_MAXSIZE 1024
+# endif
+# ifndef OSSL_HPKE_DEFSIZE
+#  define OSSL_HPKE_DEFSIZE (4 * 1024)
+# endif
+
+# define NEWAPI
+# ifdef NEWAPI
+#  define NEWAPI_ENC
+#  define NEWAPI_DEC
+# endif
 
 /*
  * Randomly toss a coin
@@ -128,20 +134,20 @@ static uint16_t hpke_aead_list[] = {
 };
 
 /* strings that can be used, with names or IANA codepoints */
-static char *kem_str_list[] = { 
-    "P-256", "P-384", "P-521", "x25519", "x448", 
-    "0x10", "0x11", "0x12", "0x20", "0x21", 
+static char *kem_str_list[] = {
+    "P-256", "P-384", "P-521", "x25519", "x448",
+    "0x10", "0x11", "0x12", "0x20", "0x21",
     "16", "17", "18", "32", "33"
 };
 static char *kdf_str_list[] = {
-    "hkdf-sha256", "hkdf-sha384", "hkdf-sha512", 
-    "0x1", "0x01", "0x2", "0x02", "0x3", "0x03", 
-    "1", "2", "3" 
+    "hkdf-sha256", "hkdf-sha384", "hkdf-sha512",
+    "0x1", "0x01", "0x2", "0x02", "0x3", "0x03",
+    "1", "2", "3"
 };
 static char *aead_str_list[] = {
-    "aes-128-gcm", "aes-256-gcm", "chacha20-poly1305", 
-    "0x1", "0x01", "0x2", "0x02", "0x3", "0x03", 
-    "1", "2", "3" 
+    "aes-128-gcm", "aes-256-gcm", "chacha20-poly1305",
+    "0x1", "0x01", "0x2", "0x02", "0x3", "0x03",
+    "1", "2", "3"
 };
 /* table of bogus strings that better not work */
 static char *bogus_suite_strs[] = {
@@ -189,11 +195,6 @@ static int test_hpke_modes_suites(void)
         OSSL_HPKE_SUITE hpke_suite = OSSL_HPKE_SUITE_DEFAULT;
         size_t plainlen = OSSL_HPKE_MAXSIZE;
         unsigned char plain[OSSL_HPKE_MAXSIZE];
-#define NEWAPI
-#ifdef NEWAPI
-#define NEWAPI_ENC
-#define NEWAPI_DEC
-#endif
 #ifdef NEWAPI
         uint64_t startseq = 0;
 #endif
@@ -308,7 +309,10 @@ static int test_hpke_modes_suites(void)
                         overallresult = 0;
                     }
 
-                    /* to maintain interop we can vary NEWAPI_ENC and NEWAPI_DEC */
+                    /*
+                     * to maintain interop we can vary NEWAPI_ENC and
+                     * NEWAPI_DEC
+                     */
 #ifdef NEWAPI_ENC
 
                     int erv = 1;
@@ -334,12 +338,14 @@ static int test_hpke_modes_suites(void)
                     }
                     /* randomly use a non zero sequnce */
                     if (COIN_IS_HEADS) {
-                        RAND_bytes_ex(testctx, (unsigned char*)&startseq, sizeof(startseq),
+                        RAND_bytes_ex(testctx,
+                                      (unsigned char *) &startseq,
+                                      sizeof(startseq),
                                       RAND_DRBG_STRENGTH);
 #ifdef HAPPYKEY
                         if (verbose) printf("setting seq = 0x%lx\n",startseq);
 #endif
-                        erv = OSSL_HPKE_CTX_set1_seq(ctx,startseq);
+                        erv = OSSL_HPKE_CTX_set1_seq(ctx, startseq);
                         if (erv != 1) {
                             overallresult = 0;
                         }
@@ -349,14 +355,11 @@ static int test_hpke_modes_suites(void)
                         if (verbose) printf("setting seq = 0x%lx\n",startseq);
 #endif
                     }
-                    erv = OSSL_HPKE_sender_seal(ctx,
-                                senderpub, &senderpublen,
-                                cipher, &cipherlen,
-                                NULL, NULL, // exporter
-                                pub, publen,
-                                infop, infolen,
-                                aadp, aadlen,
-                                plain, plainlen);
+                    erv = OSSL_HPKE_sender_seal(ctx, senderpub, &senderpublen,
+                                                cipher, &cipherlen,
+                                                NULL, NULL, /* exporter */
+                                                pub, publen, infop, infolen,
+                                                aadp, aadlen, plain, plainlen);
                     if (erv != 1) {
                         overallresult = 0;
                     }
@@ -380,7 +383,7 @@ static int test_hpke_modes_suites(void)
                     }
 #endif
 
-                    memset(clear,0,clearlen);
+                    memset(clear, 0, clearlen);
 #ifdef NEWAPI_DEC
                     OSSL_HPKE_CTX *rctx = NULL;
 
@@ -391,32 +394,33 @@ static int test_hpke_modes_suites(void)
                     }
                     if (hpke_mode == OSSL_HPKE_MODE_PSK
                         || hpke_mode == OSSL_HPKE_MODE_PSKAUTH) {
-                        erv = OSSL_HPKE_CTX_set1_psk(rctx, pskidp, pskp, psklen);
+                        erv = OSSL_HPKE_CTX_set1_psk(rctx,
+                                                     pskidp, pskp, psklen);
                         if (erv != 1) {
                             overallresult = 0;
                         }
                     }
                     if (hpke_mode == OSSL_HPKE_MODE_AUTH
                         || hpke_mode == OSSL_HPKE_MODE_PSKAUTH) {
-                        erv = OSSL_HPKE_CTX_set1_authpub(rctx, authpub, authpublen);
+                        erv = OSSL_HPKE_CTX_set1_authpub(rctx,
+                                                         authpub, authpublen);
                         if (erv != 1) {
                             overallresult = 0;
                         }
                     }
                     if (startseq != 0) {
-                        erv = OSSL_HPKE_CTX_set1_seq(rctx,startseq);
+                        erv = OSSL_HPKE_CTX_set1_seq(rctx, startseq);
                         if (erv != 1) {
                             overallresult = 0;
                         }
                     }
-                    erv = OSSL_HPKE_recipient_open(rctx,
-                            clear, &clearlen,
-                            senderpub, senderpublen,
-                            NULL, NULL,
-                            privp,
-                            infop, infolen,
-                            aadp, aadlen,
-                            cipher, cipherlen);
+                    erv = OSSL_HPKE_recipient_open(rctx, clear, &clearlen,
+                                                   senderpub, senderpublen,
+                                                   NULL, NULL,
+                                                   privp,
+                                                   infop, infolen,
+                                                   aadp, aadlen,
+                                                   cipher, cipherlen);
                     if (erv != 1) {
                         overallresult = 0;
                     }
@@ -435,7 +439,7 @@ static int test_hpke_modes_suites(void)
                                                           infop, infolen,
                                                           NULL, 0,
                                                           clear, &clearlen),
-                                                "OSSL_HPKE_dec") != 1) {
+                                            "OSSL_HPKE_dec") != 1) {
                         overallresult = 0;
                     }
 #endif
@@ -478,16 +482,16 @@ static int test_hpke_export_only(void)
     int overallresult = 1;
     EVP_PKEY *privp = NULL;
     unsigned char pub[OSSL_HPKE_MAXSIZE];
-    size_t publen=sizeof(pub);
+    size_t publen = sizeof(pub);
     unsigned char enc[OSSL_HPKE_MAXSIZE];
-    size_t enclen=sizeof(enc);
+    size_t enclen = sizeof(enc);
     unsigned char exp[OSSL_HPKE_MAXSIZE];
-    size_t explen=sizeof(exp);
+    size_t explen = sizeof(exp);
     int hpke_mode = OSSL_HPKE_MODE_BASE;
     OSSL_HPKE_SUITE hpke_suite = OSSL_HPKE_SUITE_DEFAULT;
     OSSL_HPKE_CTX *ctx = NULL;
     unsigned char rexp[OSSL_HPKE_MAXSIZE];
-    size_t rexplen=sizeof(rexp);
+    size_t rexplen = sizeof(rexp);
     OSSL_HPKE_CTX *rctx = NULL;
 
     if (OSSL_HPKE_keygen(testctx, NULL, hpke_mode, hpke_suite,
@@ -501,12 +505,11 @@ static int test_hpke_export_only(void)
     if (OSSL_HPKE_CTX_set1_exporter(ctx, "foo", strlen("foo"), 12) != 1) {
         overallresult = 0;
     }
-    if (OSSL_HPKE_TEST_true(OSSL_HPKE_export_only_sender(ctx,
-                                 enc, &enclen,
-                                 exp, &explen,
-                                 pub, publen,
-                                 NULL, 0), /* no info */
-                            "OSSL_HPKE_export_only") != 1) { 
+    if (OSSL_HPKE_TEST_true(OSSL_HPKE_export_only_sender(ctx, enc, &enclen,
+                                                         exp, &explen,
+                                                         pub, publen,
+                                                         NULL, 0), /* no info */
+                            "OSSL_HPKE_export_only") != 1) {
         overallresult = 0;
     }
     OSSL_HPKE_CTX_free(ctx);
@@ -518,11 +521,9 @@ static int test_hpke_export_only(void)
     if (OSSL_HPKE_CTX_set1_exporter(rctx, "foo", strlen("foo"), 12) != 1) {
         overallresult = 0;
     }
-    if (OSSL_HPKE_TEST_true(OSSL_HPKE_export_only_recip(rctx,
-                                enc, enclen,
-                                rexp, &rexplen,
-                                privp,
-                                NULL, 0), /* no info */
+    if (OSSL_HPKE_TEST_true(OSSL_HPKE_export_only_recip(rctx, enc, enclen,
+                                                        rexp, &rexplen, privp,
+                                                        NULL, 0), /* no info */
                             "OSSL_HPKE_export_only_recip") != 1) {
         overallresult = 0;
     }
@@ -563,7 +564,7 @@ static int test_hpke_suite_strs(void)
             for (aeadind = 0;
                  aeadind != (sizeof(aead_str_list) / sizeof(char *));
                  aeadind++) {
-                snprintf(sstr,128,"%s,%s,%s",
+                snprintf(sstr, 128, "%s,%s,%s",
                          kem_str_list[kemind],
                          kdf_str_list[kdfind],
                          aead_str_list[aeadind]);
@@ -614,7 +615,8 @@ static int test_hpke_grease(void)
         overallresult = 0;
     }
     /* expansion */
-    if (OSSL_HPKE_TEST_true(OSSL_HPKE_expansion(g_suite, &enclen, clearlen, &expanded),
+    if (OSSL_HPKE_TEST_true(OSSL_HPKE_expansion(g_suite, &enclen,
+                                                clearlen, &expanded),
                             "expansion") != 1) {
         overallresult = 0;
     }
@@ -691,11 +693,11 @@ static int test_hpke_badcalls(void)
     /* a good key to tee up bad calls below */
     hpke_suite.kem_id = 0x20;
     if (OSSL_HPKE_TEST_true(OSSL_HPKE_keygen(testctx, NULL,
-                                              hpke_mode, hpke_suite,
-                                              NULL, 0,
-                                              pub, &publen,
-                                              &privp),
-                             "OSSL_HPKE_keygen") != 1) {
+                                             hpke_mode, hpke_suite,
+                                             NULL, 0,
+                                             pub, &publen,
+                                             &privp),
+                            "OSSL_HPKE_keygen") != 1) {
         overallresult = 0;
     }
 
@@ -1055,25 +1057,6 @@ static int test_hpke_ikms(void)
     return res;
 }
 
-static int test_hpke_exporters(void)
-{
-    int res = 1;
-    unsigned char exportval[OSSL_HPKE_MAXSIZE];
-    size_t exportval_len = OSSL_HPKE_MAXSIZE;
-    OSSL_HPKE_SUITE suite = OSSL_HPKE_SUITE_DEFAULT;
-    char *tstr="test";
-
-#ifdef TBD
-    res = OSSL_HPKE_export(testctx, NULL, suite,
-                           (unsigned char *)tstr, strlen(tstr), 240,
-                           exportval, &exportval_len);
-    if (res != 1)
-        return res;
-#endif
-
-    return res;
-}
-
 static int test_hpke(void)
 {
     int res = 1;
@@ -1103,10 +1086,6 @@ static int test_hpke(void)
         return res;
 
     res = test_hpke_ikms();
-    if (res != 1)
-        return res;
-
-    res = test_hpke_exporters();
     if (res != 1)
         return res;
 
