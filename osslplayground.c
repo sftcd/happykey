@@ -64,7 +64,7 @@ int main()
                 NULL, 0, /* aad */
                 NULL, 0, /* info */
                 NULL, 0, /* seq */
-                senderpub, &senderpublen,
+                senderpub, &senderpublen, NULL,
                 cipher, &cipherlen
 #ifdef TESTVECTORS
                 ,NULL
