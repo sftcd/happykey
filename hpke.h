@@ -69,6 +69,7 @@ extern "C" {
 # define OSSL_HPKE_AEADSTR_AES128GCM  LN_aes_128_gcm       /**< AEAD id 1 */
 # define OSSL_HPKE_AEADSTR_AES256GCM  LN_aes_256_gcm       /**< AEAD id 2 */
 # define OSSL_HPKE_AEADSTR_CP         LN_chacha20_poly1305 /**< AEAD id 3 */
+# define OSSL_HPKE_AEADSTR_EXP        "exporter"           /**< AEAD id 0xff */
 
 /**
  * @brief ciphersuite combination

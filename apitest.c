@@ -330,23 +330,25 @@ static int do_testhpke(const TEST_BASEDATA *base,
         if (!TEST_mem_eq(aead[i].pt, aead[i].ptlen, ptout, ptoutlen))
             goto end;
     }
+    /* reset seq in sealctx */
+    if (!TEST_true(OSSL_HPKE_CTX_set1_seq(sealctx,0)))
+        goto end;
     for (i = 0; i < (int)exportsz; ++i) {
         size_t len = export[i].expected_secretlen;
 
         if (!TEST_true(OSSL_HPKE_CTX_set1_exporter(sealctx, 
-                                                   export[1].context,
-                                                   export[1].contextlen,
+                                                   export[i].context,
+                                                   export[i].contextlen,
                                                    export[i].expected_secretlen)))
             goto end;
-        if (!TEST_true(OSSL_HPKE_export_only_sender(openctx,
-                                                    secret, &len,
+        if (!TEST_true(OSSL_HPKE_export_only_sender(sealctx,
                                                     enc, &enclen,
+                                                    secret, &len,
                                                     rpub, rpublen,
                                                     base->ksinfo, base->ksinfolen)))
             goto end;
-        if (!TEST_mem_eq(secret, len,
-                         export[i].expected_secret,
-                         export[i].expected_secretlen))
+        if (!TEST_true(TEST_mem_eq(secret, len, export[i].expected_secret,
+                                   export[i].expected_secretlen)))
             goto end;
     }
     ret = 1;
@@ -971,7 +973,6 @@ static int test_hpke_modes_suites(void)
                      * NEWAPI_DEC
                      */
 #ifdef NEWAPI_ENC
-
                     int erv = 1;
                     OSSL_HPKE_CTX *ctx = NULL;
                     ctx = OSSL_HPKE_CTX_new(hpke_mode, hpke_suite,

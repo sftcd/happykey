@@ -44,7 +44,7 @@
  * Define this for LOADS of printing of intermediate cryptographic values
  * Really only needed when new crypto added (hopefully)
  */
-# undef SUPERVERBOSE
+# define SUPERVERBOSE
 # ifdef TESTVECTORS
 #  include "hpketv.h"
 # endif
@@ -168,9 +168,10 @@ static const char *hpke_aead_strtab[] = {
     OSSL_HPKE_AEADSTR_AES256GCM,
 # ifndef OPENSSL_NO_CHACHA20
 #  ifndef OPENSSL_NO_POLY1305
-    OSSL_HPKE_AEADSTR_CP
+    OSSL_HPKE_AEADSTR_CP,
 #  endif
 # endif
+    OSSL_HPKE_AEADSTR_EXP
 };
 #endif
 
@@ -1047,7 +1048,7 @@ static int hpke_expand(OSSL_LIB_CTX *libctx, const char *propq,
                                strlen(OSSL_HPKE_SEC41LABEL))
             || !WPACKET_put_bytes_u16(&pkt, suite.kem_id)
             || !WPACKET_memcpy(&pkt, label, labellen)
-            || !WPACKET_memcpy(&pkt, info, infolen)
+            || (info == NULL ? 0 : !WPACKET_memcpy(&pkt, info, infolen))
             || !WPACKET_get_total_written(&pkt, &concat_offset)
             || !WPACKET_finish(&pkt))
             goto err;
@@ -2325,6 +2326,7 @@ static int hpke_enc_int(OSSL_LIB_CTX *libctx, const char *propq,
         goto err;
     }
     exporterseclen = hpke_kdf_tab[kdf_ind].Nh;
+    //erv = hpke_expand(libctx, propq, suite, OSSL_HPKE_5869_MODE_KEM,
     erv = hpke_expand(libctx, propq, suite, OSSL_HPKE_5869_MODE_FULL,
                       secret, secretlen,
                       OSSL_HPKE_EXP_LABEL, strlen(OSSL_HPKE_EXP_LABEL),
@@ -2742,6 +2744,7 @@ static int hpke_dec_int(OSSL_LIB_CTX *libctx, const char *propq,
         goto err;
     }
     exporterseclen = hpke_kdf_tab[kdf_ind].Nh;
+    //erv = hpke_expand(libctx, propq, suite, OSSL_HPKE_5869_MODE_KEM,
     erv = hpke_expand(libctx, propq, suite, OSSL_HPKE_5869_MODE_FULL,
                       secret, secretlen,
                       OSSL_HPKE_EXP_LABEL, strlen(OSSL_HPKE_EXP_LABEL),
@@ -3681,25 +3684,25 @@ int OSSL_HPKE_CTX_set1_exporter(OSSL_HPKE_CTX *ctx,
 {
     if (ctx == NULL)
         return 0;
-    if (ctx->exportersec != NULL)
-        OPENSSL_cleanse(ctx->exportersec, ctx->exporterseclen);
-    OPENSSL_free(ctx->exportersec);
-    ctx->exportersec = NULL;
+    if (exp_ctx == NULL && exp_ctxlen > 0)
+        return 0;
+    if (exp_ctx != NULL && exp_ctxlen == 0)
+        return 0;
     if (ctx->exporter_ctx != NULL)
         OPENSSL_free(ctx->exporter_ctx);
-    ctx->expoutlen = explen;
-    ctx->exporter_ctx = OPENSSL_malloc(exp_ctxlen);
-    if (ctx->exporter_ctx == NULL)
-        goto err;
-    memcpy(ctx->exporter_ctx, exp_ctx, exp_ctxlen);
+    ctx->exporter_ctx = NULL;
+    if (exp_ctx != NULL) {
+        ctx->exporter_ctx = OPENSSL_malloc(exp_ctxlen);
+        if (ctx->exporter_ctx == NULL)
+            goto err;
+        memcpy(ctx->exporter_ctx, exp_ctx, exp_ctxlen);
+    }
     ctx->exporter_ctxlen = exp_ctxlen;
+    ctx->expoutlen = explen;
     return 1;
 err:
-    OPENSSL_cleanse(ctx->exportersec, ctx->exporterseclen);
-    OPENSSL_free(ctx->exportersec);
     OPENSSL_free(ctx->exporter_ctx);
     ctx->exporter_ctxlen = 0;
-    ctx->exporterseclen = 0;
     ctx->expoutlen = 0;
     return 0;
 }
@@ -3776,33 +3779,44 @@ static int hpke_calc_exporter(OSSL_HPKE_CTX *ctx,
                               size_t *explen)
 {
     int erv = 1;
+    OSSL_HPKE_SUITE scpy;
 
     /* re-calculate the exporter if needed */
     if (ctx == NULL || secret == NULL) {
         ERR_raise(ERR_LIB_CRYPTO, ERR_R_INTERNAL_ERROR);
         return 0;
     }
-    if (ctx->exporter_ctx == NULL || (exp == NULL && explen == NULL))
+    if (ctx->expoutlen == 0 || (exp == NULL && explen == NULL))
         return 1; /* not an error to not care */
-    if (ctx->expoutlen == 0) { /* oops */
-        ERR_raise(ERR_LIB_CRYPTO, ERR_R_INTERNAL_ERROR);
-        return 0;
-    }
     if (ctx->expoutlen > *explen) { /* oops */
         ERR_raise(ERR_LIB_CRYPTO, ERR_R_INTERNAL_ERROR);
         return 0;
     }
+    //scpy = ctx->suite;
+    /* fake the AEAD to the export only one for now */
+    //ctx->suite.aead_id = OSSL_HPKE_AEAD_ID_EXPORTONLY;
     erv = hpke_expand(ctx->libctx, ctx->propq, ctx->suite,
                       OSSL_HPKE_5869_MODE_FULL,
                       secret, secretlen,
                       OSSL_HPKE_EXP_SEC_LABEL, strlen(OSSL_HPKE_EXP_SEC_LABEL),
                       ctx->exporter_ctx, ctx->exporter_ctxlen,
                       ctx->expoutlen, exp, explen);
+
+    /* put back the real AEAD */
+    //ctx->suite = scpy;
     if (erv != 1) {
         ERR_raise(ERR_LIB_CRYPTO, ERR_R_INTERNAL_ERROR);
         return 0;
     }
+#if defined(SUPERVERBOSE) || defined(TESTVECTORS)
+    fprintf(stdout, "Exporting\n");
+    hpke_pbuf(stdout, "\texporter_secret", secret, secretlen);
+    fprintf(stdout, "\texp out len: %lu\n", ctx->expoutlen);
+    hpke_pbuf(stdout, "\texporter context", ctx->exporter_ctx, ctx->exporter_ctxlen);
+    hpke_pbuf(stdout, "\texporter output", exp, *explen);
+#endif
     /* update state */
+    /*
     if (ctx->exportersec)
         OPENSSL_cleanse(ctx->exportersec, ctx->exporterseclen);
     OPENSSL_free(ctx->exportersec);
@@ -3814,6 +3828,7 @@ static int hpke_calc_exporter(OSSL_HPKE_CTX *ctx,
     }
     memcpy(ctx->exportersec, secret, secretlen);
     ctx->exporterseclen = secretlen;
+    */
     return 1;
 }
 
@@ -3906,11 +3921,21 @@ int OSSL_HPKE_sender_seal(OSSL_HPKE_CTX *ctx,
             ERR_raise(ERR_LIB_CRYPTO, ERR_R_INTERNAL_ERROR);
             return 0;
         }
-    }
-    erv = hpke_calc_exporter(ctx, exportersec, exporterseclen, exp, explen);
-    if (erv != 1) {
-        ERR_raise(ERR_LIB_CRYPTO, ERR_R_INTERNAL_ERROR);
-        return 0;
+        if (ctx->exportersec == NULL) {
+            /* just record once */
+            ctx->exportersec = OPENSSL_malloc(exporterseclen);
+            if (ctx->exportersec == NULL) {
+                ERR_raise(ERR_LIB_CRYPTO, ERR_R_INTERNAL_ERROR);
+                return 0;
+            }
+            memcpy(ctx->exportersec, exportersec, exporterseclen);
+            ctx->exporterseclen = exporterseclen;
+        }
+        erv = hpke_calc_exporter(ctx, exportersec, exporterseclen, exp, explen);
+        if (erv != 1) {
+            ERR_raise(ERR_LIB_CRYPTO, ERR_R_INTERNAL_ERROR);
+            return 0;
+        }
     }
     return erv;
 }
@@ -3976,22 +4001,33 @@ int OSSL_HPKE_recipient_open(OSSL_HPKE_CTX *ctx,
                        seqlen, seqbuf,
                        &exporterseclen, exportersec,
                        ptlen, pt);
-    /* FIXME: HACK HACK - ignore decrypt fail as we're doing export only!!! */
-    erv1 = hpke_calc_exporter(ctx, exportersec, exporterseclen, exp, explen);
-    if (erv1 != 1) {
-        ERR_raise(ERR_LIB_CRYPTO, ERR_R_INTERNAL_ERROR);
-        return 0;
-    }
-    if (erv != 1) {
-        ERR_raise(ERR_LIB_CRYPTO, ERR_R_INTERNAL_ERROR);
-        return 0;
-    } else {
+    if (erv == 1) {
+        if (ctx->exportersec == NULL) {
+            /* just record once */
+            ctx->exportersec = OPENSSL_malloc(exporterseclen);
+            if (ctx->exportersec == NULL) {
+                ERR_raise(ERR_LIB_CRYPTO, ERR_R_INTERNAL_ERROR);
+                return 0;
+            }
+            memcpy(ctx->exportersec, exportersec, exporterseclen);
+            ctx->exporterseclen = exporterseclen;
+        }
         ctx->seq++;
         if (ctx->seq == 0) { /* error wrap around 64 bits */
             ERR_raise(ERR_LIB_CRYPTO, ERR_R_INTERNAL_ERROR);
             return 0;
         }
     }
+    /* HACK HACK - ignore decrypt fail to do export only!!! */
+    erv1 = hpke_calc_exporter(ctx, exportersec, exporterseclen, exp, explen);
+    if (erv1 != 1) {
+        ERR_raise(ERR_LIB_CRYPTO, ERR_R_INTERNAL_ERROR);
+        return 0;
+    }
+    if (erv != 1) {
+        /* don't ERR_raise here - for export only hack */
+        return 0;
+    } 
     return erv;
 }
 
@@ -4033,14 +4069,14 @@ int OSSL_HPKE_export_only_sender(OSSL_HPKE_CTX *ctx,
         ERR_raise(ERR_LIB_CRYPTO, ERR_R_INTERNAL_ERROR);
         return 0;
     }
-    if (ctx->exporter_ctx == NULL || ctx->expoutlen == 0) {
-        /* you should set those first */
+    if (ctx->expoutlen == 0) {
+        /* you should set that first */
         ERR_raise(ERR_LIB_CRYPTO, ERR_R_INTERNAL_ERROR);
         return 0;
     }
     /* fake the AEAD to the export only one for now */
     scpy = ctx->suite;
-    ctx->suite.aead_id = OSSL_HPKE_AEAD_ID_EXPORTONLY;
+    //ctx->suite.aead_id = OSSL_HPKE_AEAD_ID_EXPORTONLY;
     erv = OSSL_HPKE_sender_seal(ctx, enc, enclen,
                                 fake_ct, &fake_ctlen,
                                 exp, explen, pub, publen,
@@ -4092,15 +4128,15 @@ int OSSL_HPKE_export_only_recip(OSSL_HPKE_CTX *ctx,
         ERR_raise(ERR_LIB_CRYPTO, ERR_R_INTERNAL_ERROR);
         return 0;
     }
-    if (ctx->exporter_ctx == NULL || ctx->expoutlen == 0) {
-        /* you should set those first */
+    if (ctx->expoutlen == 0) {
+        /* you should set that first */
         ERR_raise(ERR_LIB_CRYPTO, ERR_R_INTERNAL_ERROR);
         return 0;
     }
     memset(fake_ct, 0x00, fake_ctlen);
     memset(fake_pt, 0x00, fake_ptlen);
     scpy = ctx->suite;
-    ctx->suite.aead_id = OSSL_HPKE_AEAD_ID_EXPORTONLY;
+    //ctx->suite.aead_id = OSSL_HPKE_AEAD_ID_EXPORTONLY;
     /* this will fail but fill in exp/explen before the AEAD fails */
     erv = OSSL_HPKE_recipient_open(ctx, fake_pt, &fake_ptlen,
                                    enc, enclen, exp, explen,
