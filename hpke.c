@@ -1883,8 +1883,6 @@ static int hpke_enc_int(OSSL_LIB_CTX *libctx, const char *propq,
                         size_t aadlen, const unsigned char *aad,
                         size_t infolen, const unsigned char *info,
                         size_t seqlen, const unsigned char *seq,
-                        size_t extsenderpublen,
-                        const unsigned char *extsenderpub,
                         EVP_PKEY *extsenderpriv,
                         size_t rawsenderprivlen,
                         const unsigned char *rawsenderpriv,
@@ -1903,8 +1901,6 @@ static int hpke_enc_int(OSSL_LIB_CTX *libctx, const char *propq,
                         size_t aadlen, const unsigned char *aad,
                         size_t infolen, const unsigned char *info,
                         size_t seqlen, const unsigned char *seq,
-                        size_t extsenderpublen,
-                        const unsigned char *extsenderpub,
                         EVP_PKEY *extsenderpriv,
                         size_t rawsenderprivlen,
                         const unsigned char *rawsenderpriv,
@@ -1967,11 +1963,14 @@ static int hpke_enc_int(OSSL_LIB_CTX *libctx, const char *propq,
     /*
      * Depending on who called us, we may want to generate this key pair
      * or we may have had it handed to us via extsender inputs
-     */
     if (extsenderpublen > 0 && extsenderpub != NULL && extsenderpriv != NULL) {
         evpcaller = 1;
     }
-    if (extsenderpublen > 0 && extsenderpub != NULL && extsenderpriv == NULL
+     */
+    if (extsenderpriv != NULL) {
+        evpcaller = 1;
+    }
+    if (extsenderpriv == NULL
         && rawsenderprivlen > 0 && rawsenderpriv != NULL) {
         rawcaller = 1;
     }
@@ -1985,7 +1984,7 @@ static int hpke_enc_int(OSSL_LIB_CTX *libctx, const char *propq,
     }
     if (evpcaller
         && (pub == NULL || clear == NULL
-            || !extsenderpublen || extsenderpub == NULL
+            || senderpublen == NULL || senderpub == NULL
             || extsenderpriv == NULL || !cipherlen || cipher == NULL)) {
         erv = 0;
         ERR_raise(ERR_LIB_CRYPTO, ERR_R_INTERNAL_ERROR);
@@ -1993,7 +1992,6 @@ static int hpke_enc_int(OSSL_LIB_CTX *libctx, const char *propq,
     }
     if (rawcaller
         && (pub == NULL || clear == NULL
-            || !extsenderpublen || extsenderpub == NULL
             || rawsenderpriv == NULL || !cipherlen || cipher == NULL)) {
         erv = 0;
         ERR_raise(ERR_LIB_CRYPTO, ERR_R_INTERNAL_ERROR);
@@ -2128,6 +2126,25 @@ static int hpke_enc_int(OSSL_LIB_CTX *libctx, const char *propq,
             ERR_raise(ERR_LIB_CRYPTO, ERR_R_INTERNAL_ERROR);
             goto err;
         }
+    }
+    if (evpcaller == 1 || rawcaller == 1) {
+        /* stash relevant public key for caller */
+        mypublen = EVP_PKEY_get1_encoded_public_key(pkE, &mypub);
+        if (mypub == NULL || mypublen == 0) {
+            erv = 0;
+            ERR_raise(ERR_LIB_CRYPTO, ERR_R_INTERNAL_ERROR);
+            goto err;
+        }
+        if (mypublen > *senderpublen) {
+            erv = 0;
+            ERR_raise(ERR_LIB_CRYPTO, ERR_R_INTERNAL_ERROR);
+            goto err;
+        }
+        memcpy(senderpub, mypub, mypublen);
+        *senderpublen = mypublen;
+        OPENSSL_free(mypub);
+        mypub = NULL;
+        mypublen = 0;
     }
 
     /* step 2 run DH KEM to get dh */
@@ -3878,7 +3895,7 @@ int OSSL_HPKE_sender_seal(OSSL_HPKE_CTX *ctx,
                        aadlen, aad,
                        infolen, info,
                        seqlen, seqbuf,
-                       0, NULL, ctx->senderpriv,
+                       ctx->senderpriv,
                        0, NULL,
                        &exporterseclen, exportersec,
                        enclen, enc,
@@ -4327,7 +4344,7 @@ int OSSL_HPKE_enc(OSSL_LIB_CTX *libctx, const char *propq,
                         aadlen, aad,
                         infolen, info,
                         seqlen, seq,
-                        *senderpublen, senderpub, senderpriv,
+                        senderpriv,
                         0, NULL, /* raw sender priv */
                         NULL, NULL, /* exporter */
                         senderpublen, senderpub,
@@ -4344,7 +4361,7 @@ int OSSL_HPKE_enc(OSSL_LIB_CTX *libctx, const char *propq,
                         aadlen, aad,
                         infolen, info,
                         seqlen, seq,
-                        *senderpublen, senderpub, senderpriv,
+                        senderpriv,
                         0, NULL, /* raw sender priv */
                         NULL, NULL, /* exporter sec */
                         senderpublen, senderpub,
@@ -4429,7 +4446,7 @@ int OSSL_HPKE_enc_evp(OSSL_LIB_CTX *libctx, const char *propq,
                         aadlen, aad,
                         infolen, info,
                         seqlen, seq,
-                        senderpublen, senderpub, senderpriv,
+                        senderpriv,
                         0, NULL,
                         NULL, NULL, /* exporter sec */
                         0, NULL,
@@ -4443,7 +4460,7 @@ int OSSL_HPKE_enc_evp(OSSL_LIB_CTX *libctx, const char *propq,
                         aadlen, aad,
                         infolen, info,
                         seqlen, seq,
-                        senderpublen, senderpub, senderpriv,
+                        senderpriv,
                         0, NULL,
                         NULL, NULL, /* exporter sec */
                         0, NULL,

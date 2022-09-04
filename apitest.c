@@ -86,10 +86,6 @@ static void usage(char *prog, char *errmsg)
 /*
  * @brief mimic OpenSSL test_true macro
  */
-# define OSSL_HPKE_TEST_true(__x__, __str__) \
-    test_true(__FILE__, __LINE__, __x__, __str__)
-# define OSSL_HPKE_TEST_false(__x__, __str__) \
-    test_false(__FILE__, __LINE__, __x__, __str__)
 # define TEST_true(__x__) \
     test_true(__FILE__, __LINE__, __x__,"")
 # define TEST_false(__x__) \
@@ -112,9 +108,6 @@ static void usage(char *prog, char *errmsg)
 #include <openssl/evp.h>
 #include <openssl/core_names.h>
 #include "testutil.h"
-
-# define OSSL_HPKE_TEST_true(__x__, __str__) TEST_int_eq(__x__, 1)
-# define OSSL_HPKE_TEST_false(__x__, __str__) TEST_false(__x__)
 #endif
 
 # ifndef OSSL_HPKE_MAXSIZE
@@ -331,7 +324,8 @@ static int do_testhpke(const TEST_BASEDATA *base,
                                                 privR,
                                                 base->ksinfo, base->ksinfolen,
                                                 aead[i].aad, aead[i].aadlen,
-                                                ct, ctlen)))
+                                                aead[i].expected_ct,
+                                                aead[i].expected_ctlen)))
             goto end;
         if (!TEST_mem_eq(aead[i].pt, aead[i].ptlen, ptout, ptoutlen))
             goto end;
@@ -926,14 +920,11 @@ static int test_hpke_modes_suites(void)
             /* can only set AUTH key pair when we know KEM */
             if ((hpke_mode == OSSL_HPKE_MODE_AUTH) ||
                 (hpke_mode == OSSL_HPKE_MODE_PSKAUTH)) {
-                if (OSSL_HPKE_TEST_true(OSSL_HPKE_keygen(testctx, NULL,
-                                                         hpke_mode,
-                                                         hpke_suite,
-                                                         NULL, 0,
-                                                         authpub,
-                                                         &authpublen,
-                                                         &authpriv_evp),
-                                        "OSS_OSSL_HPKE_keygen") != 1) {
+                if (TEST_true(OSSL_HPKE_keygen(testctx, NULL,
+                                               hpke_mode, hpke_suite,
+                                               NULL, 0,
+                                               authpub, &authpublen,
+                                               &authpriv_evp)) != 1) {
                     overallresult = 0;
                 }
                 authpubp = authpub;
@@ -968,13 +959,10 @@ static int test_hpke_modes_suites(void)
                                hpke_mode, kem_id, kdf_id, aead_id);
                     }
 #endif
-                    if (OSSL_HPKE_TEST_true(OSSL_HPKE_keygen(testctx, NULL,
-                                                             hpke_mode,
-                                                             hpke_suite,
-                                                             NULL, 0,
-                                                             pub, &publen,
-                                                             &privp),
-                                            "OSSL_HPKE_keygen") != 1) {
+                    if (TEST_true(OSSL_HPKE_keygen(testctx, NULL,
+                                                   hpke_mode, hpke_suite,
+                                                   NULL, 0,
+                                                   pub, &publen, &privp)) != 1) {
                         overallresult = 0;
                     }
 
@@ -1035,20 +1023,19 @@ static int test_hpke_modes_suites(void)
                     OSSL_HPKE_CTX_free(ctx);
 
 #else
-                    if (OSSL_HPKE_TEST_true(OSSL_HPKE_enc(testctx, NULL,
-                                                          hpke_mode, hpke_suite,
-                                                          pskidp, pskp, psklen,
-                                                          pub, publen,
-                                                          NULL, 0, authpriv_evp,
-                                                          plain, plainlen,
-                                                          aadp, aadlen,
-                                                          infop, infolen,
-                                                          NULL, 0,
-                                                          senderpub,
-                                                          &senderpublen,
-                                                          NULL,
-                                                          cipher, &cipherlen),
-                                            "OSSL_HPKE_enc") != 1) {
+                    if (TEST_true(OSSL_HPKE_enc(testctx, NULL,
+                                                hpke_mode, hpke_suite,
+                                                pskidp, pskp, psklen,
+                                                pub, publen,
+                                                NULL, 0, authpriv_evp,
+                                                plain, plainlen,
+                                                aadp, aadlen,
+                                                infop, infolen,
+                                                NULL, 0,
+                                                senderpub,
+                                                &senderpublen,
+                                                NULL,
+                                                cipher, &cipherlen)) != 1) {
                         overallresult = 0;
                     }
 #endif
@@ -1097,19 +1084,17 @@ static int test_hpke_modes_suites(void)
                     OSSL_HPKE_CTX_free(rctx);
 
 #else
-                    if (OSSL_HPKE_TEST_true(OSSL_HPKE_dec(testctx, NULL,
-                                                          hpke_mode, hpke_suite,
-                                                          pskidp, pskp, psklen,
-                                                          authpubp, authpublen,
-                                                          NULL, 0, privp,
-                                                          senderpub,
-                                                          senderpublen,
-                                                          cipher, cipherlen,
-                                                          aadp, aadlen,
-                                                          infop, infolen,
-                                                          NULL, 0,
-                                                          clear, &clearlen),
-                                            "OSSL_HPKE_dec") != 1) {
+                    if (TEST_true(OSSL_HPKE_dec(testctx, NULL,
+                                                hpke_mode, hpke_suite,
+                                                pskidp, pskp, psklen,
+                                                authpubp, authpublen,
+                                                NULL, 0, privp,
+                                                senderpub, senderpublen,
+                                                cipher, cipherlen,
+                                                aadp, aadlen,
+                                                infop, infolen,
+                                                NULL, 0,
+                                                clear, &clearlen)) != 1) {
                         overallresult = 0;
                     }
 #endif
@@ -1176,11 +1161,10 @@ static int test_hpke_export_only(void)
                                     strlen("foo"), 12) != 1) {
         overallresult = 0;
     }
-    if (OSSL_HPKE_TEST_true(OSSL_HPKE_export_only_sender(ctx, enc, &enclen,
-                                                         exp, &explen,
-                                                         pub, publen,
-                                                         NULL, 0), /* no info */
-                            "OSSL_HPKE_export_only") != 1) {
+    if (TEST_true(OSSL_HPKE_export_only_sender(ctx, enc, &enclen,
+                                               exp, &explen,
+                                               pub, publen,
+                                               NULL, 0)) != 1) {
         overallresult = 0;
     }
     OSSL_HPKE_CTX_free(ctx);
@@ -1193,10 +1177,9 @@ static int test_hpke_export_only(void)
                                     strlen("foo"), 12) != 1) {
         overallresult = 0;
     }
-    if (OSSL_HPKE_TEST_true(OSSL_HPKE_export_only_recip(rctx, enc, enclen,
-                                                        rexp, &rexplen, privp,
-                                                        NULL, 0), /* no info */
-                            "OSSL_HPKE_export_only_recip") != 1) {
+    if (TEST_true(OSSL_HPKE_export_only_recip(rctx, enc, enclen,
+                                              rexp, &rexplen, privp,
+                                              NULL, 0)) != 1) {
         overallresult = 0;
     }
 
@@ -1240,8 +1223,7 @@ static int test_hpke_suite_strs(void)
                          kem_str_list[kemind],
                          kdf_str_list[kdfind],
                          aead_str_list[aeadind]);
-                if (OSSL_HPKE_TEST_true(OSSL_HPKE_str2suite(sstr, &stirred),
-                                        sstr) != 1) {
+                if (TEST_true(OSSL_HPKE_str2suite(sstr, &stirred)) != 1) {
                     overallresult = 0;
                 }
             }
@@ -1253,9 +1235,8 @@ static int test_hpke_suite_strs(void)
         char dstr[128];
 
         sprintf(dstr, "str2suite: %s", bogus_suite_strs[sind]);
-        if (OSSL_HPKE_TEST_false(OSSL_HPKE_str2suite(bogus_suite_strs[sind],
-                                                     &stirred),
-                                 dstr) != 1) {
+        if (TEST_false(OSSL_HPKE_str2suite(bogus_suite_strs[sind],
+                                           &stirred)) != 1) {
             overallresult = 0;
         }
     }
@@ -1280,16 +1261,14 @@ static int test_hpke_grease(void)
 
     memset(&g_suite, 0, sizeof(OSSL_HPKE_SUITE));
     /* GREASEing */
-    if (OSSL_HPKE_TEST_true(OSSL_HPKE_good4grease(testctx, NULL, NULL, &g_suite,
-                                                  g_pub, &g_pub_len, g_cipher,
-                                                  g_cipher_len),
-                            "good4grease") != 1) {
+    if (TEST_true(OSSL_HPKE_good4grease(testctx, NULL, NULL, &g_suite,
+                                        g_pub, &g_pub_len,
+                                        g_cipher, g_cipher_len)) != 1) {
         overallresult = 0;
     }
     /* expansion */
-    if (OSSL_HPKE_TEST_true(OSSL_HPKE_expansion(g_suite, &enclen,
-                                                clearlen, &expanded),
-                            "expansion") != 1) {
+    if (TEST_true(OSSL_HPKE_expansion(g_suite, &enclen,
+                                      clearlen, &expanded)) != 1) {
         overallresult = 0;
     }
     if (expanded <= clearlen) {
@@ -1339,12 +1318,8 @@ static int test_hpke_badcalls(void)
     unsigned char *authprivp = NULL;
 
     /* pub is NULL now */
-    if (OSSL_HPKE_TEST_false(OSSL_HPKE_keygen(testctx, NULL,
-                                              hpke_mode, hpke_suite,
-                                              NULL, 0,
-                                              pub, &publen,
-                                              &privp),
-                             "OSSL_HPKE_keygen") != 1) {
+    if (TEST_false(OSSL_HPKE_keygen(testctx, NULL, hpke_mode, hpke_suite,
+                                    NULL, 0, pub, &publen, &privp)) != 1) {
         overallresult = 0;
     }
 
@@ -1352,63 +1327,52 @@ static int test_hpke_badcalls(void)
     publen = sizeof(buf1);
     /* bogus kem_id */
     hpke_suite.kem_id = 100;
-    if (OSSL_HPKE_TEST_false(OSSL_HPKE_keygen(testctx, NULL,
-                                              hpke_mode, hpke_suite,
-                                              NULL, 0,
-                                              pub, &publen,
-                                              &privp),
-                             "OSSL_HPKE_keygen") != 1) {
+    if (TEST_false(OSSL_HPKE_keygen(testctx, NULL, hpke_mode, hpke_suite,
+                                    NULL, 0, pub, &publen, &privp)) != 1) {
         overallresult = 0;
     }
 
     /* a good key to tee up bad calls below */
     hpke_suite.kem_id = 0x20;
-    if (OSSL_HPKE_TEST_true(OSSL_HPKE_keygen(testctx, NULL,
-                                             hpke_mode, hpke_suite,
-                                             NULL, 0,
-                                             pub, &publen,
-                                             &privp),
-                            "OSSL_HPKE_keygen") != 1) {
+    if (TEST_true(OSSL_HPKE_keygen(testctx, NULL, hpke_mode, hpke_suite,
+                                   NULL, 0, pub, &publen, &privp)) != 1) {
         overallresult = 0;
     }
 
-    if (OSSL_HPKE_TEST_false(OSSL_HPKE_enc(testctx, NULL, hpke_mode, hpke_suite,
-                                           pskidp, pskp, psklen,
-                                           pub, publen,
-                                           authprivp, authprivlen, NULL,
-                                           plain, plainlen,
-                                           aadp, aadlen,
-                                           infop, infolen,
-                                           seqp, seqlen,
-                                           senderpub, &senderpublen, NULL,
-                                           cipher, &cipherlen),
-                             "OSSL_HPKE_enc") != 1) {
+    if (TEST_false(OSSL_HPKE_enc(testctx, NULL, hpke_mode, hpke_suite,
+                                 pskidp, pskp, psklen,
+                                 pub, publen,
+                                 authprivp, authprivlen, NULL,
+                                 plain, plainlen,
+                                 aadp, aadlen,
+                                 infop, infolen,
+                                 seqp, seqlen,
+                                 senderpub, &senderpublen, NULL,
+                                 cipher, &cipherlen)) != 1) {
         overallresult = 0;
     }
-    if (OSSL_HPKE_TEST_false(OSSL_HPKE_dec(testctx, NULL, hpke_mode, hpke_suite,
-                                           pskidp, pskp, psklen,
-                                           authpubp, authpublen,
-                                           NULL, 0, privp,
-                                           senderpub, senderpublen,
-                                           cipher, cipherlen,
-                                           aadp, aadlen,
-                                           infop, infolen,
-                                           seqp, seqlen,
-                                           clear, &clearlen),
-                             "OSSL_HPKE_dec") != 1) {
+    if (TEST_false(OSSL_HPKE_dec(testctx, NULL, hpke_mode, hpke_suite,
+                                 pskidp, pskp, psklen,
+                                 authpubp, authpublen,
+                                 NULL, 0, privp,
+                                 senderpub, senderpublen,
+                                 cipher, cipherlen,
+                                 aadp, aadlen,
+                                 infop, infolen,
+                                 seqp, seqlen,
+                                 clear, &clearlen)) != 1) {
         overallresult = 0;
     }
-    if (OSSL_HPKE_TEST_false(OSSL_HPKE_enc(testctx, NULL, hpke_mode, hpke_suite,
-                                           pskidp, pskp, psklen,
-                                           pub, publen,
-                                           authprivp, authprivlen, NULL,
-                                           plain, plainlen,
-                                           aadp, aadlen,
-                                           infop, infolen,
-                                           seqp, seqlen,
-                                           senderpub, &senderpublen, NULL,
-                                           cipher, &cipherlen),
-                             "OSSL_HPKE_enc") != 1) {
+    if (TEST_false(OSSL_HPKE_enc(testctx, NULL, hpke_mode, hpke_suite,
+                                 pskidp, pskp, psklen,
+                                 pub, publen,
+                                 authprivp, authprivlen, NULL,
+                                 plain, plainlen,
+                                 aadp, aadlen,
+                                 infop, infolen,
+                                 seqp, seqlen,
+                                 senderpub, &senderpublen, NULL,
+                                 cipher, &cipherlen)) != 1) {
         overallresult = 0;
     }
 
@@ -1426,17 +1390,16 @@ static int test_hpke_badcalls(void)
     memset(cipher, 0, cipherlen);
     senderpub = buf3;
     senderpublen = sizeof(buf3);
-    if (OSSL_HPKE_TEST_true(OSSL_HPKE_enc(testctx, NULL, hpke_mode, hpke_suite,
-                                          pskidp, pskp, psklen,
-                                          pub, publen,
-                                          authprivp, authprivlen, NULL,
-                                          plain, plainlen,
-                                          aadp, aadlen,
-                                          infop, infolen,
-                                          seqp, seqlen,
-                                          senderpub, &senderpublen, NULL,
-                                          cipher, &cipherlen),
-                            "OSSL_HPKE_enc") != 1) {
+    if (TEST_true(OSSL_HPKE_enc(testctx, NULL, hpke_mode, hpke_suite,
+                                pskidp, pskp, psklen,
+                                pub, publen,
+                                authprivp, authprivlen, NULL,
+                                plain, plainlen,
+                                aadp, aadlen,
+                                infop, infolen,
+                                seqp, seqlen,
+                                senderpub, &senderpublen, NULL,
+                                cipher, &cipherlen)) != 1) {
         overallresult = 0;
     }
     EVP_PKEY_free(privp);
@@ -1794,13 +1757,15 @@ int main(int argc, char **argv)
     if (apires == 1) {
         printf("My API test success\n");
     } else {
-        printf("API test fail (%d)\n", apires);
+        printf("MY API test fail (%d)\n", apires);
     }
-    apires = x25519kdfsha256_hkdfsha256_aes128gcm_base_test();
     if (apires == 1) {
-        printf("slontis API test success\n");
-    } else {
-        printf("API test fail (%d)\n", apires);
+        apires = x25519kdfsha256_hkdfsha256_aes128gcm_base_test();
+        if (apires == 1) {
+            printf("slontis API test success\n");
+        } else {
+            printf("API test fail (%d)\n", apires);
+        }
     }
     return apires;
 }
