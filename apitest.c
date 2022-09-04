@@ -136,6 +136,15 @@ extern int OSSL_HPKE_prbuf2evp(OSSL_LIB_CTX *libctx, const char *propq,
                                const unsigned char *pubuf, size_t pubuf_len,
                                EVP_PKEY **priv);
 
+/** 
+ * @brief compare an EVP_PKEY to buffer representations of that
+ * @param pkey is the EVP_PKEY we want to check
+ * @param priv is the expected private key buffer
+ * @param privlen is the length of the above
+ * @param pub is the expected public key buffer
+ * @param publen is the length of the above
+ * @return 1 for good, 0 for bad
+ */
 static int cmpkey(const EVP_PKEY *pkey,
                   const unsigned char *priv, size_t privlen,
                   const unsigned char *pub, size_t publen)
@@ -167,7 +176,7 @@ static int cmpkey(const EVP_PKEY *pkey,
             if (!TEST_int_eq(privbuflen, privlen))
                 goto err;
         }
-    } else {
+    } else if (priv) {
         if (!TEST_int_eq(EVP_PKEY_get_octet_string_param(pkey,
                                                          OSSL_PKEY_PARAM_PRIV_KEY,
                                                          privbuf, sizeof(privbuf),
@@ -194,14 +203,14 @@ typedef struct {
     OSSL_HPKE_SUITE suite;
     const unsigned char *ikmE;
     size_t ikmElen;
+    const unsigned char *expected_pkEm;
+    size_t expected_pkEmlen;
     const unsigned char *ikmR;
     size_t ikmRlen;
     const unsigned char *expected_pkRm;
     size_t expected_pkRmlen;
     const unsigned char *expected_skRm;
     size_t expected_skRmlen;
-    const unsigned char *expected_enc;
-    size_t expected_enclen;
     const unsigned char *expected_secret;
     size_t expected_secretlen;
     const unsigned char *ksinfo;
@@ -265,12 +274,14 @@ static int do_testhpke(const TEST_BASEDATA *base,
                                     base->ikmE, base->ikmElen,
                                     pub, &publen, &privE)))
         goto end;
+    if (!TEST_true(cmpkey(privE, NULL, 0,
+                   base->expected_pkEm, base->expected_pkEmlen)))
+        goto end;
     if (!TEST_ptr(sealctx = OSSL_HPKE_CTX_new(base->mode, base->suite,
                                               libctx, NULL)))
         goto end;
     if (!TEST_true(OSSL_HPKE_CTX_set1_senderpriv(sealctx, privE)))
         goto end;
-   
     if (base->mode == OSSL_HPKE_MODE_AUTH
         || base->mode == OSSL_HPKE_MODE_PSKAUTH) {
         if (!TEST_true(OSSL_HPKE_keygen(libctx, NULL, base->mode, base->suite,
@@ -284,7 +295,9 @@ static int do_testhpke(const TEST_BASEDATA *base,
                                     base->ikmR, base->ikmRlen,
                                     rpub, &rpublen, &privR)))
         goto end;
-
+    if (!TEST_true(cmpkey(privR, NULL, 0,
+                   base->expected_pkRm, base->expected_pkRmlen)))
+        goto end;
     for (i = 0; i < (int)aeadsz; ++i) {
         ctlen = sizeof(ct);
         OPENSSL_cleanse(ct, ctlen);
@@ -296,6 +309,8 @@ static int do_testhpke(const TEST_BASEDATA *base,
                                              base->ksinfo, base->ksinfolen,
                                              aead[i].aad, aead[i].aadlen,
                                              aead[i].pt, aead[i].ptlen)))
+            goto end;
+        if (!TEST_true(cmpkey(privE, NULL, 0, enc, enclen)))
             goto end;
         if (!TEST_true(TEST_mem_eq(ct, ctlen,
                                    aead[i].expected_ct,
@@ -376,6 +391,12 @@ static int x25519kdfsha256_hkdfsha256_aes128gcm_psk_test(void)
         0x91, 0x41, 0x46, 0x3f, 0x69, 0x8f, 0x8e, 0xfd,
         0xb7, 0xac, 0xcf, 0xaf, 0xf8, 0x99, 0x50, 0x98
     };
+    const unsigned char ikmepub[]={
+        0x0a, 0xd0, 0x95, 0x0d, 0x9f, 0xb9, 0x58, 0x8e,
+        0x59, 0x69, 0x0b, 0x74, 0xf1, 0x23, 0x7e, 0xcd,
+        0xf1, 0xd7, 0x75, 0xcd, 0x60, 0xbe, 0x2e, 0xca,
+        0x57, 0xaf, 0x5a, 0x4b, 0x04, 0x71, 0xc9, 0x1b, 
+    };
     const unsigned char ikmrpub[] = {
         0x9f, 0xed, 0x7e, 0x8c, 0x17, 0x38, 0x75, 0x60,
         0xe9, 0x2c, 0xc6, 0x46, 0x2a, 0x68, 0x04, 0x96,
@@ -398,12 +419,6 @@ static int x25519kdfsha256_hkdfsha256_aes128gcm_psk_test(void)
         0x45, 0x6e, 0x6e, 0x79, 0x6e, 0x20, 0x44, 0x75,
         0x72, 0x69, 0x6e, 0x20, 0x61, 0x72, 0x61, 0x6e,
         0x20, 0x4d, 0x6f, 0x72, 0x69, 0x61
-    };
-    const unsigned char expected_enc[] = {
-        0x0a, 0xd0, 0x95, 0x0d, 0x9f, 0xb9, 0x58, 0x8e,
-        0x59, 0x69, 0x0b, 0x74, 0xf1, 0x23, 0x7e, 0xcd,
-        0xf1, 0xd7, 0x75, 0xcd, 0x60, 0xbe, 0x2e, 0xca,
-        0x57, 0xaf, 0x5a, 0x4b, 0x04, 0x71, 0xc9, 0x1b
     };
     const unsigned char expected_shared_secret[] = {
         0x72, 0x76, 0x99, 0xf0, 0x09, 0xff, 0xe3, 0xc0,
@@ -471,10 +486,10 @@ static int x25519kdfsha256_hkdfsha256_aes128gcm_psk_test(void)
             OSSL_HPKE_AEAD_ID_AES_GCM_128
         },
         ikme, sizeof(ikme),
+        ikmepub, sizeof(ikmepub),
         ikmr, sizeof(ikmr),
         ikmrpub, sizeof(ikmrpub),
         ikmrpriv, sizeof(ikmrpriv),
-        expected_enc,sizeof(expected_enc),
         expected_shared_secret, sizeof(expected_shared_secret),
         ksinfo, sizeof(ksinfo),
         NULL, 0,    /* No Auth */
@@ -518,6 +533,12 @@ static int x25519kdfsha256_hkdfsha256_aes128gcm_base_test(void)
         0x52, 0x7c, 0xff, 0x65, 0x5c, 0x13, 0x43, 0xf2,
         0x98, 0x12, 0xe6, 0x67, 0x06, 0xdf, 0x32, 0x34
     };
+    const unsigned char ikmepub[]={
+        0x37, 0xfd, 0xa3, 0x56, 0x7b, 0xdb, 0xd6, 0x28,
+        0xe8, 0x86, 0x68, 0xc3, 0xc8, 0xd7, 0xe9, 0x7d,
+        0x1d, 0x12, 0x53, 0xb6, 0xd4, 0xea, 0x6d, 0x44,
+        0xc1, 0x50, 0xf7, 0x41, 0xf1, 0xbf, 0x44, 0x31, 
+    };
     const unsigned char ikmr[] = {
         0x6d, 0xb9, 0xdf, 0x30, 0xaa, 0x07, 0xdd, 0x42,
         0xee, 0x5e, 0x81, 0x81, 0xaf, 0xdb, 0x97, 0x7e,
@@ -535,12 +556,6 @@ static int x25519kdfsha256_hkdfsha256_aes128gcm_base_test(void)
         0x58, 0x37, 0x5d, 0xf3, 0xf5, 0x57, 0xaa, 0xc5,
         0x31, 0xd2, 0x68, 0x50, 0x90, 0x3e, 0x55, 0xa9,
         0xf2, 0x3f, 0x21, 0xd8, 0x53, 0x4e, 0x8a, 0xc8
-    };
-    const unsigned char expected_enc[] = {
-        0x37, 0xfd, 0xa3, 0x56, 0x7b, 0xdb, 0xd6, 0x28,
-        0xe8, 0x86, 0x68, 0xc3, 0xc8, 0xd7, 0xe9, 0x7d,
-        0x1d, 0x12, 0x53, 0xb6, 0xd4, 0xea, 0x6d, 0x44,
-        0xc1, 0x50, 0xf7, 0x41, 0xf1, 0xbf, 0x44, 0x31
     };
     const unsigned char expected_shared_secret[] = {
         0xfe, 0x0e, 0x18, 0xc9, 0xf0, 0x24, 0xce, 0x43,
@@ -598,10 +613,10 @@ static int x25519kdfsha256_hkdfsha256_aes128gcm_base_test(void)
             OSSL_HPKE_AEAD_ID_AES_GCM_128
         },
         ikme, sizeof(ikme),
+        ikmepub, sizeof(ikmepub),
         ikmr, sizeof(ikmr),
         ikmrpub, sizeof(ikmrpub),
         ikmrpriv, sizeof(ikmrpriv),
-        expected_enc,sizeof(expected_enc),
         expected_shared_secret, sizeof(expected_shared_secret),
         ksinfo, sizeof(ksinfo)
     };
@@ -636,6 +651,17 @@ static int P256kdfsha256_hkdfsha256_aes128gcm_base_test(void)
         0x6b, 0x7d, 0x35, 0xdb, 0xe4, 0x70, 0x26, 0x5f,
         0x1f, 0x5a, 0xa2, 0x28, 0x16, 0xce, 0x86, 0x0e
     };
+    const unsigned char ikmepub[] = {
+        0x04, 0xa9, 0x27, 0x19, 0xc6, 0x19, 0x5d, 0x50,
+        0x85, 0x10, 0x4f, 0x46, 0x9a, 0x8b, 0x98, 0x14,
+        0xd5, 0x83, 0x8f, 0xf7, 0x2b, 0x60, 0x50, 0x1e,
+        0x2c, 0x44, 0x66, 0xe5, 0xe6, 0x7b, 0x32, 0x5a,
+        0xc9, 0x85, 0x36, 0xd7, 0xb6, 0x1a, 0x1a, 0xf4,
+        0xb7, 0x8e, 0x5b, 0x7f, 0x95, 0x1c, 0x09, 0x00,
+        0xbe, 0x86, 0x3c, 0x40, 0x3c, 0xe6, 0x5c, 0x9b,
+        0xfc, 0xb9, 0x38, 0x26, 0x57, 0x22, 0x2d, 0x18,
+        0xc4, 
+    };
     const unsigned char ikmr[] = {
         0x66, 0x8b, 0x37, 0x17, 0x1f, 0x10, 0x72, 0xf3,
         0xcf, 0x12, 0xea, 0x8a, 0x23, 0x6a, 0x45, 0xdf,
@@ -658,17 +684,6 @@ static int P256kdfsha256_hkdfsha256_aes128gcm_base_test(void)
         0x0d, 0x87, 0xf1, 0xeb, 0xbd, 0xe6, 0xf3, 0x28,
         0xbe, 0x0a, 0x99, 0xcd, 0xbc, 0xad, 0xf4, 0xd6,
         0x58, 0x9c, 0xf2, 0x9d, 0xe4, 0xb8, 0xff, 0xd2
-    };
-    const unsigned char expected_enc[] = {
-        0x04, 0xa9, 0x27, 0x19, 0xc6, 0x19, 0x5d, 0x50,
-        0x85, 0x10, 0x4f, 0x46, 0x9a, 0x8b, 0x98, 0x14,
-        0xd5, 0x83, 0x8f, 0xf7, 0x2b, 0x60, 0x50, 0x1e,
-        0x2c, 0x44, 0x66, 0xe5, 0xe6, 0x7b, 0x32, 0x5a,
-        0xc9, 0x85, 0x36, 0xd7, 0xb6, 0x1a, 0x1a, 0xf4,
-        0xb7, 0x8e, 0x5b, 0x7f, 0x95, 0x1c, 0x09, 0x00,
-        0xbe, 0x86, 0x3c, 0x40, 0x3c, 0xe6, 0x5c, 0x9b,
-        0xfc, 0xb9, 0x38, 0x26, 0x57, 0x22, 0x2d, 0x18,
-        0xc4
     };
     const unsigned char expected_shared_secret[] = {
         0xc0, 0xd2, 0x6a, 0xea, 0xb5, 0x36, 0x60, 0x9a,
@@ -726,10 +741,10 @@ static int P256kdfsha256_hkdfsha256_aes128gcm_base_test(void)
             OSSL_HPKE_AEAD_ID_AES_GCM_128
         },
         ikme, sizeof(ikme),
+        ikmepub, sizeof(ikmepub),
         ikmr, sizeof(ikmr),
         ikmrpub, sizeof(ikmrpub),
         ikmrpriv, sizeof(ikmrpriv),
-        expected_enc,sizeof(expected_enc),
         expected_shared_secret, sizeof(expected_shared_secret),
         ksinfo, sizeof(ksinfo)
     };
