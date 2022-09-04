@@ -143,9 +143,9 @@ static int cmpkey(const EVP_PKEY *pkey,
                   const unsigned char *pub, size_t publen)
 {
     const char *keytype;
-    char curvename[80];
-    unsigned char pubbuf[80];
-    unsigned char privbuf[80];
+    char curvename[256];
+    unsigned char pubbuf[256];
+    unsigned char privbuf[256];
     BIGNUM *privbn = NULL;
     size_t pubbuflen, privbuflen = 0;
     int ret = 0, ec;
@@ -161,10 +161,10 @@ static int cmpkey(const EVP_PKEY *pkey,
             return 0;
 
     if (ec) {
-        if (!TEST_int_eq(EVP_PKEY_get_bn_param(pkey, OSSL_PKEY_PARAM_PRIV_KEY,
-                                               &privbn), priv != NULL))
-            return 0;
         if (priv != NULL) {
+            if (!TEST_int_eq(EVP_PKEY_get_bn_param(pkey, OSSL_PKEY_PARAM_PRIV_KEY,
+                                                   &privbn), priv != NULL))
+                goto err;
             privbuflen = BN_bn2bin(privbn, privbuf);
             if (!TEST_int_eq(privbuflen, privlen))
                 goto err;
@@ -244,10 +244,10 @@ static int do_testhpke(const TEST_BASEDATA *base,
     OSSL_HPKE_CTX *sealctx = NULL, *openctx = NULL;
     EVP_PKEY_CTX *ectx = NULL, *dctx = NULL;
 
-    unsigned char secret[64];
+    unsigned char secret[256];
     unsigned char ct[256];
     unsigned char enc[256];
-    unsigned char ptout[64];
+    unsigned char ptout[256];
     size_t secretlen = sizeof(secret);
     size_t ptoutlen = sizeof(ptout);
     size_t enclen = sizeof(enc);
@@ -291,13 +291,20 @@ static int do_testhpke(const TEST_BASEDATA *base,
     if (!TEST_true(cmpkey(privR, NULL, 0,
                    base->expected_pkRm, base->expected_pkRmlen)))
         goto end;
+    if (base->mode == OSSL_HPKE_MODE_PSK
+        || base->mode == OSSL_HPKE_MODE_PSKAUTH) {
+        if (!TEST_true(OSSL_HPKE_CTX_set1_psk(sealctx,
+                                              (char*)base->pskid,
+                                              base->psk,
+                                              base->psklen)))
+            goto end;
+    }
     for (i = 0; i < (int)aeadsz; ++i) {
         ctlen = sizeof(ct);
         OPENSSL_cleanse(ct, ctlen);
         if (!TEST_true(OSSL_HPKE_sender_seal(sealctx,
                                              enc, &enclen,
                                              ct, &ctlen,
-                                             NULL, NULL, /* exporter */
                                              rpub, rpublen,
                                              base->ksinfo, base->ksinfolen,
                                              aead[i].aad, aead[i].aadlen,
@@ -314,13 +321,20 @@ static int do_testhpke(const TEST_BASEDATA *base,
     if (!TEST_ptr(openctx = OSSL_HPKE_CTX_new(base->mode, base->suite,
                                               libctx, NULL)))
         goto end;
+    if (base->mode == OSSL_HPKE_MODE_PSK
+        || base->mode == OSSL_HPKE_MODE_PSKAUTH) {
+        if (!TEST_true(OSSL_HPKE_CTX_set1_psk(openctx,
+                                              (char*)base->pskid,
+                                              base->psk,
+                                              base->psklen)))
+            goto end;
+    }
 
     for (i = 0; i < (int)aeadsz; ++i) {
         ptoutlen = sizeof(ptout);
         OPENSSL_cleanse(ptout, ptoutlen);
         if (!TEST_true(OSSL_HPKE_recipient_open(openctx, ptout, &ptoutlen,
                                                 enc, enclen,
-                                                NULL, NULL, /* exporter */
                                                 privR,
                                                 base->ksinfo, base->ksinfolen,
                                                 aead[i].aad, aead[i].aadlen,
@@ -334,6 +348,8 @@ static int do_testhpke(const TEST_BASEDATA *base,
     if (!TEST_true(OSSL_HPKE_CTX_set1_seq(sealctx,0)))
         goto end;
     for (i = 0; i < (int)exportsz; ++i) {
+#undef OLDWAY
+#ifdef OLDWAY
         size_t len = export[i].expected_secretlen;
 
         if (!TEST_true(OSSL_HPKE_CTX_set1_exporter(sealctx, 
@@ -350,6 +366,20 @@ static int do_testhpke(const TEST_BASEDATA *base,
         if (!TEST_true(TEST_mem_eq(secret, len, export[i].expected_secret,
                                    export[i].expected_secretlen)))
             goto end;
+#else
+        size_t len = export[i].expected_secretlen;
+        unsigned char eval[OSSL_HPKE_MAXSIZE];
+
+        if (len > sizeof(eval))
+            goto end;
+        if (!TEST_true(OSSL_HPKE_CTX_export(sealctx, eval, len,
+                                            export[i].context,
+                                            export[i].contextlen)))
+            goto end;
+        if (!TEST_true(TEST_mem_eq(eval, len, export[i].expected_secret,
+                                   export[i].expected_secretlen)))
+            goto end;
+#endif
     }
     ret = 1;
 end:
@@ -475,7 +505,7 @@ static int x25519kdfsha256_hkdfsha256_aes128gcm_psk_test(void)
     };
     const TEST_BASEDATA pskdata = {
         /* "X25519", NULL, "SHA256", "SHA256", "AES-128-GCM", */
-        OSSL_HPKE_MODE_BASE,
+        OSSL_HPKE_MODE_PSK,
         {  
             OSSL_HPKE_KEM_ID_25519,
             OSSL_HPKE_KDF_ID_HKDF_SHA256,
@@ -601,7 +631,6 @@ static int x25519kdfsha256_hkdfsha256_aes128gcm_base_test(void)
         0x2c, 0x61, 0xf1, 0xec, 0x7a, 0xf5, 0x49, 0x31
     };
     const TEST_BASEDATA basedata = {
-        // "X25519", NULL, "SHA256", "SHA256", "AES-128-GCM",
         OSSL_HPKE_MODE_BASE,
         {  
             OSSL_HPKE_KEM_ID_25519,
@@ -729,7 +758,6 @@ static int P256kdfsha256_hkdfsha256_aes128gcm_base_test(void)
         0xe1, 0xf6, 0xe6, 0xca, 0xe1, 0xda, 0xb8, 0x5a
     };
     const TEST_BASEDATA basedata = {
-        // "EC", "P-256", "SHA256", "SHA256", "AES-128-GCM",
         OSSL_HPKE_MODE_BASE,
         {  
             OSSL_HPKE_KEM_ID_P256,
@@ -1015,7 +1043,6 @@ static int test_hpke_modes_suites(void)
                     }
                     erv = OSSL_HPKE_sender_seal(ctx, senderpub, &senderpublen,
                                                 cipher, &cipherlen,
-                                                NULL, NULL, /* exporter */
                                                 pub, publen, infop, infolen,
                                                 aadp, aadlen, plain, plainlen);
                     if (erv != 1) {
@@ -1074,7 +1101,6 @@ static int test_hpke_modes_suites(void)
                     }
                     erv = OSSL_HPKE_recipient_open(rctx, clear, &clearlen,
                                                    senderpub, senderpublen,
-                                                   NULL, NULL,
                                                    privp,
                                                    infop, infolen,
                                                    aadp, aadlen,
@@ -1130,71 +1156,77 @@ static int test_hpke_modes_suites(void)
 }
 
 /**
- * @brief check export only stuff
+ * @brief check roundtrpi for export
  * @return 1 for success, other otherwise
  */
-static int test_hpke_export_only(void)
+static int test_hpke_export(void)
 {
     int overallresult = 1;
     EVP_PKEY *privp = NULL;
     unsigned char pub[OSSL_HPKE_MAXSIZE];
     size_t publen = sizeof(pub);
-    unsigned char enc[OSSL_HPKE_MAXSIZE];
-    size_t enclen = sizeof(enc);
-    unsigned char exp[OSSL_HPKE_MAXSIZE];
-    size_t explen = sizeof(exp);
     int hpke_mode = OSSL_HPKE_MODE_BASE;
     OSSL_HPKE_SUITE hpke_suite = OSSL_HPKE_SUITE_DEFAULT;
     OSSL_HPKE_CTX *ctx = NULL;
-    unsigned char rexp[OSSL_HPKE_MAXSIZE];
-    size_t rexplen = sizeof(rexp);
     OSSL_HPKE_CTX *rctx = NULL;
+    unsigned char exp[32];
+    unsigned char rexp[32];
+    unsigned char plain[] = "quick brown fox";
+    size_t plainlen = sizeof(plain);
+    unsigned char enc[OSSL_HPKE_MAXSIZE];
+    size_t enclen = sizeof(enc);
+    unsigned char cipher[OSSL_HPKE_MAXSIZE];
+    size_t cipherlen = sizeof(cipher);
+    unsigned char clear[OSSL_HPKE_MAXSIZE];
+    size_t clearlen = sizeof(clear);
+    unsigned char estr[] = "foo";
 
-    if (OSSL_HPKE_keygen(testctx, NULL, hpke_mode, hpke_suite,
-                         NULL, 0, pub, &publen, &privp) != 1) {
-        overallresult = 0;
-    }
-    ctx = OSSL_HPKE_CTX_new(hpke_mode, hpke_suite, testctx, NULL);
-    if (ctx == NULL) {
-        overallresult = 0;
-    }
-    if (OSSL_HPKE_CTX_set1_exporter(ctx, (unsigned char *) "foo",
-                                    strlen("foo"), 12) != 1) {
-        overallresult = 0;
-    }
-    if (TEST_true(OSSL_HPKE_export_only_sender(ctx, enc, &enclen,
-                                               exp, &explen,
-                                               pub, publen,
-                                               NULL, 0)) != 1) {
-        overallresult = 0;
-    }
+    if (!TEST_true(OSSL_HPKE_keygen(testctx, NULL,
+                                   hpke_mode, hpke_suite,
+                                   NULL, 0,
+                                   pub, &publen, &privp)))
+        goto end;
+
+    if (!TEST_ptr(ctx = OSSL_HPKE_CTX_new(hpke_mode, hpke_suite,
+                                          testctx, NULL)))
+        goto end;
+
+    if (!TEST_true(OSSL_HPKE_sender_seal(ctx, enc, &enclen,
+                                cipher, &cipherlen, pub, publen,
+                                NULL, 0, NULL, 0, /* no add, info */
+                                plain, plainlen)))
+        goto end;
+    if (!TEST_true(OSSL_HPKE_CTX_export(ctx, exp, 32,
+                                        estr, strlen(estr))))
+        goto end;
+
+    if (!TEST_ptr(rctx = OSSL_HPKE_CTX_new(hpke_mode, hpke_suite,
+                                           testctx, NULL)))
+        goto end;
+    if (!TEST_true(OSSL_HPKE_recipient_open(rctx, clear, &clearlen,
+                                            enc, enclen,
+                                            privp,
+                                            NULL, 0, NULL, 0,
+                                            cipher, cipherlen)))
+        goto end;
+
+
+    if (!TEST_true(OSSL_HPKE_CTX_export(rctx, rexp, 32,
+                                        estr, strlen(estr))))
+        goto end;
+
+    if (!TEST_true(TEST_mem_eq(exp, 32, rexp, 32)))
+        goto end;
+
     OSSL_HPKE_CTX_free(ctx);
-
-    rctx = OSSL_HPKE_CTX_new(hpke_mode, hpke_suite, testctx, NULL);
-    if (rctx == NULL) {
-        overallresult = 0;
-    }
-    if (OSSL_HPKE_CTX_set1_exporter(rctx, (unsigned char *) "foo",
-                                    strlen("foo"), 12) != 1) {
-        overallresult = 0;
-    }
-    if (TEST_true(OSSL_HPKE_export_only_recip(rctx, enc, enclen,
-                                              rexp, &rexplen, privp,
-                                              NULL, 0)) != 1) {
-        overallresult = 0;
-    }
-
     OSSL_HPKE_CTX_free(rctx);
-
-    if (overallresult == 1 && explen != rexplen) {
-        overallresult = 0;
-    }
-    if (overallresult == 1 && memcmp(exp, rexp, explen)) {
-        overallresult = 0;
-    }
     EVP_PKEY_free(privp);
-
-    return overallresult;
+    return 1;
+end:
+    OSSL_HPKE_CTX_free(ctx);
+    OSSL_HPKE_CTX_free(rctx);
+    EVP_PKEY_free(privp);
+    return 0;
 }
 
 /**
@@ -1696,7 +1728,7 @@ static int test_hpke(void)
 {
     int res = 1;
 
-    res = test_hpke_export_only();
+    res = test_hpke_export();
     if (res != 1)
         return res;
 
@@ -1766,6 +1798,18 @@ int main(int argc, char **argv)
             printf("slontis API test success\n");
         } else {
             printf("API test fail (%d)\n", apires);
+        }
+        apires = x25519kdfsha256_hkdfsha256_aes128gcm_psk_test();
+        if (apires == 1) {
+            printf("slontis API test 2 success\n");
+        } else {
+            printf("slontis API test 2 fail (%d)\n", apires);
+        }
+        apires = P256kdfsha256_hkdfsha256_aes128gcm_base_test();
+        if (apires == 1) {
+            printf("slontis API test 3 success\n");
+        } else {
+            printf("slontis API test 3 fail (%d)\n", apires);
         }
     }
     return apires;

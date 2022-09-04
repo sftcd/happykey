@@ -166,18 +166,6 @@ int OSSL_HPKE_CTX_set1_authpub(OSSL_HPKE_CTX *ctx,
                                size_t publen);
 
 /**
- * @brief set an exporter length and context for HPKE
- * @param ctx is the pointer for the HPKE context
- * @param exp_ctx is the exporter context octets
- * @param exp_ctxlen is the size of exp_ctx
- * @param explen is the desired exporter output size
- * @return 1 for success, 0 for error
- */
-int OSSL_HPKE_CTX_set1_exporter(OSSL_HPKE_CTX *ctx,
-                                const unsigned char *exp_ctx, size_t exp_ctxlen,
-                                size_t explen);
-
-/**
  * @brief ask for the state of the sequence of seal/open calls
  * @param ctx is the pointer for the HPKE context
  * @return seq returns the positive integer sequence number
@@ -209,8 +197,6 @@ int OSSL_HPKE_CTX_set1_seq(OSSL_HPKE_CTX *ctx, uint64_t seq);
  * @param enclen is the size the above
  * @param ct is the ciphertext output
  * @param ctlen is the size the above
- * @param exp is the exporter octets
- * @param explen is the size the above
  * @param pub is the recipient public key octets
  * @param publen is the size the above
  * @param recip is the EVP_PKEY form of recipient public value
@@ -236,7 +222,6 @@ int OSSL_HPKE_CTX_set1_seq(OSSL_HPKE_CTX *ctx, uint64_t seq);
 int OSSL_HPKE_sender_seal(OSSL_HPKE_CTX *ctx,
                           unsigned char *enc, size_t *enclen,
                           unsigned char *ct, size_t *ctlen,
-                          unsigned char *exp, size_t *explen,
                           unsigned char *pub, size_t publen,
                           const unsigned char *info, size_t infolen,
                           const unsigned char *aad, size_t aadlen,
@@ -249,8 +234,6 @@ int OSSL_HPKE_sender_seal(OSSL_HPKE_CTX *ctx,
  * @param ptlen is the size the above
  * @param enc is the sender's ephemeral public value
  * @param enclen is the size the above
- * @param exp is the exporter octets
- * @param explen is the size the above
  * @param recippriv is the EVP_PKEY form of recipient private value
  * @param info is the info parameter
  * @param infolen is the size the above
@@ -273,52 +256,29 @@ int OSSL_HPKE_sender_seal(OSSL_HPKE_CTX *ctx,
 int OSSL_HPKE_recipient_open(OSSL_HPKE_CTX *ctx,
                              unsigned char *pt, size_t *ptlen,
                              const unsigned char *enc, size_t enclen,
-                             unsigned char *exp, size_t *explen,
                              EVP_PKEY *recippriv,
                              const unsigned char *info, size_t infolen,
                              const unsigned char *aad, size_t aadlen,
                              const unsigned char *ct, size_t ctlen);
 
 /**
- * @brief sender export-only function
- * @param ctx is the pointer for the HPKE context
- * @param enc is the sender's ephemeral public value
- * @param enclen is the size the above
- * @param exp is the exporter octets
- * @param explen is the size the above
- * @param pub is the recipient public key octets
- * @param publen is the size the above
- * @param info is the key schedule info parameter
- * @param infolen is the size the above
- * @return 1 for success, 0 for error
+ * @brief generate a given-length secret based on context and label
+ * @param ctx is the HPKE context
+ * @param secret is the resulting secret that will be of length...
+ * @param secret_len is the desired output length
+ * @param label is a buffer to provide separation between secrets
+ * @param labellen is the length of the above
+ * @return 1 for good, 0 for error
  *
- * This can be called once, or multiple, times.
+ * The context has to have been used already for one encryption
+ * or decryption for this to work (as this is based on the negotiated
+ * "exporter_secret" estabilshed via the HPKE operation.
  */
-int OSSL_HPKE_export_only_sender(OSSL_HPKE_CTX *ctx,
-                                 unsigned char *enc, size_t *enclen,
-                                 unsigned char *exp, size_t *explen,
-                                 unsigned char *pub, size_t publen,
-                                 const unsigned char *info, size_t infolen);
-
-/**
- * @brief receiver export-only function
- * @param ctx is the pointer for the HPKE context
- * @param enc is the sender's ephemeral public value
- * @param enclen is the size the above
- * @param exp is the exporter octets
- * @param explen is the size the above
- * @param recippriv is the EVP_PKEY form of recipient private value
- * @param info is the key schedule info parameter
- * @param infolen is the size the above
- * @return 1 for success, 0 for error
- *
- * This can be called once, or multiple, times.
- */
-int OSSL_HPKE_export_only_recip(OSSL_HPKE_CTX *ctx,
-                                unsigned char *enc, size_t enclen,
-                                unsigned char *exp, size_t *explen,
-                                EVP_PKEY *recippriv,
-                                const unsigned char *info, size_t infolen);
+int OSSL_HPKE_CTX_export(OSSL_HPKE_CTX *ctx, 
+                         unsigned char *secret,
+                         size_t secret_len,
+                         const unsigned char *label,
+                         size_t labellen);
 
 /**
  * @brief generate a key pair
