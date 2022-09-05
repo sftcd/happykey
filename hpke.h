@@ -168,12 +168,12 @@ int OSSL_HPKE_CTX_set1_authpub(OSSL_HPKE_CTX *ctx,
 /**
  * @brief ask for the state of the sequence of seal/open calls
  * @param ctx is the pointer for the HPKE context
- * @return seq returns the positive integer sequence number
+ * @param seq returns the positive integer sequence number
  * @return 1 for success, 0 for error
  *
  * The value returned is the next one to be used when sealing
- * or opening (so if we start at zero this will be 1 after the
- * first successful call to seal)
+ * or opening (so as we start at zero this will be 1 after the
+ * first successful call to seal or open)
  *
  * seq is a uint64_t as that's what two other implementations
  * chose
@@ -272,7 +272,7 @@ int OSSL_HPKE_recipient_open(OSSL_HPKE_CTX *ctx,
  *
  * The context has to have been used already for one encryption
  * or decryption for this to work (as this is based on the negotiated
- * "exporter_secret" estabilshed via the HPKE operation.
+ * "exporter_secret" estabilshed via the HPKE operation).
  */
 int OSSL_HPKE_CTX_export(OSSL_HPKE_CTX *ctx,
                          unsigned char *secret,
