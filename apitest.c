@@ -111,9 +111,9 @@ static void usage(char *prog, char *errmsg)
 #include "testutil.h"
 #endif
 
-# ifndef OSSL_HPKE_MAXSIZE
-#  define OSSL_HPKE_MAXSIZE 1024
-# endif
+#ifndef OSSL_HPKE_MAXSIZE
+# define OSSL_HPKE_MAXSIZE 1024
+#endif
 
 extern int OSSL_HPKE_prbuf2evp(OSSL_LIB_CTX *libctx, const char *propq,
                                unsigned int kem_id,
@@ -134,16 +134,15 @@ static int cmpkey(const EVP_PKEY *pkey,
                   const unsigned char *pub, size_t publen)
 {
     unsigned char pubbuf[256];
-    int ret = 0;
     size_t pubbuflen = 0;
+    int erv = 0;
 
     if (!TEST_true(publen <= sizeof(pubbuf)))
         return 0;
-    if (!TEST_true(EVP_PKEY_get_octet_string_param(pkey,
-                                                   OSSL_PKEY_PARAM_ENCODED_PUBLIC_KEY,
-                                                   pubbuf,
-                                                   sizeof(pubbuf),
-                                                   &pubbuflen)))
+    erv = EVP_PKEY_get_octet_string_param(pkey,
+                                          OSSL_PKEY_PARAM_ENCODED_PUBLIC_KEY,
+                                          pubbuf, sizeof(pubbuf), &pubbuflen);
+    if (!TEST_true(erv))
         return 0;
     if (pub != NULL && !TEST_mem_eq(pubbuf, pubbuflen, pub, publen))
         return 0;
@@ -171,8 +170,7 @@ typedef struct {
     size_t ikmAuthlen;
     const unsigned char *psk;
     size_t psklen;
-    const unsigned char *pskid;
-    size_t pskidlen;
+    const char *pskid; /* want teminating NUL here */
 } TEST_BASEDATA;
 
 typedef struct
@@ -201,12 +199,9 @@ static int do_testhpke(const TEST_BASEDATA *base,
     OSSL_LIB_CTX *libctx = NULL;
     const char *propq = NULL;
     OSSL_HPKE_CTX *sealctx = NULL, *openctx = NULL;
-    EVP_PKEY_CTX *ectx = NULL, *dctx = NULL;
-    unsigned char secret[256];
     unsigned char ct[256];
     unsigned char enc[256];
     unsigned char ptout[256];
-    size_t secretlen = sizeof(secret);
     size_t ptoutlen = sizeof(ptout);
     size_t enclen = sizeof(enc);
     size_t ctlen = sizeof(ct);
@@ -221,27 +216,29 @@ static int do_testhpke(const TEST_BASEDATA *base,
     EVP_PKEY *privR = NULL;
     int ret = 0, i;
 
-    if (!TEST_true(OSSL_HPKE_keygen(libctx, NULL, base->mode, base->suite,
+    if (!TEST_true(OSSL_HPKE_keygen(libctx, propq, base->mode, base->suite,
                                     base->ikmE, base->ikmElen,
                                     pub, &publen, &privE)))
         goto end;
     if (!TEST_true(cmpkey(privE, base->expected_pkEm, base->expected_pkEmlen)))
         goto end;
     if (!TEST_ptr(sealctx = OSSL_HPKE_CTX_new(base->mode, base->suite,
-                                              libctx, NULL)))
+                                              libctx, propq)))
         goto end;
     if (!TEST_true(OSSL_HPKE_CTX_set1_senderpriv(sealctx, privE)))
         goto end;
     if (base->mode == OSSL_HPKE_MODE_AUTH
         || base->mode == OSSL_HPKE_MODE_PSKAUTH) {
-        if (!TEST_true(OSSL_HPKE_keygen(libctx, NULL, base->mode, base->suite,
+        if (!TEST_true(base->ikmAuth != NULL && base->ikmAuthlen > 0))
+            goto end;
+        if (!TEST_true(OSSL_HPKE_keygen(libctx, propq, base->mode, base->suite,
                                         base->ikmAuth, base->ikmAuthlen,
                                         authpub, &authpublen, &authpriv)))
             goto end;
         if (!TEST_true(OSSL_HPKE_CTX_set1_authpriv(sealctx, authpriv)))
             goto end;
     }
-    if (!TEST_true(OSSL_HPKE_keygen(libctx, NULL, base->mode, base->suite,
+    if (!TEST_true(OSSL_HPKE_keygen(libctx, propq, base->mode, base->suite,
                                     base->ikmR, base->ikmRlen,
                                     rpub, &rpublen, &privR)))
         goto end;
@@ -249,10 +246,8 @@ static int do_testhpke(const TEST_BASEDATA *base,
         goto end;
     if (base->mode == OSSL_HPKE_MODE_PSK
         || base->mode == OSSL_HPKE_MODE_PSKAUTH) {
-        if (!TEST_true(OSSL_HPKE_CTX_set1_psk(sealctx,
-                                              (char *)base->pskid,
-                                              base->psk,
-                                              base->psklen)))
+        if (!TEST_true(OSSL_HPKE_CTX_set1_psk(sealctx, base->pskid,
+                                              base->psk, base->psklen)))
             goto end;
     }
     for (i = 0; i < (int)aeadsz; ++i) {
@@ -275,14 +270,15 @@ static int do_testhpke(const TEST_BASEDATA *base,
     }
 
     if (!TEST_ptr(openctx = OSSL_HPKE_CTX_new(base->mode, base->suite,
-                                              libctx, NULL)))
+                                              libctx, propq)))
         goto end;
     if (base->mode == OSSL_HPKE_MODE_PSK
         || base->mode == OSSL_HPKE_MODE_PSKAUTH) {
-        if (!TEST_true(OSSL_HPKE_CTX_set1_psk(openctx,
-                                              (char *)base->pskid,
-                                              base->psk,
-                                              base->psklen)))
+        if (!TEST_true(base->pskid != NULL && base->psk != NULL
+                       && base->psklen > 0))
+            goto end;
+        if (!TEST_true(OSSL_HPKE_CTX_set1_psk(openctx, base->pskid,
+                                              base->psk, base->psklen)))
             goto end;
     }
     if (base->mode == OSSL_HPKE_MODE_AUTH
@@ -381,11 +377,19 @@ static int x25519kdfsha256_hkdfsha256_aes128gcm_psk_test(void)
         0x7f, 0xbe, 0x65, 0xeb, 0x17, 0x1e, 0x81, 0x32,
         0xc2, 0xaf, 0x18, 0x55, 0x5a, 0x73, 0x8b, 0x82
     };
-    const unsigned char pskid[] = {
+    const char *pskid = "Ennyn Durin aran Moria";
+#if 0
+    /*
+     * unused ascii-hex equivalent of the above - better to
+     * use the char * variant as that has the terminating
+     * NUL we want
+     */
+    const unsigned char pskid_ascii_hex[] = {
         0x45, 0x6e, 0x6e, 0x79, 0x6e, 0x20, 0x44, 0x75,
         0x72, 0x69, 0x6e, 0x20, 0x61, 0x72, 0x61, 0x6e,
         0x20, 0x4d, 0x6f, 0x72, 0x69, 0x61
     };
+#endif
     const unsigned char expected_shared_secret[] = {
         0x72, 0x76, 0x99, 0xf0, 0x09, 0xff, 0xe3, 0xc0,
         0x76, 0x31, 0x50, 0x19, 0xc6, 0x96, 0x48, 0x36,
@@ -460,7 +464,7 @@ static int x25519kdfsha256_hkdfsha256_aes128gcm_psk_test(void)
         ksinfo, sizeof(ksinfo),
         NULL, 0,    /* No Auth */
         psk, sizeof(psk),
-        pskid, sizeof(pskid),
+        pskid
     };
     const TEST_AEADDATA aeaddata[] = {
         {
@@ -583,7 +587,9 @@ static int x25519kdfsha256_hkdfsha256_aes128gcm_base_test(void)
         ikmrpub, sizeof(ikmrpub),
         ikmrpriv, sizeof(ikmrpriv),
         expected_shared_secret, sizeof(expected_shared_secret),
-        ksinfo, sizeof(ksinfo)
+        ksinfo, sizeof(ksinfo),
+        NULL, 0, /* no auth ikm */
+        NULL, 0, NULL /* no psk */
     };
     const TEST_AEADDATA aeaddata[] = {
         {
@@ -710,7 +716,9 @@ static int P256kdfsha256_hkdfsha256_aes128gcm_base_test(void)
         ikmrpub, sizeof(ikmrpub),
         ikmrpriv, sizeof(ikmrpriv),
         expected_shared_secret, sizeof(expected_shared_secret),
-        ksinfo, sizeof(ksinfo)
+        ksinfo, sizeof(ksinfo),
+        NULL, 0, /* no auth */
+        NULL, 0, NULL /* PSK stuff */
     };
     const TEST_AEADDATA aeaddata[] = {
         {
@@ -739,7 +747,7 @@ static int P256kdfsha256_hkdfsha256_aes128gcm_base_test(void)
  * Randomly toss a coin
  */
 static unsigned char rb = 0;
-# define COIN_IS_HEADS (RAND_bytes_ex(testctx, &rb, 1, 10) && rb % 2)
+#define COIN_IS_HEADS (RAND_bytes_ex(testctx, &rb, 1, 10) && rb % 2)
 
 /* tables of HPKE modes and suite values */
 static int hpke_mode_list[] = {
@@ -994,8 +1002,8 @@ static int test_hpke_modes_suites(void)
                     }
                     if (hpke_mode == OSSL_HPKE_MODE_PSK
                         || hpke_mode == OSSL_HPKE_MODE_PSKAUTH) {
-                        erv = OSSL_HPKE_CTX_set1_psk(rctx,
-                                                     pskidp, pskp, psklen);
+                        erv = OSSL_HPKE_CTX_set1_psk(rctx, pskidp,
+                                                     pskp, psklen);
                         if (erv != 1) {
                             overallresult = 0;
                         }
@@ -1061,7 +1069,6 @@ static int test_hpke_modes_suites(void)
  */
 static int test_hpke_export(void)
 {
-    int overallresult = 1;
     EVP_PKEY *privp = NULL;
     unsigned char pub[OSSL_HPKE_MAXSIZE];
     size_t publen = sizeof(pub);
@@ -1079,7 +1086,7 @@ static int test_hpke_export(void)
     size_t cipherlen = sizeof(cipher);
     unsigned char clear[OSSL_HPKE_MAXSIZE];
     size_t clearlen = sizeof(clear);
-    unsigned char estr[] = "foo";
+    char * estr = "foo";
 
     if (!TEST_true(OSSL_HPKE_keygen(testctx, NULL,
                                     hpke_mode, hpke_suite,
@@ -1097,7 +1104,7 @@ static int test_hpke_export(void)
                                          plain, plainlen)))
         goto end;
     if (!TEST_true(OSSL_HPKE_CTX_export(ctx, exp, 32,
-                                        estr, strlen(estr))))
+                                        (unsigned char *)estr, strlen(estr))))
         goto end;
 
     if (!TEST_ptr(rctx = OSSL_HPKE_CTX_new(hpke_mode, hpke_suite,
@@ -1111,7 +1118,7 @@ static int test_hpke_export(void)
         goto end;
 
     if (!TEST_true(OSSL_HPKE_CTX_export(rctx, rexp, 32,
-                                        estr, strlen(estr))))
+                                        (unsigned char *)estr, strlen(estr))))
         goto end;
 
     if (!TEST_true(TEST_mem_eq(exp, 32, rexp, 32)))
@@ -1338,7 +1345,7 @@ static int test_hpke_badcalls(void)
     return overallresult;
 }
 
-# ifndef OPENSSL_NO_ASM
+#ifndef OPENSSL_NO_ASM
 /*
  * NIST p256 key pair from HPKE-07 test vectors
  * FIXME: I have no idea why, but as of now building
@@ -1366,7 +1373,7 @@ static unsigned char n256pub[] = {
     0x99, 0x14, 0x98, 0xe3, 0x45, 0xaa, 0x76, 0x60,
     0x04
 };
-# endif
+#endif
 
 /*
  * X25519 key pair from HPKE-07 test vectors
@@ -1438,7 +1445,7 @@ static int test_hpke_gen_from_priv(void)
 {
     int res = 0;
 
-# ifndef OPENSSL_NO_ASM
+#ifndef OPENSSL_NO_ASM
     /*
      * NIST P-256 case
      * FIXME: I have no idea why, but as of now building
@@ -1453,7 +1460,7 @@ static int test_hpke_gen_from_priv(void)
                                           n256priv, sizeof(n256priv),
                                           n256pub, sizeof(n256pub));
     if (res != 1) { return res; }
-# endif
+#endif
 
     /* X25519 case */
     res = test_hpke_one_key_gen_from_priv(0x20,
@@ -1714,6 +1721,8 @@ int main(int argc, char **argv)
     return apires;
 }
 #else
+#if 0
+/* don't do this yet 'till we move outta evp_extra_test */
 int setup_tests(void)
 {
     ADD_TEST(x25519kdfsha256_hkdfsha256_aes128gcm_base_test);
@@ -1725,4 +1734,5 @@ int setup_tests(void)
 void cleanup_tests(void)
 {
 }
+#endif
 #endif

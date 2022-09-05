@@ -28,9 +28,9 @@
 #include <internal/packet.h>
 #ifdef HAPPYKEY
 /* if you don't have an openssl development tree you may need this */
-#ifndef OSSL_NELEM
-#define OSSL_NELEM(x)    (sizeof(x)/sizeof((x)[0]))
-#endif
+# ifndef OSSL_NELEM
+#  define OSSL_NELEM(x) (sizeof(x) / sizeof((x)[0]))
+# endif
 #else
 #include <internal/common.h>
 #endif
@@ -129,7 +129,7 @@ static const char *hpke_mode_strtab[] = {
 /*
  * @brief  Map ascii to binary - utility macro used in >1 place
  */
-# define OSSL_HPKE_A2B(_c_) (_c_ >= '0' && _c_ <= '9' ? (_c_ - '0') :\
+# define HPKE_A2B(_c_) (_c_ >= '0' && _c_ <= '9' ? (_c_ - '0') :\
                         (_c_ >= 'A' && _c_ <= 'F' ? (_c_ - 'A' + 10) :\
                          (_c_ >= 'a' && _c_ <= 'f' ? (_c_ - 'a' + 10) : 0)))
 #endif
@@ -390,10 +390,10 @@ static int hpke_ah_decode(size_t ahlen, const char *ah,
     for (i = ahlen - 1; i > nibble; i -= 2) {
         int j = i / 2;
 
-        lbuf[j] = OSSL_HPKE_A2B(ah[i - 1]) * 16 + OSSL_HPKE_A2B(ah[i]);
+        lbuf[j] = HPKE_A2B(ah[i - 1]) * 16 + HPKE_A2B(ah[i]);
     }
     if (nibble) {
-        lbuf[0] = OSSL_HPKE_A2B(ah[0]);
+        lbuf[0] = HPKE_A2B(ah[0]);
     }
     *blen = lblen;
     *buf = lbuf;
@@ -410,8 +410,8 @@ static int hpke_ah_decode(size_t ahlen, const char *ah,
  * @param blen is the length of the buffer
  * @return 1 for success
  */
-static int hpke_pbuf(FILE *fout,
-        const char *msg, const unsigned char *buf, size_t blen)
+static int hpke_pbuf(FILE *fout, const char *msg,
+                     const unsigned char *buf, size_t blen)
 {
     size_t i = 0;
 
@@ -3554,6 +3554,7 @@ int OSSL_HPKE_CTX_set1_psk(OSSL_HPKE_CTX *ctx,
 {
 #ifdef HAPPYKEY
     int erv = 1;
+
 #endif
     if (ctx == NULL || pskid == NULL || psk == NULL || psklen == 0) {
         ERR_raise(ERR_LIB_CRYPTO, ERR_R_INTERNAL_ERROR);
@@ -3596,6 +3597,7 @@ int OSSL_HPKE_CTX_set1_senderpriv(OSSL_HPKE_CTX *ctx, EVP_PKEY *privp)
 {
 #ifdef HAPPYKEY
     int erv = 1;
+
 #endif
     if (ctx == NULL || privp == NULL) {
         ERR_raise(ERR_LIB_CRYPTO, ERR_R_INTERNAL_ERROR);
@@ -3619,6 +3621,7 @@ int OSSL_HPKE_CTX_set1_authpriv(OSSL_HPKE_CTX *ctx, EVP_PKEY *privp)
 {
 #ifdef HAPPYKEY
     int erv = 1;
+
 #endif
     if (ctx == NULL || privp == NULL) {
         ERR_raise(ERR_LIB_CRYPTO, ERR_R_INTERNAL_ERROR);
@@ -3689,6 +3692,7 @@ int OSSL_HPKE_CTX_set1_seq(OSSL_HPKE_CTX *ctx, uint64_t seq)
 {
 #ifdef HAPPYKEY
     int erv = 1;
+
 #endif
     if (ctx == NULL)
         return 0;
