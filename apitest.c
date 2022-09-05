@@ -115,12 +115,6 @@ static void usage(char *prog, char *errmsg)
 #  define OSSL_HPKE_MAXSIZE 1024
 # endif
 
-# define NEWAPI
-# ifdef NEWAPI
-#  define NEWAPI_ENC
-#  define NEWAPI_DEC
-# endif
-
 extern int OSSL_HPKE_prbuf2evp(OSSL_LIB_CTX *libctx, const char *propq,
                                unsigned int kem_id,
                                const unsigned char *prbuf, size_t prbuf_len,
@@ -289,6 +283,12 @@ static int do_testhpke(const TEST_BASEDATA *base,
                                               (char *)base->pskid,
                                               base->psk,
                                               base->psklen)))
+            goto end;
+    }
+    if (base->mode == OSSL_HPKE_MODE_AUTH
+        || base->mode == OSSL_HPKE_MODE_PSKAUTH) {
+        if (!TEST_true(OSSL_HPKE_CTX_set1_authpub(openctx,
+                                                  authpub, authpublen)))
             goto end;
     }
 
@@ -828,9 +828,10 @@ static int test_hpke_modes_suites(void)
         OSSL_HPKE_SUITE hpke_suite = OSSL_HPKE_SUITE_DEFAULT;
         size_t plainlen = OSSL_HPKE_MAXSIZE;
         unsigned char plain[OSSL_HPKE_MAXSIZE];
-#ifdef NEWAPI
         uint64_t startseq = 0;
-#endif
+        OSSL_HPKE_CTX *rctx = NULL;
+        int erv = 1;
+        OSSL_HPKE_CTX *ctx = NULL;
 
         memset(plain, 0x00, OSSL_HPKE_MAXSIZE);
         strcpy((char *)plain, "a message not in a bottle");
@@ -935,13 +936,6 @@ static int test_hpke_modes_suites(void)
                                                     pub, &publen, &privp)))
                         overallresult = 0;
 
-                    /*
-                     * to maintain interop we can vary NEWAPI_ENC and
-                     * NEWAPI_DEC
-                     */
-#ifdef NEWAPI_ENC
-                    int erv = 1;
-                    OSSL_HPKE_CTX *ctx = NULL;
                     ctx = OSSL_HPKE_CTX_new(hpke_mode, hpke_suite,
                                             testctx, NULL);
                     if (ctx == NULL) {
@@ -991,27 +985,7 @@ static int test_hpke_modes_suites(void)
                     }
                     OSSL_HPKE_CTX_free(ctx);
 
-#else
-                    if (TEST_true(OSSL_HPKE_enc(testctx, NULL,
-                                                hpke_mode, hpke_suite,
-                                                pskidp, pskp, psklen,
-                                                pub, publen,
-                                                NULL, 0, authpriv_evp,
-                                                plain, plainlen,
-                                                aadp, aadlen,
-                                                infop, infolen,
-                                                NULL, 0,
-                                                senderpub,
-                                                &senderpublen,
-                                                NULL,
-                                                cipher, &cipherlen)) != 1) {
-                        overallresult = 0;
-                    }
-#endif
-
                     memset(clear, 0, clearlen);
-#ifdef NEWAPI_DEC
-                    OSSL_HPKE_CTX *rctx = NULL;
 
                     rctx = OSSL_HPKE_CTX_new(hpke_mode, hpke_suite,
                                              testctx, NULL);
@@ -1051,21 +1025,6 @@ static int test_hpke_modes_suites(void)
                     }
                     OSSL_HPKE_CTX_free(rctx);
 
-#else
-                    if (TEST_true(OSSL_HPKE_dec(testctx, NULL,
-                                                hpke_mode, hpke_suite,
-                                                pskidp, pskp, psklen,
-                                                authpubp, authpublen,
-                                                NULL, 0, privp,
-                                                senderpub, senderpublen,
-                                                cipher, cipherlen,
-                                                aadp, aadlen,
-                                                infop, infolen,
-                                                NULL, 0,
-                                                clear, &clearlen)) != 1) {
-                        overallresult = 0;
-                    }
-#endif
                     EVP_PKEY_free(privp);
                     privp = NULL;
                     /* check output */
