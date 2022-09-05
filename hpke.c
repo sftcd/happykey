@@ -44,7 +44,7 @@
  * Define this for LOADS of printing of intermediate cryptographic values
  * Really only needed when new crypto added (hopefully)
  */
-# define SUPERVERBOSE
+# undef SUPERVERBOSE
 # ifdef TESTVECTORS
 #  include "hpketv.h"
 # endif
@@ -259,12 +259,12 @@ struct ossl_hpke_ctx_st
     char *propq; /**< properties */
     int mode; /**< HPKE mode */
     OSSL_HPKE_SUITE suite; /**< suite */
-    uint64_t seq;
+    uint64_t seq; /**< sequence number */
     unsigned char *exportersec; /**< exporter secret */
     size_t exporterseclen;
-    char *pskid;
+    char *pskid; /**< PSK stuff */
     unsigned char *psk;
-    size_t psklen; /**< PSK */
+    size_t psklen;
     EVP_PKEY *senderpriv; /**< sender's ephemeral private key */
     EVP_PKEY *authpriv; /**< sender's authentication private key */
     unsigned char *authpub; /**< auth public key */
@@ -1858,8 +1858,6 @@ static int hpke_suite_check(OSSL_HPKE_SUITE suite)
  * @param info is the encoded info data (can be NULL)
  * @param seqlen is the length of the sequence data (can be zero)
  * @param seq is the encoded sequence data (can be NULL)
- * @param extsenderpublen length of the input buffer for sender's public key
- * @param extsenderpub is the input buffer for sender public key
  * @param extsenderpriv has the handle for the sender private key
  * @param expseclen is the length of the exportersecret buffer
  * @param expsec is the exporter secret
@@ -1961,9 +1959,6 @@ static int hpke_enc_int(OSSL_LIB_CTX *libctx, const char *propq,
     /*
      * Depending on who called us, we may want to generate this key pair
      * or we may have had it handed to us via extsender inputs
-    if (extsenderpublen > 0 && extsenderpub != NULL && extsenderpriv != NULL) {
-        evpcaller = 1;
-    }
      */
     if (extsenderpriv != NULL) {
         evpcaller = 1;
@@ -3897,7 +3892,7 @@ int OSSL_HPKE_recipient_open(OSSL_HPKE_CTX *ctx,
     if (erv != 1) {
         ERR_raise(ERR_LIB_CRYPTO, ERR_R_INTERNAL_ERROR);
         return 0;
-    } 
+    }
     return erv;
 }
 
@@ -3914,7 +3909,7 @@ int OSSL_HPKE_recipient_open(OSSL_HPKE_CTX *ctx,
  * or decryption for this to work (as this is based on the negotiated
  * "exporter_secret" estabilshed via the HPKE operation.
  */
-int OSSL_HPKE_CTX_export(OSSL_HPKE_CTX *ctx, 
+int OSSL_HPKE_CTX_export(OSSL_HPKE_CTX *ctx,
                          unsigned char *secret,
                          size_t secret_len,
                          const unsigned char *label,
@@ -3926,7 +3921,8 @@ int OSSL_HPKE_CTX_export(OSSL_HPKE_CTX *ctx,
     if (ctx == NULL) {
         ERR_raise(ERR_LIB_CRYPTO, ERR_R_INTERNAL_ERROR);
         return 0;
-    if (ctx->exportersec == NULL) 
+    }
+    if (ctx->exportersec == NULL) {
         ERR_raise(ERR_LIB_CRYPTO, ERR_R_INTERNAL_ERROR);
         return 0;
     }

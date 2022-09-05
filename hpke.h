@@ -274,7 +274,7 @@ int OSSL_HPKE_recipient_open(OSSL_HPKE_CTX *ctx,
  * or decryption for this to work (as this is based on the negotiated
  * "exporter_secret" estabilshed via the HPKE operation.
  */
-int OSSL_HPKE_CTX_export(OSSL_HPKE_CTX *ctx, 
+int OSSL_HPKE_CTX_export(OSSL_HPKE_CTX *ctx,
                          unsigned char *secret,
                          size_t secret_len,
                          const unsigned char *label,
