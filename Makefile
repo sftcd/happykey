@@ -61,7 +61,7 @@ endif
 #
 # The "-x 1" below is just to get unifdef to return zero if the input
 # and output differ, which should be the case for us.
-forlib: hpke.c-forlib hpke.h-forlib apitest.c-frag-forlib
+forlib: hpke.c-forlib hpke.h-forlib apitest.c-forlib
 
 hpke.c-forlib: hpke.c
 	- unifdef -x 1 -UHAPPYKEY -USUPERVERBOSE -UTESTVECTORS hpke.c >hpke.c-forlib
@@ -69,8 +69,8 @@ hpke.c-forlib: hpke.c
 hpke.h-forlib: hpke.h
 	- unifdef -x 1 -UHAPPYKEY -USUPERVERBOSE -UTESTVECTORS hpke.h >hpke.h-forlib
 
-apitest.c-frag-forlib: apitest.c
-	- unifdef -x 1 -UHAPPYKEY -USUPERVERBOSE -UTESTVECTORS apitest.c >apitest.c-frag-forlib
+apitest.c-forlib: apitest.c
+	- unifdef -x 1 -UHAPPYKEY -USUPERVERBOSE -UTESTVECTORS apitest.c >apitest.c-forlib
 
 forlibclean:
 	- rm -f hpke.h-forlib
@@ -79,7 +79,7 @@ forlibclean:
 copy2lib: forlib
 	- cp hpke.c-forlib ${OSSL}/crypto/hpke/hpke.c
 	- cp hpke.h-forlib ${INCL}/openssl/hpke.h
-	- ./dosub.sh ${OSSL}/test/evp_extra_test.c
+	- cp apitest.c-forlib ${OSSL}/test/hpke_test.c
 
 os2evp: os2evp.o hpke.o packet.o
 	LD_LIBRARY_PATH=${OSSL} ${CC} ${CFLAGS} -g -o $@ os2evp.o hpke.o packet.o -L ${OSSL} -lcrypto -L ${NSSL} -lnss3 -lnspr4

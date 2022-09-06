@@ -28,7 +28,6 @@
 # include "hpke.h"
 
 static int verbose = 0;
-static OSSL_LIB_CTX *testctx = NULL;
 
 /*
  * @brief mimic OpenSSL test_true function
@@ -108,12 +107,16 @@ static void usage(char *prog, char *errmsg)
 #include <openssl/hpke.h>
 #include <openssl/evp.h>
 #include <openssl/core_names.h>
+#include <openssl/rand.h>
 #include "testutil.h"
 #endif
 
 #ifndef OSSL_HPKE_MAXSIZE
 # define OSSL_HPKE_MAXSIZE 1024
 #endif
+
+static OSSL_LIB_CTX *testctx = NULL;
+static char *testpropq = NULL;
 
 extern int OSSL_HPKE_prbuf2evp(OSSL_LIB_CTX *libctx, const char *propq,
                                unsigned int kem_id,
@@ -197,7 +200,7 @@ static int do_testhpke(const TEST_BASEDATA *base,
                        const TEST_EXPORTDATA *export, size_t exportsz)
 {
     OSSL_LIB_CTX *libctx = NULL;
-    const char *propq = NULL;
+    const char *propq = testpropq;
     OSSL_HPKE_CTX *sealctx = NULL, *openctx = NULL;
     unsigned char ct[256];
     unsigned char enc[256];
@@ -1721,7 +1724,6 @@ int main(int argc, char **argv)
     return apires;
 }
 #else
-#if 0
 /* don't do this yet 'till we move outta evp_extra_test */
 int setup_tests(void)
 {
@@ -1734,5 +1736,4 @@ int setup_tests(void)
 void cleanup_tests(void)
 {
 }
-#endif
 #endif
