@@ -139,7 +139,7 @@ int main(int argc, char **argv)
     /*
      * Call EVP mode encrypt
      */
-    rv=OSSL_HPKE_enc_evp(
+    rv=OSSL_HPKE_enc(
         NULL, NULL, hpke_mode, hpke_suite,
         pskid, psk, psklen,
         pub, publen,
@@ -148,7 +148,7 @@ int main(int argc, char **argv)
         aad, aadlen,
         info, infolen,
         NULL, 0, /* seq */
-        senderpub, senderpublen, senderpriv,
+        senderpub, &senderpublen, senderpriv,
         cipher, &cipherlen
 #ifdef TESTVECTORS
         , NULL
