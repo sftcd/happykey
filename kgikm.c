@@ -20,6 +20,13 @@
 #include <openssl/ssl.h>
 #include "hpke.h"
 
+#ifndef OSSL_HPKE_MAXSIZE
+#define OSSL_HPKE_MAXSIZE 1024
+#endif
+#ifndef OSSL_HPKE_DEFSIZE
+#define OSSL_HPKE_DEFSIZE (4 * 1024)
+#endif
+
 /* from RFC 9180 Appendix A.1.1 */
 unsigned char ikm25519[]={
     0x72,0x68,0x60,0x0d,0x40,0x3f,0xce,0x43,
@@ -110,8 +117,8 @@ static int hpke_test_one_ikm_gen(uint16_t kem_id,
     EVP_PKEY *sk = NULL;
 
     hpke_suite.kem_id = kem_id;
-    if (OSSL_HPKE_keygen_evp(NULL, NULL, hpke_mode, hpke_suite,
-                             ikm, ikmlen, lpub, &lpublen, &sk) != 1) {
+    if (OSSL_HPKE_keygen(NULL, NULL, hpke_mode, hpke_suite,
+                         ikm, ikmlen, lpub, &lpublen, &sk) != 1) {
         return (- __LINE__);
     }
     if (sk == NULL) return(- __LINE__);

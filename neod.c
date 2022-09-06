@@ -34,6 +34,13 @@
 
 #define MEMCHAR 0xfa
 
+#ifndef OSSL_HPKE_MAXSIZE
+#define OSSL_HPKE_MAXSIZE 1024
+#endif
+#ifndef OSSL_HPKE_DEFSIZE
+#define OSSL_HPKE_DEFSIZE (4 * 1024)
+#endif
+
 /*
  * Our Happykey wrapper for NSS stuff
  */
@@ -99,7 +106,7 @@ int main(int argc, char **argv)
 #define EVP
 #ifdef EVP
     EVP_PKEY *privevp=NULL;
-    int rv=OSSL_HPKE_keygen_evp(
+    int rv=OSSL_HPKE_keygen(
         NULL, NULL, hpke_mode, hpke_suite,
         NULL, 0, pub, &publen, &privevp);
     if (rv!=1) {
@@ -107,11 +114,11 @@ int main(int argc, char **argv)
         exit(1);
     } 
 #else
-    int rv=OSSL_HPKE_keygen(
+    int rv=OSSL_HPKE_keygen_buf(
         NULL, NULL, hpke_mode, hpke_suite,
         0, NULL, pub, &publen, priv, &privlen);
     if (rv!=1) {
-        fprintf(stderr,"Error (%d) from OSSL_HPKEkeygen\n",rv);
+        fprintf(stderr,"Error (%d) from OSSL_HPKE_keygen_buf\n",rv);
         exit(1);
     } 
 #endif

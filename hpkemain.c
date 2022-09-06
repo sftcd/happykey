@@ -29,6 +29,13 @@
 #include "hpketv.h"
 #endif
 
+#ifndef OSSL_HPKE_MAXSIZE
+#define OSSL_HPKE_MAXSIZE 1024
+#endif
+#ifndef OSSL_HPKE_DEFSIZE
+#define OSSL_HPKE_DEFSIZE (4 * 1024)
+#endif
+
 static int verbose=0; ///< global var for verbosity
 
 static void usage(char *prog,char *errmsg) 
@@ -199,7 +206,7 @@ static int map_input(const char *inp, size_t *outlen, unsigned char **outbuf, in
         if (!feof(stdin)) return(__LINE__);
     } else {
         toutlen=strlen(inp);
-        if (toutlen>OSSL_HPKE_MAXSIZE) return(__LINE__);
+        if (toutlen>OSSL_HPKE_DEFSIZE) return(__LINE__);
         FILE *fp=fopen(inp,"r"); /* check if inp is file name */
         if (fp) {
             /* that worked - so read file up to max into buffer */
@@ -287,12 +294,26 @@ static int map_input(const char *inp, size_t *outlen, unsigned char **outbuf, in
  * @return 1 for good
  */
 static int hpkemain_write_keys(
-        size_t publen, unsigned char *pub,
-        size_t privlen, unsigned char *priv,
+        size_t publen, unsigned char *pub, EVP_PKEY *privp,
         char *privname, char *pubname)
 {
     FILE *fp=NULL;
     size_t frv=0;
+    BIO *bfp = NULL;
+    unsigned char lpriv[OSSL_HPKE_MAXSIZE];
+    size_t lprivlen = OSSL_HPKE_MAXSIZE;
+
+    bfp = BIO_new(BIO_s_mem());
+    if (bfp == NULL) {
+        return(__LINE__);
+    }
+    if (!PEM_write_bio_PrivateKey(bfp, privp, NULL, NULL, 0, NULL, NULL)) {
+        return(__LINE__);
+    }
+    lprivlen = BIO_read(bfp, lpriv, OSSL_HPKE_MAXSIZE);
+    if (lprivlen <= 0) {
+        return(__LINE__);
+    }
     if (!privname) {
         return(__LINE__);
     }
@@ -308,17 +329,17 @@ static int hpkemain_write_keys(
         if ((fp=fopen(privname,"w"))==NULL) {
             return(__LINE__);
         }
-        frv=fwrite(priv,1,privlen,fp);
+        frv=fwrite(lpriv,1,lprivlen,fp);
         fclose(fp);
-        if (frv!=privlen) {
+        if (frv!=lprivlen) {
             return(__LINE__);
         }
     } else  {
         if ((fp=fopen(privname,"w"))==NULL) {
             return(__LINE__);
         }
-        frv=fwrite(priv,1,privlen,fp);
-        if (frv!=privlen) {
+        frv=fwrite(lpriv,1,lprivlen,fp);
+        if (frv!=lprivlen) {
             fclose(fp);
             return(__LINE__);
         }
@@ -772,14 +793,16 @@ int main(int argc, char **argv)
     if (generate) {
         size_t publen=OSSL_HPKE_MAXSIZE; unsigned char pub[OSSL_HPKE_MAXSIZE];
         size_t privlen=OSSL_HPKE_MAXSIZE; unsigned char priv[OSSL_HPKE_MAXSIZE];
+        EVP_PKEY *privp = NULL;
         int rv=OSSL_HPKE_keygen(
             NULL, NULL, hpke_mode, hpke_suite,
-            NULL, 0, pub, &publen, priv, &privlen);
+            NULL, 0, pub, &publen, &privp);
         if (rv!=1) {
             fprintf(stderr,"Error (%d) from OSSL_HPKE_keygen\n",rv);
             exit(3);
         }
-        rv=hpkemain_write_keys(publen, pub, privlen, priv,
+
+        rv=hpkemain_write_keys(publen, pub, privp,
                 priv_in,pub_in);
         if (rv!=1) {
             fprintf(stderr,"Error (%d) writing files (%s,%s)\n",rv,
@@ -806,7 +829,7 @@ int main(int argc, char **argv)
                 aad, aadlen,
                 info, infolen,
                 NULL,0, /* seq */
-                senderpub, &senderpublen,
+                senderpub, &senderpublen, NULL,
                 cipher, &cipherlen
 #ifdef TESTVECTORS
                 ,tv

@@ -27,6 +27,9 @@ High level notes:
 
 ## Recent Changes
 
+- 202200902: new API seal/open working, with export APIs, and more
+  test vectors, ECH interop to be checked again
+
 - 20220828: made quite a few changes based on review of our 
   [OpenSSL HPKE PR](https://github.com/openssl/openssl/pull/17172). Many
   fairly trivial, but one required adding a shim for the otherwise

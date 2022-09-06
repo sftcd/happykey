@@ -35,6 +35,13 @@
 
 #define MEMCHAR 0xfa
 
+#ifndef OSSL_HPKE_MAXSIZE
+#define OSSL_HPKE_MAXSIZE 1024
+#endif
+#ifndef OSSL_HPKE_DEFSIZE
+#define OSSL_HPKE_DEFSIZE (4 * 1024)
+#endif
+
 /*!
  * @brief for odd/occasional debugging
  *
@@ -86,8 +93,8 @@ int main(int argc, char **argv)
     memset(priv,MEMCHAR,privlen);
 
     EVP_PKEY *privevp=NULL;
-    int rv=OSSL_HPKE_keygen_evp(NULL, NULL, hpke_mode, hpke_suite,
-                                NULL, 0, pub, &publen, &privevp);
+    int rv=OSSL_HPKE_keygen(NULL, NULL, hpke_mode, hpke_suite,
+                            NULL, 0, pub, &publen, &privevp);
     if (rv!=1) {
         fprintf(stderr,"Error (%d) from OSSL_HPKE_keygen (receiver)\n",rv);
         exit(1);
@@ -96,8 +103,8 @@ int main(int argc, char **argv)
 
     EVP_PKEY *senderpriv=NULL;
     size_t senderpublen=OSSL_HPKE_MAXSIZE; unsigned char senderpub[OSSL_HPKE_MAXSIZE];
-    rv=OSSL_HPKE_keygen_evp(NULL, NULL, hpke_mode, hpke_suite,
-                            NULL, 0, senderpub, &senderpublen, &senderpriv);
+    rv=OSSL_HPKE_keygen(NULL, NULL, hpke_mode, hpke_suite,
+                        NULL, 0, senderpub, &senderpublen, &senderpriv);
     if (rv!=1) {
         fprintf(stderr,"Error (%d) from OSSL_HPKE_keygen (sender)\n",rv);
         exit(1);
