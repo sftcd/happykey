@@ -27,6 +27,9 @@ High level notes:
 
 ## Recent Changes
 
+- 20020906: these changes are now merged into master, so this
+  branch is done with probably
+
 - 202200902: new API seal/open working, with export APIs, and more
   test vectors, ECH interop to be checked again
 
