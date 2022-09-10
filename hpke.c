@@ -272,8 +272,8 @@ struct ossl_hpke_ctx_st
     size_t psklen;
     EVP_PKEY *senderpriv; /**< sender's ephemeral private key */
 #ifdef OSSL_KEM_PARAM_OPERATION_DHKEM
-    //unsigned char *enc;
-    //size_t enclen;
+    char *ikme;
+    size_t ikmelen;
 #endif
     EVP_PKEY *authpriv; /**< sender's authentication private key */
     unsigned char *authpub; /**< auth public key */
@@ -3550,6 +3550,7 @@ void OSSL_HPKE_CTX_free(OSSL_HPKE_CTX *ctx)
     OPENSSL_free(ctx->psk);
 #ifdef OSSL_KEM_PARAM_OPERATION_DHKEM
     OPENSSL_free(ctx->shared_secret);
+    OPENSSL_free(ctx->ikme);
 #endif
 
     EVP_PKEY_free(ctx->authpriv);
@@ -3631,6 +3632,35 @@ int OSSL_HPKE_CTX_set1_senderpriv(OSSL_HPKE_CTX *ctx, EVP_PKEY *privp)
         return 0;
     return 1;
 }
+
+#ifdef OSSL_KEM_PARAM_OPERATION_DHKEM
+/**
+ * @brief set a sender IKM for key DHKEM generation
+ * @param ctx is the pointer for the HPKE context
+ * @param ikme is a buffer for the IKM
+ * @param ikmelen is the length of the above
+ * @return 1 for success, 0 for error
+ */
+int OSSL_HPKE_CTX_set1_ikme(OSSL_HPKE_CTX *ctx,
+                            const unsigned char *ikme, size_t ikmelen)
+{
+#ifdef HAPPYKEY
+    int erv = 1;
+
+#endif
+    if (ctx == NULL || ikme == NULL) {
+        ERR_raise(ERR_LIB_CRYPTO, ERR_R_INTERNAL_ERROR);
+        return 0;
+    }
+    OPENSSL_free(ctx->ikme);
+    ctx->ikme = OPENSSL_malloc(ikmelen);
+    if (ctx->ikme == NULL)
+        return 0;
+    memcpy(ctx->ikme, ikme, ikmelen);
+    ctx->ikmelen = ikmelen;
+    return 1;
+}
+#endif
 
 /**
  * @brief set a private key for HPKE authenticated modes
@@ -3785,35 +3815,12 @@ static int hpke_new_shared_secret(OSSL_HPKE_CTX *ctx,
     *p++ = OSSL_PARAM_construct_utf8_string(
                         OSSL_KEM_PARAM_OPERATION,
                         (char *)OSSL_KEM_PARAM_OPERATION_DHKEM, 0);
-    if (ctx->senderpriv != NULL) {
-#if 0
-        unsigned char *pp = NULL;
-        size_t pplen = 0;
-
-        pplen = i2d_PrivateKey(ctx->senderpriv, &pp);
-        if (pplen <= 0) {
-            erv = 0;
-            ERR_raise(ERR_LIB_CRYPTO, ERR_R_INTERNAL_ERROR);
-            goto err;
-        }
+    if (ctx->ikme != NULL) {
 #if defined(SUPERVERBOSE) || defined(TESTVECTORS)
-        hpke_pbuf(stdout, "\tpp", pp, pplen);
+        hpke_pbuf(stdout, "\tikme", ctx->ikme, sizeof(ctx->ikme));
 #endif
-        *p++ = OSSL_PARAM_construct_utf8_string(OSSL_PKEY_PARAM_PRIV_KEY,
-                                                pp, pplen);
-#endif
-        unsigned char ikme[] = {
-            0x72, 0x68, 0x60, 0x0d, 0x40, 0x3f, 0xce, 0x43,
-            0x15, 0x61, 0xae, 0xf5, 0x83, 0xee, 0x16, 0x13,
-            0x52, 0x7c, 0xff, 0x65, 0x5c, 0x13, 0x43, 0xf2,
-            0x98, 0x12, 0xe6, 0x67, 0x06, 0xdf, 0x32, 0x34,
-            0x00
-        };
-#if defined(SUPERVERBOSE) || defined(TESTVECTORS)
-        hpke_pbuf(stdout, "\tikm", ikme, sizeof(ikme));
-#endif
-        *p++ = OSSL_PARAM_construct_octet_string(OSSL_PKEY_PARAM_DHKEM_IKM,
-                                               (char *)ikme, sizeof(ikme));
+        *p++ = OSSL_PARAM_construct_octet_string(OSSL_KEM_PARAM_IKME,
+                                               ctx->ikme, ctx->ikmelen);
     }
     *p = OSSL_PARAM_construct_end();
     if (ctx->mode == OSSL_HPKE_MODE_AUTH

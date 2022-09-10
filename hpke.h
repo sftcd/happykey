@@ -143,6 +143,18 @@ int OSSL_HPKE_CTX_set1_psk(OSSL_HPKE_CTX *ctx,
  */
 int OSSL_HPKE_CTX_set1_senderpriv(OSSL_HPKE_CTX *ctx, EVP_PKEY *privp);
 
+#ifdef OSSL_KEM_PARAM_OPERATION_DHKEM
+/**
+ * @brief set a sender IKM for key DHKEM generation
+ * @param ctx is the pointer for the HPKE context
+ * @param ikme is a buffer for the IKM
+ * @param ikmelen is the length of the above
+ * @return 1 for success, 0 for error
+ */
+int OSSL_HPKE_CTX_set1_ikme(OSSL_HPKE_CTX *ctx,
+                            const unsigned char *ikme, size_t ikmelen);
+#endif
+
 /**
  * @brief set a sender private key for HPKE authenticated modes
  * @param ctx is the pointer for the HPKE context

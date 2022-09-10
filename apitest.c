@@ -230,6 +230,10 @@ static int do_testhpke(const TEST_BASEDATA *base,
         goto end;
     if (!TEST_true(OSSL_HPKE_CTX_set1_senderpriv(sealctx, privE)))
         goto end;
+#ifdef OSSL_KEM_PARAM_OPERATION_DHKEM
+    if (!TEST_true(OSSL_HPKE_CTX_set1_ikme(sealctx, base->ikmE, base->ikmElen)))
+        goto end;
+#endif
     if (base->mode == OSSL_HPKE_MODE_AUTH
         || base->mode == OSSL_HPKE_MODE_PSKAUTH) {
         if (!TEST_true(base->ikmAuth != NULL && base->ikmAuthlen > 0))
