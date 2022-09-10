@@ -1701,28 +1701,28 @@ int main(int argc, char **argv)
 
     apires = test_hpke();
     if (apires == 1) {
-        printf("My API test success\n");
+        printf("Round-trip test success\n");
     } else {
-        printf("MY API test fail (%d)\n", apires);
+        printf("Round-trip test fail (%d)\n", apires);
     }
     if (apires == 1) {
         apires = x25519kdfsha256_hkdfsha256_aes128gcm_base_test();
         if (apires == 1) {
-            printf("slontis API test success\n");
+            printf("Test vector 1 success\n");
         } else {
-            printf("API test fail (%d)\n", apires);
+            printf("Teat vector 1 fail (%d)\n", apires);
         }
         apires = x25519kdfsha256_hkdfsha256_aes128gcm_psk_test();
         if (apires == 1) {
-            printf("slontis API test 2 success\n");
+            printf("Test vector 2 success\n");
         } else {
-            printf("slontis API test 2 fail (%d)\n", apires);
+            printf("Teat vector 2 fail (%d)\n", apires);
         }
         apires = P256kdfsha256_hkdfsha256_aes128gcm_base_test();
         if (apires == 1) {
-            printf("slontis API test 3 success\n");
+            printf("Test vector 3 success\n");
         } else {
-            printf("slontis API test 3 fail (%d)\n", apires);
+            printf("Test vector 3 fail (%d)\n", apires);
         }
     }
     return apires;

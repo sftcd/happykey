@@ -44,7 +44,7 @@
  * Define this for LOADS of printing of intermediate cryptographic values
  * Really only needed when new crypto added (hopefully)
  */
-# define SUPERVERBOSE
+# undef SUPERVERBOSE
 # ifdef TESTVECTORS
 #  include "hpketv.h"
 # endif
@@ -261,7 +261,7 @@ struct ossl_hpke_ctx_st
     OSSL_HPKE_SUITE suite; /**< suite */
     uint64_t seq; /**< sequence number */
 #ifdef OSSL_KEM_PARAM_OPERATION_DHKEM
-#warning "Slontis approach"
+#warning "DHKEM approach"
     unsigned char *shared_secret;
     size_t shared_secretlen;
 #endif
@@ -547,7 +547,7 @@ err:
 #if defined(SUPERVERBOSE) || defined(TESTVECTORS)
     if (ret != NULL) {
         pblen = EVP_PKEY_get1_encoded_public_key(ret, &pbuf);
-        hpke_pbuf(stdout, "EARLY public", pbuf, pblen);
+        hpke_pbuf(stdout, "\tEARLY public", pbuf, pblen);
         OPENSSL_free(pbuf);
     } else {
         printf("no EARLY public\n");
@@ -3771,9 +3771,8 @@ static int hpke_seq2buf(uint64_t seq, unsigned char *buf, size_t blen)
 }
 
 #ifdef OSSL_KEM_PARAM_OPERATION_DHKEM
-static int hpke_new_shared_secret(OSSL_HPKE_CTX *ctx,
-                                  unsigned char *enc, size_t *enclen,
-                                  const unsigned char *pub, size_t publen)
+static int hpke_encap(OSSL_HPKE_CTX *ctx, unsigned char *enc, size_t *enclen,
+                      const unsigned char *pub, size_t publen)
 {
     int erv = 1;
     OSSL_PARAM params[3], *p = params;
@@ -3872,6 +3871,106 @@ err:
               ctx->shared_secretlen);
 #endif
     EVP_PKEY_CTX_free(pctx);
+    EVP_PKEY_free(pkR);
+    return erv;
+}
+
+static int hpke_decap(OSSL_HPKE_CTX *ctx,
+                      const unsigned char *enc, size_t enclen,
+                      EVP_PKEY *priv)
+{
+    int erv = 1;
+    EVP_PKEY_CTX *pctx = NULL;
+    EVP_PKEY *spub = NULL;
+    OSSL_PARAM params[3], *p = params;
+    size_t secretlen;
+    unsigned char secret[OSSL_HPKE_MAXSIZE];
+
+    pctx = EVP_PKEY_CTX_new_from_pkey(ctx->libctx, priv, ctx->propq);
+    if (pctx == NULL) {
+        erv = 0;
+        ERR_raise(ERR_LIB_CRYPTO, ERR_R_INTERNAL_ERROR);
+        goto err;
+    }
+    *p++ = OSSL_PARAM_construct_utf8_string(
+                        OSSL_KEM_PARAM_OPERATION,
+                        (char *)OSSL_KEM_PARAM_OPERATION_DHKEM, 0);
+    *p = OSSL_PARAM_construct_end();
+    if (ctx->mode == OSSL_HPKE_MODE_AUTH
+        || ctx->mode == OSSL_HPKE_MODE_PSKAUTH) {
+        int kem_ind = 0;
+
+        kem_ind = kem_iana2index(ctx->suite.kem_id);
+        if (kem_ind == 0) {
+            erv = 0;
+            ERR_raise(ERR_LIB_CRYPTO, ERR_R_INTERNAL_ERROR);
+            goto err;
+        }
+        if (hpke_kem_id_nist_curve(ctx->suite.kem_id) == 1) {
+            spub = EVP_PKEY_new_raw_nist_public_key(ctx->libctx, ctx->propq,
+                                                    hpke_kem_tab[kem_ind].
+                                                    groupid,
+                                                    hpke_kem_tab[kem_ind].
+                                                    groupname,
+                                                    ctx->authpub,
+                                                    ctx->authpublen);
+        } else {
+            spub = EVP_PKEY_new_raw_public_key_ex(ctx->libctx,
+                                                  hpke_kem_tab[kem_ind].keytype,
+                                                  ctx->propq,
+                                                  ctx->authpub, ctx->authpublen);
+        }
+        if (spub == NULL) {
+            erv = 0;
+            ERR_raise(ERR_LIB_CRYPTO, ERR_R_INTERNAL_ERROR);
+            goto err;
+        }
+        if (EVP_PKEY_auth_decapsulate_init(pctx, spub, params) != 1) {
+            erv = 0;
+            ERR_raise(ERR_LIB_CRYPTO, ERR_R_INTERNAL_ERROR);
+            goto err;
+        }
+    } else {
+        if (EVP_PKEY_decapsulate_init(pctx, params) != 1) {
+            erv = 0;
+            ERR_raise(ERR_LIB_CRYPTO, ERR_R_INTERNAL_ERROR);
+            goto err;
+        }
+    }
+    erv = EVP_PKEY_decapsulate(pctx, NULL, &secretlen, enc, enclen);
+    if (erv != 1) {
+        ERR_raise(ERR_LIB_CRYPTO, ERR_R_INTERNAL_ERROR);
+        goto err;
+    }
+    if (secretlen > OSSL_HPKE_MAXSIZE) {
+        erv = 0;
+        ERR_raise(ERR_LIB_CRYPTO, ERR_R_INTERNAL_ERROR);
+        goto err;
+    }
+    erv = EVP_PKEY_decapsulate(pctx, secret, &secretlen, enc, enclen);
+    if (erv != 1) {
+        ERR_raise(ERR_LIB_CRYPTO, ERR_R_INTERNAL_ERROR);
+        goto err;
+    }
+    EVP_PKEY_CTX_free(pctx); pctx = NULL;
+    OPENSSL_free(ctx->shared_secret); /* in case of 2nd call */
+    ctx->shared_secret = OPENSSL_malloc(secretlen);
+    if (ctx->shared_secret == NULL) {
+        erv = 0;
+        ERR_raise(ERR_LIB_CRYPTO, ERR_R_INTERNAL_ERROR);
+        goto err;
+    }
+    ctx->shared_secretlen = secretlen;
+    memcpy(ctx->shared_secret,secret,secretlen);
+
+err:
+#if defined(SUPERVERBOSE) || defined(TESTVECTORS)
+    hpke_pbuf(stdout, "\tenc", enc, enclen);
+    hpke_pbuf(stdout, "\tshared_secret", ctx->shared_secret,
+              ctx->shared_secretlen);
+#endif
+    EVP_PKEY_CTX_free(pctx);
+    EVP_PKEY_free(spub);
     return erv;
 }
 
@@ -3902,7 +4001,7 @@ static int hpke_do_rest(OSSL_HPKE_CTX *ctx, int do_enc,
     int kem_ind = 0;
 #endif
 
-    /* step 3. create context buffer starting with key_schedule_context */
+    /* create context buffer starting with key_schedule_context */
     memset(ks_context, 0, OSSL_HPKE_MAXSIZE);
     ks_context[0] = (unsigned char)(ctx->mode % 256);
     ks_contextlen--;
@@ -3932,7 +4031,7 @@ static int hpke_do_rest(OSSL_HPKE_CTX *ctx, int do_enc,
         goto err;
     }
     ks_contextlen += 1 + halflen;
-    /* step 4. extracts and expands as needed */
+    /*  extracts and expands as needed */
 #ifdef TESTVECTORS
     hpke_test_expand_extract();
 #endif
@@ -3947,9 +4046,6 @@ static int hpke_do_rest(OSSL_HPKE_CTX *ctx, int do_enc,
         ERR_raise(ERR_LIB_CRYPTO, ERR_R_INTERNAL_ERROR);
         goto err;
     }
-#if defined(SUPERVERBOSE) || defined(TESTVECTORS)
-    hpke_pbuf(stdout, "\tpsk_hash", psk_hash, psk_hashlen);
-#endif
     kdf_ind = kdf_iana2index(ctx->suite.kdf_id);
     if (kdf_ind == 0) {
         erv = 0;
@@ -4026,22 +4122,25 @@ static int hpke_do_rest(OSSL_HPKE_CTX *ctx, int do_enc,
         ERR_raise(ERR_LIB_CRYPTO, ERR_R_INTERNAL_ERROR);
         goto err;
     }
-    ctx->exporterseclen = hpke_kdf_tab[kdf_ind].Nh;
-    ctx->exportersec = OPENSSL_malloc(ctx->exporterseclen);
     if (ctx->exportersec == NULL) {
-        erv = 0;
-        ERR_raise(ERR_LIB_CRYPTO, ERR_R_INTERNAL_ERROR);
-        goto err;
-    }
-    erv = hpke_expand(ctx->libctx, ctx->propq, ctx->suite,
-                      OSSL_HPKE_5869_MODE_FULL,
-                      secret, secretlen,
-                      OSSL_HPKE_EXP_LABEL, strlen(OSSL_HPKE_EXP_LABEL),
-                      ks_context, ks_contextlen,
-                      ctx->exporterseclen, ctx->exportersec, &ctx->exporterseclen);
-    if (erv != 1) {
-        ERR_raise(ERR_LIB_CRYPTO, ERR_R_INTERNAL_ERROR);
-        goto err;
+        ctx->exporterseclen = hpke_kdf_tab[kdf_ind].Nh;
+        ctx->exportersec = OPENSSL_malloc(ctx->exporterseclen);
+        if (ctx->exportersec == NULL) {
+            erv = 0;
+            ERR_raise(ERR_LIB_CRYPTO, ERR_R_INTERNAL_ERROR);
+            goto err;
+        }
+        erv = hpke_expand(ctx->libctx, ctx->propq, ctx->suite,
+                          OSSL_HPKE_5869_MODE_FULL,
+                          secret, secretlen,
+                          OSSL_HPKE_EXP_LABEL, strlen(OSSL_HPKE_EXP_LABEL),
+                          ks_context, ks_contextlen,
+                          ctx->exporterseclen, ctx->exportersec,
+                          &ctx->exporterseclen);
+        if (erv != 1) {
+            ERR_raise(ERR_LIB_CRYPTO, ERR_R_INTERNAL_ERROR);
+            goto err;
+        }
     }
 
     /* step 5. call the AEAD */
@@ -4065,10 +4164,12 @@ err:
            hpke_kem_strtab[kem_ind], ctx->suite.kem_id,
            hpke_kdf_strtab[kdf_ind], ctx->suite.kdf_id,
            hpke_aead_strtab[aead_ind], ctx->suite.aead_id);
+    hpke_pbuf(stdout, "\tpsk_hash", psk_hash, psk_hashlen);
     hpke_pbuf(stdout, "\tks_context", ks_context, ks_contextlen);
     hpke_pbuf(stdout, "\tsecret", secret, secretlen);
     hpke_pbuf(stdout, "\tinfo", info, infolen);
     hpke_pbuf(stdout, "\taad", aad, aadlen);
+    hpke_pbuf(stdout, "\tseq", seqbuf, seqlen);
     hpke_pbuf(stdout, "\tnonce", nonce, noncelen);
     hpke_pbuf(stdout, "\tkey", key, keylen);
     hpke_pbuf(stdout, "\texportersec", ctx->exportersec, ctx->exporterseclen);
@@ -4136,15 +4237,21 @@ int OSSL_HPKE_sender_seal(OSSL_HPKE_CTX *ctx,
 
 #ifdef OSSL_KEM_PARAM_OPERATION_DHKEM
 #if defined(SUPERVERBOSE) || defined(TESTVECTORS)
-    printf("Encrypting:\n");
+    printf("DHKEM Encrypting:\n");
 #endif
     if (ctx->shared_secret == NULL) {
-        erv = hpke_new_shared_secret(ctx, enc, enclen, pub, publen);
+        erv = hpke_encap(ctx, enc, enclen, pub, publen);
         if (erv != 1) {
             ERR_raise(ERR_LIB_CRYPTO, ERR_R_INTERNAL_ERROR);
             return 0;
         }
     }
+#if defined(SUPERVERBOSE) || defined(TESTVECTORS)
+     else {
+        hpke_pbuf(stdout, "\texisting shared secret", ctx->shared_secret,
+                  ctx->shared_secretlen);
+     }
+#endif
     erv = hpke_do_rest(ctx, 1, ct, ctlen, (unsigned char *)pt, &ptlen,
                         info, infolen, aad, aadlen);
     if (erv != 1) {
@@ -4246,6 +4353,32 @@ int OSSL_HPKE_recipient_open(OSSL_HPKE_CTX *ctx,
         ERR_raise(ERR_LIB_CRYPTO, ERR_R_INTERNAL_ERROR);
         return 0;
     }
+#ifdef OSSL_KEM_PARAM_OPERATION_DHKEM
+#if defined(SUPERVERBOSE) || defined(TESTVECTORS)
+    printf("DHKEM Decrypting:\n");
+#endif
+    if (ctx->shared_secret == NULL) {
+        erv = hpke_decap(ctx, enc, enclen, recippriv);
+        if (erv != 1) {
+            ERR_raise(ERR_LIB_CRYPTO, ERR_R_INTERNAL_ERROR);
+            return 0;
+        }
+    }
+#if defined(SUPERVERBOSE) || defined(TESTVECTORS)
+     else {
+        hpke_pbuf(stdout, "\texisting shared secret", ctx->shared_secret,
+                  ctx->shared_secretlen);
+     }
+#endif
+    erv = hpke_do_rest(ctx, 0, (unsigned char *)ct, &ctlen, pt, ptlen,
+                        info, infolen, aad, aadlen);
+    if (erv != 1) {
+        ERR_raise(ERR_LIB_CRYPTO, ERR_R_INTERNAL_ERROR);
+        return 0;
+    } else {
+        ctx->seq++;
+    }
+#else
     seqlen = hpke_seq2buf(ctx->seq, seqbuf, 12);
     if (seqlen == 0) {
         ERR_raise(ERR_LIB_CRYPTO, ERR_R_INTERNAL_ERROR);
@@ -4283,6 +4416,7 @@ int OSSL_HPKE_recipient_open(OSSL_HPKE_CTX *ctx,
         ERR_raise(ERR_LIB_CRYPTO, ERR_R_INTERNAL_ERROR);
         return 0;
     }
+#endif
     return erv;
 }
 
