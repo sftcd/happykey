@@ -20,9 +20,11 @@
 # VERBOSE=yes
 
 # just in case...
-BINDIR=$HOME/code/happykey
+BINDIR=$HOME/code/happykey-ecxdhkem
 # LD_LIBRARY_PATH...
 . $BINDIR/env
+# special setting
+export LD_LIBRARY_PATH=$HOME/code/openssl-slontis
 
 if [ ! -f $BINDIR/hpkemain ]
 then

@@ -44,7 +44,7 @@
  * Define this for LOADS of printing of intermediate cryptographic values
  * Really only needed when new crypto added (hopefully)
  */
-# undef SUPERVERBOSE
+# define SUPERVERBOSE
 # ifdef TESTVECTORS
 #  include "hpketv.h"
 # endif
@@ -2394,6 +2394,7 @@ err:
     hpke_pbuf(stdout, "\tenc", enc, enclen);
     hpke_pbuf(stdout, "\tinfo", info, infolen);
     hpke_pbuf(stdout, "\taad", aad, aadlen);
+    hpke_pbuf(stdout, "\tseq", seq, seqlen);
     hpke_pbuf(stdout, "\tnonce", nonce, noncelen);
     hpke_pbuf(stdout, "\tkey", key, keylen);
     hpke_pbuf(stdout, "\texportersec", exportersec, exporterseclen);
@@ -3699,7 +3700,7 @@ int OSSL_HPKE_CTX_set1_authpriv(OSSL_HPKE_CTX *ctx, EVP_PKEY *privp)
  * @return 1 for success, 0 for error
  */
 int OSSL_HPKE_CTX_set1_authpub(OSSL_HPKE_CTX *ctx,
-                               unsigned char *pub, size_t publen)
+                               const unsigned char *pub, size_t publen)
 {
     if (ctx == NULL)
         return 0;
@@ -4237,7 +4238,7 @@ int OSSL_HPKE_sender_seal(OSSL_HPKE_CTX *ctx,
 
 #ifdef OSSL_KEM_PARAM_OPERATION_DHKEM
 #if defined(SUPERVERBOSE) || defined(TESTVECTORS)
-    printf("DHKEM Encrypting:\n");
+    printf("DHKEM Sealing:\n");
 #endif
     if (ctx->shared_secret == NULL) {
         erv = hpke_encap(ctx, enc, enclen, pub, publen);
@@ -4260,6 +4261,7 @@ int OSSL_HPKE_sender_seal(OSSL_HPKE_CTX *ctx,
     } else {
         ctx->seq++;
     }
+
 #else
     seqlen = hpke_seq2buf(ctx->seq, seqbuf, 12);
     if (seqlen == 0) {
@@ -4355,7 +4357,7 @@ int OSSL_HPKE_recipient_open(OSSL_HPKE_CTX *ctx,
     }
 #ifdef OSSL_KEM_PARAM_OPERATION_DHKEM
 #if defined(SUPERVERBOSE) || defined(TESTVECTORS)
-    printf("DHKEM Decrypting:\n");
+    printf("DHKEM Opening:\n");
 #endif
     if (ctx->shared_secret == NULL) {
         erv = hpke_decap(ctx, enc, enclen, recippriv);
@@ -4706,6 +4708,85 @@ int OSSL_HPKE_enc(OSSL_LIB_CTX *libctx, const char *propq,
                         cipherlen, cipher, tv);
 
 #else
+
+#ifdef OSSL_KEM_PARAM_OPERATION_DHKEM
+    int erv = 1;
+    OSSL_HPKE_CTX *ctx = NULL;
+
+#if defined(SUPERVERBOSE) || defined(TESTVECTORS)
+    printf("DHKEM Encrypting:\n");
+#endif
+    ctx = OSSL_HPKE_CTX_new(mode, suite, libctx, propq);
+    if (!ctx) {
+        ERR_raise(ERR_LIB_CRYPTO, ERR_R_INTERNAL_ERROR);
+        return 0;
+    }
+    if (seq != NULL) {
+        /* need to map to uint64_t and use setter */
+        uint64_t sval = 0;
+        int i;
+
+        if (seqlen > 8) {
+            ERR_raise(ERR_LIB_CRYPTO, ERR_R_INTERNAL_ERROR);
+            return 0;
+        }
+        for (i = 0; i!= seqlen; i++) {
+            sval = sval * 256 + seq[i];
+        }
+        erv = OSSL_HPKE_CTX_set1_seq(ctx, sval);
+        if (erv != 1) {
+            ERR_raise(ERR_LIB_CRYPTO, ERR_R_INTERNAL_ERROR);
+            return 0;
+        }
+    }
+    if (ctx->mode == OSSL_HPKE_MODE_AUTH
+        || ctx->mode == OSSL_HPKE_MODE_PSKAUTH) {
+        if (authpriv_evp != NULL) {
+            erv = OSSL_HPKE_CTX_set1_authpriv(ctx, authpriv_evp);
+            if (erv != 1) {
+                ERR_raise(ERR_LIB_CRYPTO, ERR_R_INTERNAL_ERROR);
+                return 0;
+            }
+        } else {
+            EVP_PKEY *tpriv = NULL;
+
+            erv = hpke_prbuf2evp(libctx, propq, suite.kem_id,
+                                 authpriv, authprivlen,
+                                 NULL, 0, &tpriv);
+            if (erv != 1) {
+                ERR_raise(ERR_LIB_CRYPTO, ERR_R_INTERNAL_ERROR);
+                return 0;
+            }
+            erv = OSSL_HPKE_CTX_set1_authpriv(ctx, tpriv);
+            if (erv != 1) {
+                ERR_raise(ERR_LIB_CRYPTO, ERR_R_INTERNAL_ERROR);
+                return 0;
+            }
+            EVP_PKEY_free(tpriv);
+        }
+    }
+    if (ctx->mode == OSSL_HPKE_MODE_PSK
+        || ctx->mode == OSSL_HPKE_MODE_PSKAUTH) {
+        erv = OSSL_HPKE_CTX_set1_psk(ctx, pskid, psk, psklen);
+        if (erv != 1) {
+            ERR_raise(ERR_LIB_CRYPTO, ERR_R_INTERNAL_ERROR);
+            return 0;
+        }
+    }
+    erv = hpke_encap(ctx, senderpub, senderpublen, pub, publen);
+    if (erv != 1) {
+        ERR_raise(ERR_LIB_CRYPTO, ERR_R_INTERNAL_ERROR);
+        return 0;
+    }
+    erv = hpke_do_rest(ctx, 1, cipher, cipherlen,
+                       (unsigned char *)clear, &clearlen,
+                       info, infolen, aad, aadlen);
+    if (erv != 1) {
+        ERR_raise(ERR_LIB_CRYPTO, ERR_R_INTERNAL_ERROR);
+        return 0;
+    } 
+    return erv;
+#else
     if (senderpublen == NULL)
         return 0;
     return hpke_enc_int(libctx, propq, mode, suite,
@@ -4721,6 +4802,7 @@ int OSSL_HPKE_enc(OSSL_LIB_CTX *libctx, const char *propq,
                         NULL, NULL, /* exporter sec */
                         senderpublen, senderpub,
                         cipherlen, cipher);
+#endif
 #endif
 }
 
@@ -4864,6 +4946,84 @@ int OSSL_HPKE_dec(OSSL_LIB_CTX *libctx, const char *propq,
                   const unsigned char *seq, size_t seqlen,
                   unsigned char *clear, size_t *clearlen)
 {
+#ifdef OSSL_KEM_PARAM_OPERATION_DHKEM
+    int erv = 1;
+    OSSL_HPKE_CTX *ctx = NULL;
+
+#if defined(SUPERVERBOSE) || defined(TESTVECTORS)
+    printf("DHKEM Decrypting:\n");
+#endif
+    ctx = OSSL_HPKE_CTX_new(mode, suite, libctx, propq);
+    if (!ctx) {
+        ERR_raise(ERR_LIB_CRYPTO, ERR_R_INTERNAL_ERROR);
+        return 0;
+    }
+    if (seq != NULL) {
+        /* need to map to uint64_t and use setter */
+        uint64_t sval = 0;
+        int i;
+
+        if (seqlen > 8) {
+            ERR_raise(ERR_LIB_CRYPTO, ERR_R_INTERNAL_ERROR);
+            return 0;
+        }
+        for (i = 0; i!= seqlen; i++) {
+            sval = sval * 256 + seq[i];
+        }
+        erv = OSSL_HPKE_CTX_set1_seq(ctx, sval);
+        if (erv != 1) {
+            ERR_raise(ERR_LIB_CRYPTO, ERR_R_INTERNAL_ERROR);
+            return 0;
+        }
+    }
+    if (ctx->mode == OSSL_HPKE_MODE_AUTH
+        || ctx->mode == OSSL_HPKE_MODE_PSKAUTH) {
+        erv = OSSL_HPKE_CTX_set1_authpub(ctx, pub, publen);
+        if (erv != 1) {
+            ERR_raise(ERR_LIB_CRYPTO, ERR_R_INTERNAL_ERROR);
+            return 0;
+        }
+    }
+    if (ctx->mode == OSSL_HPKE_MODE_PSK
+        || ctx->mode == OSSL_HPKE_MODE_PSKAUTH) {
+        erv = OSSL_HPKE_CTX_set1_psk(ctx, pskid, psk, psklen);
+        if (erv != 1) {
+            ERR_raise(ERR_LIB_CRYPTO, ERR_R_INTERNAL_ERROR);
+            return 0;
+        }
+    }
+    if (evppriv != NULL) {
+        erv = hpke_decap(ctx, enc, enclen, evppriv);
+        if (erv != 1) {
+            ERR_raise(ERR_LIB_CRYPTO, ERR_R_INTERNAL_ERROR);
+            return 0;
+        }
+    } else {
+        EVP_PKEY *tpriv = NULL;
+
+        erv = hpke_prbuf2evp(libctx, propq, suite.kem_id,
+                             priv, privlen,
+                             NULL, 0, &tpriv);
+        if (erv != 1) {
+            ERR_raise(ERR_LIB_CRYPTO, ERR_R_INTERNAL_ERROR);
+            return 0;
+        }
+        erv = hpke_decap(ctx, enc, enclen, tpriv);
+        if (erv != 1) {
+            ERR_raise(ERR_LIB_CRYPTO, ERR_R_INTERNAL_ERROR);
+            return 0;
+        }
+        EVP_PKEY_free(tpriv);
+    }
+    erv = hpke_do_rest(ctx, 0, (unsigned char *)cipher, &cipherlen,
+                       clear, clearlen,
+                       info, infolen, aad, aadlen);
+    if (erv != 1) {
+        ERR_raise(ERR_LIB_CRYPTO, ERR_R_INTERNAL_ERROR);
+        return 0;
+    } 
+    return erv;
+#else
     return hpke_dec_int(libctx, propq, mode, suite,
                         pskid, psklen, psk,
                         publen, pub,
@@ -4875,4 +5035,5 @@ int OSSL_HPKE_dec(OSSL_LIB_CTX *libctx, const char *propq,
                         seqlen, seq,
                         NULL, NULL, /* exporter */
                         clearlen, clear);
+#endif
 }

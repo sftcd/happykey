@@ -28,7 +28,9 @@ High level notes:
 ## Recent Changes
 
 - 20220910: playing more with @slontis DHKEM stuff. Working now for
-  round-trips and test vectors and leak-checked.
+  round-trips and test vectors and leak-checked. Changed the (soon
+  to be legacy) ``OSSL_HPKE_enc|dec`` APIs to use DHKEM stuff. (That'll
+  allow deleting a lot of old code once DHKEM PR is merged.)
 
 - 202200906: new API seal/open working, with export APIs, and more
   test vectors, ECH interop tested

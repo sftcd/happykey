@@ -174,7 +174,7 @@ int OSSL_HPKE_CTX_set1_authpriv(OSSL_HPKE_CTX *ctx, EVP_PKEY *privp);
  * private keys as passed as EVP_PKEY pointers.
  */
 int OSSL_HPKE_CTX_set1_authpub(OSSL_HPKE_CTX *ctx,
-                               unsigned char *pub,
+                               const unsigned char *pub,
                                size_t publen);
 
 /**
