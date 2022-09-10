@@ -28,7 +28,8 @@ High level notes:
 ## Recent Changes
 
 - 20220910: playing more with @slontis KEM stuff. Working for ephemeral
-  client key gen but not deterministic.
+  client key gen enc and deterministic. Need to make decryption code use
+  slontis' DHKEM stuff too still.
 
 - 202200906: new API seal/open working, with export APIs, and more
   test vectors, ECH interop tested
