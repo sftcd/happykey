@@ -458,7 +458,7 @@ static int x25519kdfsha256_hkdfsha256_aes128gcm_psk_test(void)
         /* "X25519", NULL, "SHA256", "SHA256", "AES-128-GCM", */
         OSSL_HPKE_MODE_PSK,
         {
-            OSSL_HPKE_KEM_ID_25519,
+            OSSL_HPKE_KEM_ID_X25519,
             OSSL_HPKE_KDF_ID_HKDF_SHA256,
             OSSL_HPKE_AEAD_ID_AES_GCM_128
         },
@@ -584,7 +584,7 @@ static int x25519kdfsha256_hkdfsha256_aes128gcm_base_test(void)
     const TEST_BASEDATA basedata = {
         OSSL_HPKE_MODE_BASE,
         {
-            OSSL_HPKE_KEM_ID_25519,
+            OSSL_HPKE_KEM_ID_X25519,
             OSSL_HPKE_KDF_ID_HKDF_SHA256,
             OSSL_HPKE_AEAD_ID_AES_GCM_128
         },
@@ -767,8 +767,8 @@ static uint16_t hpke_kem_list[] = {
     OSSL_HPKE_KEM_ID_P256,
     OSSL_HPKE_KEM_ID_P384,
     OSSL_HPKE_KEM_ID_P521,
-    OSSL_HPKE_KEM_ID_25519,
-    OSSL_HPKE_KEM_ID_448
+    OSSL_HPKE_KEM_ID_X25519,
+    OSSL_HPKE_KEM_ID_X448
 };
 static uint16_t hpke_kdf_list[] = {
     OSSL_HPKE_KDF_ID_HKDF_SHA256,

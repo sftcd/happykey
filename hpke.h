@@ -37,8 +37,8 @@ extern "C" {
 # define OSSL_HPKE_KEM_ID_P256             0x0010 /**< NIST P-256 */
 # define OSSL_HPKE_KEM_ID_P384             0x0011 /**< NIST P-256 */
 # define OSSL_HPKE_KEM_ID_P521             0x0012 /**< NIST P-521 */
-# define OSSL_HPKE_KEM_ID_25519            0x0020 /**< Curve25519 */
-# define OSSL_HPKE_KEM_ID_448              0x0021 /**< Curve448 */
+# define OSSL_HPKE_KEM_ID_X25519           0x0020 /**< Curve25519 */
+# define OSSL_HPKE_KEM_ID_X448             0x0021 /**< Curve448 */
 
 # define OSSL_HPKE_KDF_ID_RESERVED         0x0000 /**< not used */
 # define OSSL_HPKE_KDF_ID_HKDF_SHA256      0x0001 /**< HKDF-SHA256 */
@@ -86,7 +86,7 @@ typedef struct {
  */
 # define OSSL_HPKE_SUITE_DEFAULT \
     {\
-        OSSL_HPKE_KEM_ID_25519, \
+        OSSL_HPKE_KEM_ID_X25519, \
         OSSL_HPKE_KDF_ID_HKDF_SHA256, \
         OSSL_HPKE_AEAD_ID_AES_GCM_128 \
     }

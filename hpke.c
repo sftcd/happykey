@@ -198,9 +198,9 @@ static hpke_kem_info_t hpke_kem_tab[] = {
       LN_sha384, 48, 97, 97, 48 },
     { OSSL_HPKE_KEM_ID_P521, "EC", OSSL_HPKE_KEMSTR_P521, NID_secp521r1,
       LN_sha512, 64, 133, 133, 66 },
-    { OSSL_HPKE_KEM_ID_25519, OSSL_HPKE_KEMSTR_X25519, NULL, NID_X25519,
+    { OSSL_HPKE_KEM_ID_X25519, OSSL_HPKE_KEMSTR_X25519, NULL, NID_X25519,
       LN_sha256, 32, 32, 32, 32 },
-    { OSSL_HPKE_KEM_ID_448, OSSL_HPKE_KEMSTR_X448, NULL, NID_X448,
+    { OSSL_HPKE_KEM_ID_X448, OSSL_HPKE_KEMSTR_X448, NULL, NID_X448,
       LN_sha512, 64, 56, 56, 56 }
 };
 #if defined(SUPERVERBOSE) || defined(TESTVECTORS)
@@ -458,8 +458,8 @@ static int hpke_kem_id_check(uint16_t kem_id)
     case OSSL_HPKE_KEM_ID_P256:
     case OSSL_HPKE_KEM_ID_P384:
     case OSSL_HPKE_KEM_ID_P521:
-    case OSSL_HPKE_KEM_ID_25519:
-    case OSSL_HPKE_KEM_ID_448:
+    case OSSL_HPKE_KEM_ID_X25519:
+    case OSSL_HPKE_KEM_ID_X448:
         break;
     default:
         return 0;
@@ -474,10 +474,14 @@ static int hpke_kem_id_check(uint16_t kem_id)
  */
 static int hpke_kem_id_nist_curve(uint16_t kem_id)
 {
-    if (hpke_kem_id_check(kem_id) != 1)
-        return 0;
-    if (kem_id >= 0x10 && kem_id < 0x20)
+    switch (kem_id) {
+    case OSSL_HPKE_KEM_ID_P256:
+    case OSSL_HPKE_KEM_ID_P384:
+    case OSSL_HPKE_KEM_ID_P521:
         return 1;
+    default:
+        return 0;
+    }
     return 0;
 }
 
@@ -2930,7 +2934,7 @@ static int hpke_kg_evp(OSSL_LIB_CTX *libctx, const char *propq,
 
     if (hpke_suite_check(suite) != 1)
         return 0;
-    if (pub == NULL || priv == NULL)
+    if (pub == NULL || publen == NULL || *publen == 0 || priv == NULL)
         return 0;
     if (ikmlen > 0 && ikm == NULL)
         return 0;
@@ -3390,10 +3394,10 @@ static int hpke_str2suite(const char *suitestr, OSSL_HPKE_SUITE *suite)
                 kem = OSSL_HPKE_KEM_ID_P521;
             }
             if (HPKE_MSMATCH(st, OSSL_HPKE_KEMSTR_X25519)) {
-                kem = OSSL_HPKE_KEM_ID_25519;
+                kem = OSSL_HPKE_KEM_ID_X25519;
             }
             if (HPKE_MSMATCH(st, OSSL_HPKE_KEMSTR_X448)) {
-                kem = OSSL_HPKE_KEM_ID_448;
+                kem = OSSL_HPKE_KEM_ID_X448;
             }
             if (HPKE_MSMATCH(st, "0x10")) { kem = OSSL_HPKE_KEM_ID_P256; }
             if (HPKE_MSMATCH(st, "16")) { kem = OSSL_HPKE_KEM_ID_P256; }
@@ -3401,10 +3405,10 @@ static int hpke_str2suite(const char *suitestr, OSSL_HPKE_SUITE *suite)
             if (HPKE_MSMATCH(st, "17")) { kem = OSSL_HPKE_KEM_ID_P384; }
             if (HPKE_MSMATCH(st, "0x12")) { kem = OSSL_HPKE_KEM_ID_P521; }
             if (HPKE_MSMATCH(st, "18")) { kem = OSSL_HPKE_KEM_ID_P521; }
-            if (HPKE_MSMATCH(st, "0x20")) { kem = OSSL_HPKE_KEM_ID_25519; }
-            if (HPKE_MSMATCH(st, "32")) { kem = OSSL_HPKE_KEM_ID_25519; }
-            if (HPKE_MSMATCH(st, "0x21")) { kem = OSSL_HPKE_KEM_ID_448; }
-            if (HPKE_MSMATCH(st, "33")) { kem = OSSL_HPKE_KEM_ID_448; }
+            if (HPKE_MSMATCH(st, "0x20")) { kem = OSSL_HPKE_KEM_ID_X25519; }
+            if (HPKE_MSMATCH(st, "32")) { kem = OSSL_HPKE_KEM_ID_X25519; }
+            if (HPKE_MSMATCH(st, "0x21")) { kem = OSSL_HPKE_KEM_ID_X448; }
+            if (HPKE_MSMATCH(st, "33")) { kem = OSSL_HPKE_KEM_ID_X448; }
         } else if (kem != 0 && kdf == 0) {
             if (HPKE_MSMATCH(st, OSSL_HPKE_KDFSTR_256)) { kdf = 1; }
             if (HPKE_MSMATCH(st, OSSL_HPKE_KDFSTR_384)) { kdf = 2; }
