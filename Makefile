@@ -31,7 +31,7 @@ NINCL=  -I../nss/lib \
 # There are test vectors for this - see comments in hpketv.h.
 # If you want to compile in test vector checks then uncomment 
 # the next line:
-# testvectors=-D TESTVECTORS -I ../json-c
+testvectors=-D TESTVECTORS -I ../json-c
 
 # define this if you want to use HPKE from libcrypto rather
 # than from the source here
@@ -162,7 +162,7 @@ endif
 
 ifdef testvectors
 hpkemain: hpkemain.o hpke.o hpketv.o packet.o
-	${CC} ${CFLAGS} -o $@ hpkemain.o hpke.o packet.o hpketv.o -L ${OSSL} -lssl -lcrypto -L ../json-c/.libs -ljson-c
+	${CC} ${CFLAGS} -o $@ hpkemain.o hpke.o packet.o hpketv.o -L ${OSSL} -lssl -lcrypto -L ../json-c/ -ljson-c
 else
 ifdef uselibcrypto
 hpkemain: hpkemain.o packet.o
