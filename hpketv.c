@@ -322,7 +322,7 @@ void hpke_tv_print(int nelems, hpke_tv_t *array)
  * For now, this just matches the first <mode>,default-suite
  * test vector.
  */
-static int hpke_tv_match(unsigned int mode, hpke_suite_t suite,hpke_tv_t *a)
+static int hpke_tv_match(unsigned int mode, OSSL_HPKE_SUITE suite,hpke_tv_t *a)
 {
     if (a && a->mode==mode &&
         a->kdf_id==suite.kdf_id && 
@@ -347,7 +347,7 @@ static int hpke_tv_match(unsigned int mode, hpke_suite_t suite,hpke_tv_t *a)
  * mode=base/psk for my default ciphersuite. So no point in 
  * spending time now on randomly picking;-)
  */
-int hpke_tv_pick(unsigned int mode, hpke_suite_t suite, int nelems, hpke_tv_t *arr,hpke_tv_t **tv)
+int hpke_tv_pick(unsigned int mode, OSSL_HPKE_SUITE suite, int nelems, hpke_tv_t *arr,hpke_tv_t **tv)
 {
     hpke_tv_t *a=arr;
     hpke_tv_t **resarr=NULL; ///< array of pointers to matching vectors

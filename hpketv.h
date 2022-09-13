@@ -105,7 +105,7 @@ int hpke_tv_load(char *fname, int *nelems, hpke_tv_t **array);
  * mode and suite in the (sorta:-) obvious manner.
  */
 int hpke_tv_pick(
-        unsigned int mode, hpke_suite_t suite,
+        unsigned int mode, OSSL_HPKE_SUITE suite,
         int nelems, hpke_tv_t *arr, 
         hpke_tv_t **tv);
 

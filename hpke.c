@@ -1265,8 +1265,8 @@ static int hpke_test_expand_extract(void)
     int rv = 1;
     OSSL_HPKE_SUITE suite = OSSL_HPKE_SUITE_DEFAULT;
 
-    rv = hpke_extract(NULL, suite, OSSL_HPKE_5869_MODE_PURE, salt, saltlen,
-                      "", 0, IKM, IKMlen, calc_prk, &PRKlen);
+    rv = hpke_extract(NULL, NULL, suite, OSSL_HPKE_5869_MODE_PURE,
+                      salt, saltlen, "", 0, IKM, IKMlen, calc_prk, &PRKlen);
     if (rv != 1) {
         printf("rfc5869 check: hpke_extract failed: %d\n", rv);
         printf("rfc5869 check: hpke_extract failed: %d\n", rv);
@@ -1284,7 +1284,7 @@ static int hpke_test_expand_extract(void)
         printf("rfc5869 check: hpke_extract gave wrong answer!\n");
     }
     OKMlen = 42;
-    rv = hpke_expand(NULL, suite, OSSL_HPKE_5869_MODE_PURE, PRK, PRKlen,
+    rv = hpke_expand(NULL, NULL, suite, OSSL_HPKE_5869_MODE_PURE, PRK, PRKlen,
                      (unsigned char *)"", 0, info, infolen, OKMlen,
                      calc_okm, &OKMlen);
     if (rv != 1) {
@@ -3798,7 +3798,11 @@ int OSSL_HPKE_sender_seal(OSSL_HPKE_CTX *ctx,
                        0, NULL,
                        &exporterseclen, exportersec,
                        enclen, enc,
-                       ctlen, ct);
+                       ctlen, ct
+#ifdef TESTVECTORS
+                       , NULL
+#endif
+                        );
     if (erv == 1) {
         ctx->seq++;
         if (ctx->seq == 0) { /* error wrap around 64 bits */
