@@ -431,8 +431,8 @@ values as those when encrypting with the given keys.
 To enable test vector checking, compile with ``TESTVECTORS`` #define'd.
 There's a line to uncomment in the [Makefile](Makefile) that does that.
 To do the test vector comparison I use the published 
-[test-vectors-07](test-vectors-07.json) or [test-vectors-06](test-vectors-06.json),
-as appropriate, from 
+[test-vectors-08](test-vectors-08.json) 
+from 
 [the CFRG repo](https://github.com/cfrg/draft-irtf-cfrg-hpke).  I use the 
 [json-c](https://github.com/json-c/json-c) library to decode
 the JSON file into an array of type``hpke_tv_t`` that I defined.
