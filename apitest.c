@@ -104,10 +104,10 @@ static void usage(char *prog, char *errmsg)
  * https://www.openssl.org/source/license.html
  */
 
-#include <openssl/hpke.h>
 #include <openssl/evp.h>
 #include <openssl/core_names.h>
 #include <openssl/rand.h>
+#include <openssl/hpke.h>
 #include "testutil.h"
 #endif
 

@@ -25,6 +25,9 @@ High level notes:
 
 ## Recent Changes
 
+- 20220924: now that DHKEM stuff is merged, starting to refactor to
+  use that (when available) and for HPKE-PR to base on that
+
 - 20220910: playing more with @slontis DHKEM stuff. Working now for
   round-trips and test vectors and leak-checked. Changed the (soon
   to be legacy) ``OSSL_HPKE_enc|dec`` APIs to use DHKEM stuff. (That'll

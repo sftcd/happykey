@@ -27,6 +27,9 @@
 #include <openssl/core_names.h>
 #include <internal/packet.h>
 #ifdef HAPPYKEY
+#ifdef OSSL_KEM_PARAM_OPERATION_DHKEM
+#warning "DHKEM approach"
+#endif
 /* if you don't have an openssl development tree you may need this */
 # ifndef OSSL_NELEM
 #  define OSSL_NELEM(x) (sizeof(x) / sizeof((x)[0]))
@@ -44,7 +47,7 @@
  * Define this for LOADS of printing of intermediate cryptographic values
  * Really only needed when new crypto added (hopefully)
  */
-# define SUPERVERBOSE
+# undef SUPERVERBOSE
 # ifdef TESTVECTORS
 #  include "hpketv.h"
 # endif
@@ -258,7 +261,6 @@ struct ossl_hpke_ctx_st
     OSSL_HPKE_SUITE suite; /**< suite */
     uint64_t seq; /**< sequence number */
 #ifdef OSSL_KEM_PARAM_OPERATION_DHKEM
-#warning "DHKEM approach"
     unsigned char *shared_secret;
     size_t shared_secretlen;
 #endif
@@ -2423,6 +2425,7 @@ err:
     return erv;
 }
 
+#ifndef OSSL_KEM_PARAM_OPERATION_DHKEM
 /*
  * @brief HPKE single-shot decryption function
  *
@@ -2827,6 +2830,7 @@ err:
     OPENSSL_free(mypub);
     return erv;
 }
+#endif
 
 /*
  * @brief compare a buffer vs. the group order
@@ -4222,10 +4226,12 @@ int OSSL_HPKE_sender_seal(OSSL_HPKE_CTX *ctx,
                           const unsigned char *pt, size_t ptlen)
 {
     int erv = 1;
+#ifndef OSSL_KEM_PARAM_OPERATION_DHKEM
     unsigned char seqbuf[12]; /* 12 octets is the max nonce */
     size_t seqlen = 1;
     unsigned char exportersec[OSSL_HPKE_MAXSIZE];
     size_t exporterseclen = OSSL_HPKE_MAXSIZE;
+#endif
 
     if (ctx == NULL || enc == NULL || enclen == NULL || *enclen == 0
         || ct == NULL || ctlen == NULL || *ctlen == 0
@@ -4342,10 +4348,12 @@ int OSSL_HPKE_recipient_open(OSSL_HPKE_CTX *ctx,
                              const unsigned char *ct, size_t ctlen)
 {
     int erv = 1;
+#ifndef OSSL_KEM_PARAM_OPERATION_DHKEM
     unsigned char seqbuf[12];
     size_t seqlen = 1;
     unsigned char exportersec[OSSL_HPKE_MAXSIZE];
     size_t exporterseclen = OSSL_HPKE_MAXSIZE;
+#endif
 
     if (ctx == NULL || pt == NULL || ptlen == NULL || *ptlen == 0
         || enc == NULL || enclen == 0 || ct == NULL || ctlen == 0
