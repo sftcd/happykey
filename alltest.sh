@@ -21,8 +21,9 @@
 
 # just in case...
 BINDIR=$HOME/code/happykey
-# LD_LIBRARY_PATH...
-. $BINDIR/env
+: ${OSSL:=$HOME/code/openssl}
+: ${NSSL:=$HOME/code/dist/Debug/lib}
+export LD_LIBRARY_PATH=$OSSL:$NSSL
 
 if [ ! -f $BINDIR/hpkemain ]
 then

@@ -907,30 +907,6 @@ int main(int argc, char **argv)
             exit(7);
         }
 
-#undef USEBUF2EVP
-#ifdef USEBUF2EVP
-        EVP_PKEY *privevp=NULL;
-        rv=OSSL_HPKE_prbuf2evp(NULL, hpke_suite.kem_id,
-                priv, privlen,
-                NULL, 0,
-                &privevp);
-        if (rv!=1) {
-            fprintf(stderr,"Error mapping private key 2 EVP - exiting\n");
-            OPENSSL_free(cipher);
-            OPENSSL_free(clear);
-            exit(8);
-        }
-        rv=OSSL_HPKE_dec(NULL, NULL, hpke_mode, hpke_suite,
-                pskid, psk, psklen,
-                pub, publen,
-                NULL, 0, privevp,
-                senderpub, senderpublen,
-                cipher, cipherlen,
-                aad, aadlen,
-                info, infolen,
-                NULL, 0, /* seq */
-                clear, &clearlen);
-#else
         rv=OSSL_HPKE_dec(NULL, NULL, hpke_mode, hpke_suite,
                 pskid, psk, psklen,
                 pub, publen,
@@ -941,16 +917,12 @@ int main(int argc, char **argv)
                 info, infolen,
                 NULL, 0, /* seq */
                 clear, &clearlen);
-#endif
         if (cipher!=NULL) OPENSSL_free(cipher);
         if (pub!=NULL) OPENSSL_free(pub);
         if (priv!=NULL) OPENSSL_free(priv);
         if (info!=NULL) OPENSSL_free(info);
         if (aad!=NULL) OPENSSL_free(aad);
         if (psk) OPENSSL_free(psk);
-#ifdef USEBUF2EVP
-        if (privevp) EVP_PKEY_free(privevp);
-#endif
         if (rv!=1) {
             fprintf(stderr,"Error decrypting (%d) - exiting\n",rv);
             OPENSSL_free(clear);

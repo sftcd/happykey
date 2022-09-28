@@ -27,6 +27,15 @@ High level notes:
 
 ## Recent Changes
 
+- 20220928: now working on two build targets - one for when using
+  the system install of OpenSSL (3.0 or above) (using -DHAPPOBJS),
+  so HPKE API objects need to be directly linked to application code,
+  and a second for when linking with a master branch build that has
+  the new HPKE APIs built-in (-DHPKEAPI).  The ``make forlib`` and
+  ``make copy2lib`` targets can be used to create and move the
+  relevant files (``hpke.h, hpke.c`` and ``apitest.c`` with some
+  ifdef'd code taken out using the ``uninfdef`` tool) to an OpenSSL build.
+
 - 202200906: new API seal/open working, with export APIs, and more
   test vectors, ECH interop tested
 

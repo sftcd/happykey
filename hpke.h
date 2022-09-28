@@ -37,8 +37,8 @@ extern "C" {
 # define OSSL_HPKE_KEM_ID_P256             0x0010 /**< NIST P-256 */
 # define OSSL_HPKE_KEM_ID_P384             0x0011 /**< NIST P-256 */
 # define OSSL_HPKE_KEM_ID_P521             0x0012 /**< NIST P-521 */
-# define OSSL_HPKE_KEM_ID_25519            0x0020 /**< Curve25519 */
-# define OSSL_HPKE_KEM_ID_448              0x0021 /**< Curve448 */
+# define OSSL_HPKE_KEM_ID_X25519           0x0020 /**< Curve25519 */
+# define OSSL_HPKE_KEM_ID_X448             0x0021 /**< Curve448 */
 
 # define OSSL_HPKE_KDF_ID_RESERVED         0x0000 /**< not used */
 # define OSSL_HPKE_KDF_ID_HKDF_SHA256      0x0001 /**< HKDF-SHA256 */
@@ -86,7 +86,7 @@ typedef struct {
  */
 # define OSSL_HPKE_SUITE_DEFAULT \
     {\
-        OSSL_HPKE_KEM_ID_25519, \
+        OSSL_HPKE_KEM_ID_X25519, \
         OSSL_HPKE_KDF_ID_HKDF_SHA256, \
         OSSL_HPKE_AEAD_ID_AES_GCM_128 \
     }
@@ -144,6 +144,16 @@ int OSSL_HPKE_CTX_set1_psk(OSSL_HPKE_CTX *ctx,
 int OSSL_HPKE_CTX_set1_senderpriv(OSSL_HPKE_CTX *ctx, EVP_PKEY *privp);
 
 /**
+ * @brief set a sender IKM for key DHKEM generation
+ * @param ctx is the pointer for the HPKE context
+ * @param ikme is a buffer for the IKM
+ * @param ikmelen is the length of the above
+ * @return 1 for success, 0 for error
+ */
+int OSSL_HPKE_CTX_set1_ikme(OSSL_HPKE_CTX *ctx,
+                            const unsigned char *ikme, size_t ikmelen);
+
+/**
  * @brief set a sender private key for HPKE authenticated modes
  * @param ctx is the pointer for the HPKE context
  * @param privp is an EVP_PKEY form of the private key
@@ -162,7 +172,7 @@ int OSSL_HPKE_CTX_set1_authpriv(OSSL_HPKE_CTX *ctx, EVP_PKEY *privp);
  * private keys as passed as EVP_PKEY pointers.
  */
 int OSSL_HPKE_CTX_set1_authpub(OSSL_HPKE_CTX *ctx,
-                               unsigned char *pub,
+                               const unsigned char *pub,
                                size_t publen);
 
 /**
