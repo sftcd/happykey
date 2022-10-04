@@ -226,10 +226,8 @@ static int do_testhpke(const TEST_BASEDATA *base,
         goto end;
     if (!TEST_true(OSSL_HPKE_CTX_set1_senderpriv(sealctx, privE)))
         goto end;
-#ifdef OSSL_KEM_PARAM_OPERATION_DHKEM
     if (!TEST_true(OSSL_HPKE_CTX_set1_ikme(sealctx, base->ikmE, base->ikmElen)))
         goto end;
-#endif
     if (base->mode == OSSL_HPKE_MODE_AUTH
         || base->mode == OSSL_HPKE_MODE_PSKAUTH) {
         if (!TEST_true(base->ikmAuth != NULL && base->ikmAuthlen > 0))
@@ -820,6 +818,9 @@ static int test_hpke_modes_suites(void)
     int kemind = 0; /* index into hpke_kem_list */
     int kdfind = 0; /* index into hpke_kdf_list */
     int aeadind = 0; /* index into hpke_aead_list */
+#ifdef HAPPYKEY
+    int testcount = 0; /* count of tests done */
+#endif
 
     /* iterate over the different modes */
     for (mind = 0; mind != (sizeof(hpke_mode_list) / sizeof(int)); mind++) {
@@ -827,13 +828,13 @@ static int test_hpke_modes_suites(void)
         size_t aadlen = OSSL_HPKE_MAXSIZE;
         unsigned char aad[OSSL_HPKE_MAXSIZE];
         unsigned char *aadp = NULL;
-        size_t infolen = OSSL_HPKE_MAXSIZE;
-        unsigned char info[OSSL_HPKE_MAXSIZE];
+        size_t infolen = 32;
+        unsigned char info[32];
         unsigned char *infop = NULL;
-        unsigned char psk[OSSL_HPKE_MAXSIZE];
+        unsigned char psk[32];
         unsigned char *pskp = NULL;
-        char pskid[OSSL_HPKE_MAXSIZE];
-        size_t psklen = OSSL_HPKE_MAXSIZE;
+        char pskid[32];
+        size_t psklen = 32;
         char *pskidp = NULL;
         EVP_PKEY *privp = NULL;
         OSSL_HPKE_SUITE hpke_suite = OSSL_HPKE_SUITE_DEFAULT;
@@ -853,27 +854,36 @@ static int test_hpke_modes_suites(void)
          * code paths fairly quickly. We don't really care what the values
          * are but it'll be easier to debug if they're known, so we set 'em.
          */
+#ifdef HAPPYKEY
+        if (verbose) {
+            printf("New test (%d): ", testcount++);
+        }
+#endif
         if (COIN_IS_HEADS) {
 #ifdef HAPPYKEY
-            if (verbose) { printf("adding aad,"); }
+            if (verbose) {
+                printf("adding aad, ");
+            }
 #endif
             aadp = aad;
             memset(aad, 'a', aadlen);
         } else {
 #ifdef HAPPYKEY
-            if (verbose) { printf("not adding aad,"); }
+            if (verbose) {
+                printf("not adding aad, ");
+            }
 #endif
             aadlen = 0;
         }
         if (COIN_IS_HEADS) {
 #ifdef HAPPYKEY
-            if (verbose) { printf("adding info,"); }
+            if (verbose) { printf("adding info, "); }
 #endif
             infop = info;
             memset(info, 'i', infolen);
         } else {
 #ifdef HAPPYKEY
-            if (verbose) { printf("not adding info,"); }
+            if (verbose) { printf("not adding info, "); }
 #endif
             infolen = 0;
         }
@@ -882,8 +892,8 @@ static int test_hpke_modes_suites(void)
             pskp = psk;
             memset(psk, 'P', psklen);
             pskidp = pskid;
-            memset(pskid, 'I', OSSL_HPKE_MAXSIZE - 1);
-            pskid[OSSL_HPKE_MAXSIZE - 1] = '\0';
+            memset(pskid, 'I', psklen - 1);
+            pskid[psklen - 1] = '\0';
         } else {
             psklen = 0;
         }
@@ -1052,7 +1062,7 @@ static int test_hpke_modes_suites(void)
                         overallresult = 0;
                     }
 #ifdef HAPPYKEY
-                    if (verbose) { printf("test success\n"); }
+                    if (verbose && overallresult == 1) { printf("test success\n"); }
 #endif
                     if (privp) {
                         EVP_PKEY_free(privp);
@@ -1577,18 +1587,21 @@ int main(int argc, char **argv)
             printf("Test vector 1 success\n");
         } else {
             printf("Teat vector 1 fail (%d)\n", apires);
+            return apires;
         }
         apires = x25519kdfsha256_hkdfsha256_aes128gcm_psk_test();
         if (apires == 1) {
             printf("Test vector 2 success\n");
         } else {
             printf("Teat vector 2 fail (%d)\n", apires);
+            return apires;
         }
         apires = P256kdfsha256_hkdfsha256_aes128gcm_base_test();
         if (apires == 1) {
             printf("Test vector 3 success\n");
         } else {
             printf("Test vector 3 fail (%d)\n", apires);
+            return apires;
         }
     }
     return apires;
