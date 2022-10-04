@@ -8,7 +8,7 @@
  */
 
 #ifdef HAPPYKEY
-/* 
+/*
  * emptiness :-(
  * Unless one of the ifdef's triggers something unifef complains
  */
@@ -18,11 +18,11 @@
 # pragma once
 
 /* Constants from RFC 9180 Section 7.1 and 7.3 */
-#define OSSL_HPKE_MAX_SECRET 64
-#define OSSL_HPKE_MAX_PUBLIC 133
-#define OSSL_HPKE_MAX_PRIVATE 66
-#define OSSL_HPKE_MAX_NONCE 12
-#define OSSL_HPKE_MAX_KDF_INPUTLEN 64
+# define OSSL_HPKE_MAX_SECRET 64
+# define OSSL_HPKE_MAX_PUBLIC 133
+# define OSSL_HPKE_MAX_PRIVATE 66
+# define OSSL_HPKE_MAX_NONCE 12
+# define OSSL_HPKE_MAX_KDF_INPUTLEN 64
 
 int ossl_hpke_kdf_extract(EVP_KDF_CTX *kctx,
                           unsigned char *prk, size_t prklen,

@@ -18,10 +18,6 @@
 
 # include <openssl/ssl.h>
 
-# ifdef __cplusplus
-extern "C" {
-# endif
-
 /*
  * The HPKE modes
  */
@@ -488,7 +484,4 @@ int OSSL_HPKE_dec(OSSL_LIB_CTX *libctx, const char *propq,
                   const unsigned char *seq, size_t seqlen,
                   unsigned char *clear, size_t *clearlen);
 
-# ifdef __cplusplus
-}
-# endif
 #endif

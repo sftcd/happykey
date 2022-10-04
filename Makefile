@@ -129,7 +129,7 @@ hpketv.o: hpketv.c hpketv.h hpke.h
 
 ifeq ($(useopenssl_3),y)
 apitest: apitest.o hpke.o hpke_util.o packet.o
-	${CC} ${CFLAGS} -o $@ apitest.o hpke.o hpke_util.o packet.o -L${OSSL} -lssl -lcrypto
+	${CC} ${CFLAGS} -o $@ apitest.o hpke.o hpke_util.o packet.o -lssl -lcrypto
 endif
 ifeq ($(useopenssl_master),y)
 apitest: apitest.o hpke.o hpke_util.o packet.o

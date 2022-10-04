@@ -27,9 +27,10 @@ High level notes:
 
 ## Recent Changes
 
-- 20221002: started process of reducing HPKE code duplication with DHKEM 
+- 20221004: middle of process of reducing HPKE code duplication with DHKEM 
   PR now having being merged (but keeping ability to build and link to
-  a released OpenSSL 3.0.0).
+  a released OpenSSL 3.0.0). TODO: Check DHKEM allowed input lengths,
+  probably have something to fix there.
 
 - 20220928: now working on two build targets - one for when using
   the system install of OpenSSL (3.0 or above) (using -DHAPPOBJS),

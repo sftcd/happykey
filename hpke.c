@@ -825,7 +825,7 @@ err:
     OPENSSL_free(ciphertext);
     return erv;
 }
-
+#ifdef HAPPYKEY
 /*
  * @brief RFC5869 HKDF-Extract
  *
@@ -1529,7 +1529,7 @@ static int hpke_psk_check(unsigned int mode,
         return 0;
     return 1;
 }
-
+#endif
 /*
  * @brief map a kem_id and a private key buffer into an EVP_PKEY
  *
@@ -1845,6 +1845,7 @@ static int hpke_suite_check(OSSL_HPKE_SUITE suite)
     return 0;
 }
 
+#ifdef HAPPYKEY
 /*
  * @brief Internal HPKE single-shot encryption function
  *
@@ -2423,7 +2424,6 @@ err:
     return erv;
 }
 
-#ifndef OSSL_KEM_PARAM_OPERATION_DHKEM
 /*
  * @brief HPKE single-shot decryption function
  *
@@ -2828,8 +2828,7 @@ err:
     OPENSSL_free(mypub);
     return erv;
 }
-#endif
-
+#endif /* HAPPYKEY */
 /*
  * @brief compare a buffer vs. the group order
  *
@@ -2933,6 +2932,11 @@ static int hpke_kg_evp(OSSL_LIB_CTX *libctx, const char *propq,
     size_t lpublen = 0;
     uint16_t kem_ind = 0;
     int cmp = 0;
+#ifndef HAPPYKEY
+    unsigned char suitebuf[2];
+    EVP_KDF_CTX *kctx = NULL;
+    const char *mdname = NULL;
+#endif
 
     if (hpke_suite_check(suite) != 1)
         return 0;
@@ -2996,17 +3000,47 @@ static int hpke_kg_evp(OSSL_LIB_CTX *libctx, const char *propq,
 #ifdef SUPERVERBOSE
             printf("Deterministic KG for KEM %d\n", suite.kem_id);
 #endif
+#ifndef HAPPYKEY
+            mdname = hpke_kem_tab[kem_ind].mdname;
+            kctx = ossl_kdf_ctx_create("HKDF", mdname, libctx, propq);
+            if (kctx == NULL) {
+                ERR_raise(ERR_LIB_CRYPTO, ERR_R_INTERNAL_ERROR);
+                goto err;
+            }
+            suitebuf[0] = suite.kem_id / 256;
+            suitebuf[1] = suite.kem_id % 256;
+            tmplen = hpke_kem_tab[kem_ind].Nsecret;
+            erv = ossl_hpke_labeled_extract(kctx, tmp, tmplen,
+                                            (const unsigned char *)"", 0,
+                                            OSSL_HPKE_SEC41LABEL,
+                                            suitebuf, 2,
+                                            OSSL_HPKE_DPK_LABEL,
+                                            ikm, ikmlen);
+#else
             erv = hpke_extract(libctx, propq, suite, OSSL_HPKE_5869_MODE_KEM,
                                (const unsigned char *)"", 0,
                                OSSL_HPKE_DPK_LABEL, strlen(OSSL_HPKE_DPK_LABEL),
                                ikm, ikmlen, tmp, &tmplen);
+#endif
             if (erv != 1) { goto err; }
             while (counter < 255) {
+#ifndef HAPPYKEY
+                sklen = hpke_kem_tab[kem_ind].Npriv;
+                erv = ossl_hpke_labeled_expand(kctx,
+                                               sk, sklen,
+                                               tmp, tmplen, /* salt */
+                                               /* protocol label */
+                                               OSSL_HPKE_SEC41LABEL,
+                                               suitebuf, 2, /* suiteid */
+                                               OSSL_HPKE_CAND_LABEL, /* label */
+                                               &counter, 1); /* ikmlen */
+#else
                 erv = hpke_expand(libctx, propq, suite, OSSL_HPKE_5869_MODE_KEM,
                                   tmp, tmplen, OSSL_HPKE_CAND_LABEL,
                                   strlen(OSSL_HPKE_CAND_LABEL),
                                   &counter, 1, hpke_kem_tab[kem_ind].Npriv,
                                   sk, &sklen);
+#endif
                 if (erv != 1) {
                     memset(tmp, 0, sizeof(tmp));
                     goto err;
@@ -3031,10 +3065,11 @@ static int hpke_kg_evp(OSSL_LIB_CTX *libctx, const char *propq,
                 if (cmp == -1) { /* success! */
                     break;
                 }
-#ifdef SUPERVERBOSE
-                printf("Incrememting det counter! (%d)\n", counter);
-#endif
                 counter++;
+#ifdef SUPERVERBOSE
+                printf("Incrememting det counter! (%d -> %d) for KEM 0x%2x\n",
+                       counter - 1, counter, suite.kem_id);
+#endif
             }
             if (counter == 255) {
                 memset(tmp, 0, sizeof(tmp));
@@ -3084,17 +3119,47 @@ static int hpke_kg_evp(OSSL_LIB_CTX *libctx, const char *propq,
 #ifdef SUPERVERBOSE
             printf("Deterministic KG for KEM %d\n", suite.kem_id);
 #endif
+#ifndef HAPPYKEY
+            mdname = hpke_kem_tab[kem_ind].mdname;
+            kctx = ossl_kdf_ctx_create("HKDF", mdname, libctx, propq);
+            if (kctx == NULL) {
+                ERR_raise(ERR_LIB_CRYPTO, ERR_R_INTERNAL_ERROR);
+                goto err;
+            }
+            suitebuf[0] = suite.kem_id / 256;
+            suitebuf[1] = suite.kem_id % 256;
+            tmplen = hpke_kem_tab[kem_ind].Nsecret;
+            erv = ossl_hpke_labeled_extract(kctx, tmp, tmplen,
+                                            (const unsigned char *)"", 0,
+                                            OSSL_HPKE_SEC41LABEL,
+                                            suitebuf, 2,
+                                            OSSL_HPKE_DPK_LABEL,
+                                            ikm, ikmlen);
+#else
             erv = hpke_extract(libctx, propq, suite, OSSL_HPKE_5869_MODE_KEM,
                                (const unsigned char *)"", 0,
                                OSSL_HPKE_DPK_LABEL, strlen(OSSL_HPKE_DPK_LABEL),
                                ikm, ikmlen, tmp, &tmplen);
+#endif
             if (erv != 1) { goto err; }
+#ifndef HAPPYKEY
+            sklen = hpke_kem_tab[kem_ind].Npriv;
+            erv = ossl_hpke_labeled_expand(kctx,
+                                           sk, sklen,
+                                           tmp, tmplen, /* salt */
+                                           /* protocol label */
+                                           OSSL_HPKE_SEC41LABEL,
+                                           suitebuf, 2, /* suiteid */
+                                           OSSL_HPKE_SK_LABEL, /* label */
+                                           NULL, 0); /* ikmlen */
+#else
             erv = hpke_expand(libctx, propq, suite, OSSL_HPKE_5869_MODE_KEM,
                               tmp, tmplen,
                               OSSL_HPKE_SK_LABEL, strlen(OSSL_HPKE_SK_LABEL),
                               NULL, 0,
                               hpke_kem_tab[kem_ind].Npriv,
                               sk, &sklen);
+#endif
             if (erv != 1) {
                 memset(tmp, 0, sizeof(tmp));
                 goto err;
@@ -3145,6 +3210,9 @@ static int hpke_kg_evp(OSSL_LIB_CTX *libctx, const char *propq,
     *priv = skR;
 
 err:
+#ifndef HAPPYKEY
+    EVP_KDF_CTX_free(kctx);
+#endif
     if (erv != 1) { EVP_PKEY_free(skR); }
     EVP_PKEY_CTX_free(pctx);
     OPENSSL_free(lpub);
@@ -3769,7 +3837,7 @@ static int hpke_seq2buf(uint64_t seq, unsigned char *buf, size_t blen)
     return nbo_seq_len;
 }
 
-#ifdef OSSL_KEM_PARAM_OPERATION_DHKEM
+#ifndef HAPPYKEY
 static int hpke_encap(OSSL_HPKE_CTX *ctx, unsigned char *enc, size_t *enclen,
                       const unsigned char *pub, size_t publen)
 {
@@ -3781,7 +3849,7 @@ static int hpke_encap(OSSL_HPKE_CTX *ctx, unsigned char *enc, size_t *enclen,
     int kem_ind = 0;
 
     if (ctx == NULL || enc == NULL || enclen == NULL || *enclen == 0
-        || pub == NULL || publen ==0) {
+        || pub == NULL || publen == 0) {
         ERR_raise(ERR_LIB_CRYPTO, ERR_R_INTERNAL_ERROR);
 #if defined(SUPERVERBOSE) || defined(TESTVECTORS)
         printf("\tbad input\n");
@@ -3815,15 +3883,15 @@ static int hpke_encap(OSSL_HPKE_CTX *ctx, unsigned char *enc, size_t *enclen,
         ERR_raise(ERR_LIB_CRYPTO, ERR_R_INTERNAL_ERROR);
         goto err;
     }
-    *p++ = OSSL_PARAM_construct_utf8_string(
-                        OSSL_KEM_PARAM_OPERATION,
-                        (char *)OSSL_KEM_PARAM_OPERATION_DHKEM, 0);
+    *p++ = OSSL_PARAM_construct_utf8_string(OSSL_KEM_PARAM_OPERATION,
+                                            OSSL_KEM_PARAM_OPERATION_DHKEM,
+                                            0);
     if (ctx->ikme != NULL) {
 #if defined(SUPERVERBOSE) || defined(TESTVECTORS)
         hpke_pbuf(stdout, "\tikme", ctx->ikme, sizeof(ctx->ikme));
 #endif
         *p++ = OSSL_PARAM_construct_octet_string(OSSL_KEM_PARAM_IKME,
-                                               ctx->ikme, ctx->ikmelen);
+                                                 ctx->ikme, ctx->ikmelen);
     }
     *p = OSSL_PARAM_construct_end();
     if (ctx->mode == OSSL_HPKE_MODE_AUTH
@@ -3893,9 +3961,9 @@ static int hpke_decap(OSSL_HPKE_CTX *ctx,
         ERR_raise(ERR_LIB_CRYPTO, ERR_R_INTERNAL_ERROR);
         goto err;
     }
-    *p++ = OSSL_PARAM_construct_utf8_string(
-                        OSSL_KEM_PARAM_OPERATION,
-                        (char *)OSSL_KEM_PARAM_OPERATION_DHKEM, 0);
+    *p++ = OSSL_PARAM_construct_utf8_string(OSSL_KEM_PARAM_OPERATION,
+                                            OSSL_KEM_PARAM_OPERATION_DHKEM,
+                                            0);
     *p = OSSL_PARAM_construct_end();
     if (ctx->mode == OSSL_HPKE_MODE_AUTH
         || ctx->mode == OSSL_HPKE_MODE_PSKAUTH) {
@@ -3919,7 +3987,8 @@ static int hpke_decap(OSSL_HPKE_CTX *ctx,
             spub = EVP_PKEY_new_raw_public_key_ex(ctx->libctx,
                                                   hpke_kem_tab[kem_ind].keytype,
                                                   ctx->propq,
-                                                  ctx->authpub, ctx->authpublen);
+                                                  ctx->authpub,
+                                                  ctx->authpublen);
         }
         if (spub == NULL) {
             erv = 0;
@@ -3953,7 +4022,8 @@ static int hpke_decap(OSSL_HPKE_CTX *ctx,
         ERR_raise(ERR_LIB_CRYPTO, ERR_R_INTERNAL_ERROR);
         goto err;
     }
-    EVP_PKEY_CTX_free(pctx); pctx = NULL;
+    EVP_PKEY_CTX_free(pctx);
+    pctx = NULL;
     OPENSSL_free(ctx->shared_secret); /* in case of 2nd call */
     ctx->shared_secret = OPENSSL_malloc(lsslen);
     if (ctx->shared_secret == NULL) {
@@ -3962,7 +4032,7 @@ static int hpke_decap(OSSL_HPKE_CTX *ctx,
         goto err;
     }
     ctx->shared_secretlen = lsslen;
-    memcpy(ctx->shared_secret,lss,lsslen);
+    memcpy(ctx->shared_secret, lss, lsslen);
 
 err:
 #if defined(SUPERVERBOSE) || defined(TESTVECTORS)
@@ -3972,7 +4042,7 @@ err:
 #endif
     EVP_PKEY_CTX_free(pctx);
     EVP_PKEY_free(spub);
-    OPENSSL_cleanse(lss,sizeof(lss));
+    OPENSSL_cleanse(lss, sizeof(lss));
     return erv;
 }
 
@@ -4003,7 +4073,6 @@ static int hpke_do_rest(OSSL_HPKE_CTX *ctx, int do_enc,
     EVP_KDF_CTX *kctx = NULL;
     unsigned char suitebuf[6];
     const char *mdname = NULL;
-    size_t exlen = 0;
 
     /* TODO: check if ok to skip the checks here, likely done before */
     kem_ind = kem_iana2index(ctx->suite.kem_id);
@@ -4027,7 +4096,7 @@ static int hpke_do_rest(OSSL_HPKE_CTX *ctx, int do_enc,
 
     mdname = hpke_kdf_tab[kdf_ind].mdname;
     kctx = ossl_kdf_ctx_create("HKDF", mdname, ctx->libctx, ctx->propq);
-    if (kctx == NULL ) {
+    if (kctx == NULL) {
         ERR_raise(ERR_LIB_CRYPTO, ERR_R_INTERNAL_ERROR);
         goto err;
     }
@@ -4043,33 +4112,33 @@ static int hpke_do_rest(OSSL_HPKE_CTX *ctx, int do_enc,
     }
     pskidlen = (ctx->psk == NULL ? 0 : strlen(ctx->pskid));
     /* mode == FULL as per RFC9180 sec 5.1 */
-    suitebuf[0]=ctx->suite.kem_id / 256;
-    suitebuf[1]=ctx->suite.kem_id % 256;
-    suitebuf[2]=ctx->suite.kdf_id / 256;
-    suitebuf[3]=ctx->suite.kdf_id % 256;
-    suitebuf[4]=ctx->suite.aead_id / 256;
-    suitebuf[5]=ctx->suite.aead_id % 256;
+    suitebuf[0] = ctx->suite.kem_id / 256;
+    suitebuf[1] = ctx->suite.kem_id % 256;
+    suitebuf[2] = ctx->suite.kdf_id / 256;
+    suitebuf[3] = ctx->suite.kdf_id % 256;
+    suitebuf[4] = ctx->suite.aead_id / 256;
+    suitebuf[5] = ctx->suite.aead_id % 256;
 
     erv = ossl_hpke_labeled_extract(kctx,
-                                    ks_context + 1, halflen, /* prk */
-                                    NULL, 0,  /* salt */
-                                    OSSL_HPKE_SEC51LABEL, /* protocol label */
-                                    suitebuf, 6, /* suiteid */
-                                    OSSL_HPKE_PSKIDHASH_LABEL, /* label */
-                                    (unsigned char *)ctx->pskid, /* ikm */
-                                    pskidlen); /* ikmlen */
+                                    ks_context + 1, halflen,
+                                    NULL, 0,
+                                    OSSL_HPKE_SEC51LABEL,
+                                    suitebuf, 6,
+                                    OSSL_HPKE_PSKIDHASH_LABEL,
+                                    (unsigned char *)ctx->pskid,
+                                    pskidlen);
     if (erv != 1) {
         ERR_raise(ERR_LIB_CRYPTO, ERR_R_INTERNAL_ERROR);
         goto err;
     }
 
     erv = ossl_hpke_labeled_extract(kctx,
-                                    ks_context + 1 + halflen, halflen, /* prk */
-                                    NULL, 0,  /* salt */
-                                    OSSL_HPKE_SEC51LABEL, /* protocol label */
-                                    suitebuf, 6, /* suiteid */
-                                    OSSL_HPKE_INFOHASH_LABEL, /* label */
-                                    (unsigned char *)info, infolen); /* ikmlen */
+                                    ks_context + 1 + halflen, halflen,
+                                    NULL, 0,
+                                    OSSL_HPKE_SEC51LABEL,
+                                    suitebuf, 6,
+                                    OSSL_HPKE_INFOHASH_LABEL,
+                                    (unsigned char *)info, infolen);
     if (erv != 1) {
         ERR_raise(ERR_LIB_CRYPTO, ERR_R_INTERNAL_ERROR);
         goto err;
@@ -4167,11 +4236,11 @@ static int hpke_do_rest(OSSL_HPKE_CTX *ctx, int do_enc,
         }
         erv = ossl_hpke_labeled_expand(kctx,
                                        ctx->exportersec, ctx->exporterseclen,
-                                       secret, secretlen, /* salt */
-                                       OSSL_HPKE_SEC51LABEL, /* protocol label */
-                                       suitebuf, 6, /* suiteid */
-                                       OSSL_HPKE_EXP_LABEL, /* label */
-                                       ks_context, ks_contextlen); /* ikmlen */
+                                       secret, secretlen,
+                                       OSSL_HPKE_SEC51LABEL,
+                                       suitebuf, 6,
+                                       OSSL_HPKE_EXP_LABEL,
+                                       ks_context, ks_contextlen);
         if (erv != 1) {
             ERR_raise(ERR_LIB_CRYPTO, ERR_R_INTERNAL_ERROR);
             goto err;
@@ -4219,9 +4288,7 @@ err:
     EVP_KDF_CTX_free(kctx);
     return erv;
 }
-
-#endif /* DHKEM */
-
+#endif /* not HAPPYKEY */
 /**
  * @brief sender seal function
  * @param ctx is the pointer for the HPKE context
@@ -4253,7 +4320,7 @@ int OSSL_HPKE_sender_seal(OSSL_HPKE_CTX *ctx,
                           const unsigned char *pt, size_t ptlen)
 {
     int erv = 1;
-#ifndef OSSL_KEM_PARAM_OPERATION_DHKEM
+#ifdef HAPPYKEY
     unsigned char seqbuf[12]; /* 12 octets is the max nonce */
     size_t seqlen = 1;
     unsigned char exportersec[OSSL_HPKE_MAXSIZE];
@@ -4262,12 +4329,12 @@ int OSSL_HPKE_sender_seal(OSSL_HPKE_CTX *ctx,
 
     if (ctx == NULL || enc == NULL || enclen == NULL || *enclen == 0
         || ct == NULL || ctlen == NULL || *ctlen == 0
-        || pub == NULL || publen ==0 || pt == NULL || ptlen == 0) {
+        || pub == NULL || publen == 0 || pt == NULL || ptlen == 0) {
         ERR_raise(ERR_LIB_CRYPTO, ERR_R_INTERNAL_ERROR);
         return 0;
     }
 
-#ifdef OSSL_KEM_PARAM_OPERATION_DHKEM
+#ifndef HAPPYKEY
 #if defined(SUPERVERBOSE) || defined(TESTVECTORS)
     printf("DHKEM Sealing:\n");
 #endif
@@ -4285,7 +4352,7 @@ int OSSL_HPKE_sender_seal(OSSL_HPKE_CTX *ctx,
      }
 #endif
     erv = hpke_do_rest(ctx, 1, ct, ctlen, (unsigned char *)pt, &ptlen,
-                        info, infolen, aad, aadlen);
+                       info, infolen, aad, aadlen);
     if (erv != 1) {
         ERR_raise(ERR_LIB_CRYPTO, ERR_R_INTERNAL_ERROR);
         return 0;
@@ -4375,7 +4442,7 @@ int OSSL_HPKE_recipient_open(OSSL_HPKE_CTX *ctx,
                              const unsigned char *ct, size_t ctlen)
 {
     int erv = 1;
-#ifndef OSSL_KEM_PARAM_OPERATION_DHKEM
+#ifdef HAPPYKEY
     unsigned char seqbuf[12];
     size_t seqlen = 1;
     unsigned char exportersec[OSSL_HPKE_MAXSIZE];
@@ -4388,7 +4455,7 @@ int OSSL_HPKE_recipient_open(OSSL_HPKE_CTX *ctx,
         ERR_raise(ERR_LIB_CRYPTO, ERR_R_INTERNAL_ERROR);
         return 0;
     }
-#ifdef OSSL_KEM_PARAM_OPERATION_DHKEM
+#ifndef HAPPYKEY
 #if defined(SUPERVERBOSE) || defined(TESTVECTORS)
     printf("DHKEM Opening:\n");
 #endif
@@ -4406,7 +4473,7 @@ int OSSL_HPKE_recipient_open(OSSL_HPKE_CTX *ctx,
      }
 #endif
     erv = hpke_do_rest(ctx, 0, (unsigned char *)ct, &ctlen, pt, ptlen,
-                        info, infolen, aad, aadlen);
+                       info, infolen, aad, aadlen);
     if (erv != 1) {
         ERR_raise(ERR_LIB_CRYPTO, ERR_R_INTERNAL_ERROR);
         return 0;
@@ -4475,7 +4542,14 @@ int OSSL_HPKE_CTX_export(OSSL_HPKE_CTX *ctx,
                          size_t labellen)
 {
     int erv = 1;
+#ifdef HAPPYKEY
     size_t lsecretlen = secret_len;
+#else
+    EVP_KDF_CTX *kctx = NULL;
+    unsigned char suitebuf[6];
+    const char *mdname = NULL;
+    int kdf_ind = 0;
+#endif
 
     if (ctx == NULL) {
         ERR_raise(ERR_LIB_CRYPTO, ERR_R_INTERNAL_ERROR);
@@ -4485,6 +4559,39 @@ int OSSL_HPKE_CTX_export(OSSL_HPKE_CTX *ctx,
         ERR_raise(ERR_LIB_CRYPTO, ERR_R_INTERNAL_ERROR);
         return 0;
     }
+#ifndef HAPPYKEY
+    kdf_ind = kdf_iana2index(ctx->suite.kdf_id);
+    if (kdf_ind == 0) {
+        erv = 0;
+        ERR_raise(ERR_LIB_CRYPTO, ERR_R_INTERNAL_ERROR);
+        return 0;
+    }
+    mdname = hpke_kdf_tab[kdf_ind].mdname;
+    kctx = ossl_kdf_ctx_create("HKDF", mdname, ctx->libctx, ctx->propq);
+    if (kctx == NULL) {
+        ERR_raise(ERR_LIB_CRYPTO, ERR_R_INTERNAL_ERROR);
+        return 0;
+    }
+    /* mode == FULL as per RFC9180 sec 5.1 */
+    suitebuf[0] = ctx->suite.kem_id / 256;
+    suitebuf[1] = ctx->suite.kem_id % 256;
+    suitebuf[2] = ctx->suite.kdf_id / 256;
+    suitebuf[3] = ctx->suite.kdf_id % 256;
+    suitebuf[4] = ctx->suite.aead_id / 256;
+    suitebuf[5] = ctx->suite.aead_id % 256;
+    erv = ossl_hpke_labeled_expand(kctx,
+                                   secret, secret_len,
+                                   ctx->exportersec, ctx->exporterseclen,
+                                   OSSL_HPKE_SEC51LABEL,
+                                   suitebuf, 6,
+                                   OSSL_HPKE_EXP_SEC_LABEL,
+                                   label, labellen);
+    EVP_KDF_CTX_free(kctx);
+    if (erv != 1) {
+        ERR_raise(ERR_LIB_CRYPTO, ERR_R_INTERNAL_ERROR);
+        return 0;
+    }
+#else
     erv = hpke_expand(ctx->libctx, ctx->propq, ctx->suite,
                       OSSL_HPKE_5869_MODE_FULL,
                       ctx->exportersec, ctx->exporterseclen,
@@ -4495,6 +4602,7 @@ int OSSL_HPKE_CTX_export(OSSL_HPKE_CTX *ctx,
         ERR_raise(ERR_LIB_CRYPTO, ERR_R_INTERNAL_ERROR);
         return 0;
     }
+#endif
 #if defined(SUPERVERBOSE) || defined(TESTVECTORS)
     printf("Exporting (%lu)\n", secret_len);
     hpke_pbuf(stdout, "\tctx->exportersec", ctx->exportersec,
@@ -4741,8 +4849,7 @@ int OSSL_HPKE_enc(OSSL_LIB_CTX *libctx, const char *propq,
                         cipherlen, cipher, tv);
 
 #else
-
-#ifdef OSSL_KEM_PARAM_OPERATION_DHKEM
+#ifndef HAPPYKEY
     int erv = 1;
     OSSL_HPKE_CTX *ctx = NULL;
 
@@ -4763,9 +4870,8 @@ int OSSL_HPKE_enc(OSSL_LIB_CTX *libctx, const char *propq,
             ERR_raise(ERR_LIB_CRYPTO, ERR_R_INTERNAL_ERROR);
             return 0;
         }
-        for (i = 0; i!= seqlen; i++) {
+        for (i = 0; i != seqlen; i++)
             sval = sval * 256 + seq[i];
-        }
         erv = OSSL_HPKE_CTX_set1_seq(ctx, sval);
         if (erv != 1) {
             ERR_raise(ERR_LIB_CRYPTO, ERR_R_INTERNAL_ERROR);
@@ -4841,6 +4947,7 @@ err:
 #endif
 }
 
+#ifdef HAPPYKEY
 /*
  * @brief HPKE encryption function, with externally supplied sender key pair
  *
@@ -4939,7 +5046,7 @@ int OSSL_HPKE_enc_evp(OSSL_LIB_CTX *libctx, const char *propq,
                         cipherlen, cipher);
 #endif
 }
-
+#endif
 /*
  * @brief HPKE single-shot decryption function
  *
@@ -4981,7 +5088,7 @@ int OSSL_HPKE_dec(OSSL_LIB_CTX *libctx, const char *propq,
                   const unsigned char *seq, size_t seqlen,
                   unsigned char *clear, size_t *clearlen)
 {
-#ifdef OSSL_KEM_PARAM_OPERATION_DHKEM
+#ifndef HAPPYKEY
     int erv = 1;
     OSSL_HPKE_CTX *ctx = NULL;
 
@@ -5002,9 +5109,8 @@ int OSSL_HPKE_dec(OSSL_LIB_CTX *libctx, const char *propq,
             ERR_raise(ERR_LIB_CRYPTO, ERR_R_INTERNAL_ERROR);
             goto err;
         }
-        for (i = 0; i!= seqlen; i++) {
+        for (i = 0; i != seqlen; i++)
             sval = sval * 256 + seq[i];
-        }
         erv = OSSL_HPKE_CTX_set1_seq(ctx, sval);
         if (erv != 1) {
             ERR_raise(ERR_LIB_CRYPTO, ERR_R_INTERNAL_ERROR);

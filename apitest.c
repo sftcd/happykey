@@ -379,18 +379,6 @@ static int x25519kdfsha256_hkdfsha256_aes128gcm_psk_test(void)
         0xc2, 0xaf, 0x18, 0x55, 0x5a, 0x73, 0x8b, 0x82
     };
     const char *pskid = "Ennyn Durin aran Moria";
-#if 0
-    /*
-     * unused ascii-hex equivalent of the above - better to
-     * use the char * variant as that has the terminating
-     * NUL we want
-     */
-    const unsigned char pskid_ascii_hex[] = {
-        0x45, 0x6e, 0x6e, 0x79, 0x6e, 0x20, 0x44, 0x75,
-        0x72, 0x69, 0x6e, 0x20, 0x61, 0x72, 0x61, 0x6e,
-        0x20, 0x4d, 0x6f, 0x72, 0x69, 0x61
-    };
-#endif
     const unsigned char expected_shared_secret[] = {
         0x72, 0x76, 0x99, 0xf0, 0x09, 0xff, 0xe3, 0xc0,
         0x76, 0x31, 0x50, 0x19, 0xc6, 0x96, 0x48, 0x36,
@@ -897,8 +885,7 @@ static int test_hpke_modes_suites(void)
         } else {
             psklen = 0;
         }
-        /* iterate over the kems, kdfs and aeads */
-        for (kemind = 0;
+        for (kemind = 0; /* iterate over the kems, kdfs and aeads */
              overallresult == 1 &&
              kemind != (sizeof(hpke_kem_list) / sizeof(uint16_t));
              kemind++) {
@@ -909,7 +896,6 @@ static int test_hpke_modes_suites(void)
             EVP_PKEY *authpriv_evp = NULL;
 
             hpke_suite.kem_id = kem_id;
-            /* can only set AUTH key pair when we know KEM */
             if ((hpke_mode == OSSL_HPKE_MODE_AUTH) ||
                 (hpke_mode == OSSL_HPKE_MODE_PSKAUTH)) {
                 if (TEST_true(OSSL_HPKE_keygen(testctx, NULL,
@@ -956,27 +942,19 @@ static int test_hpke_modes_suites(void)
                                                     NULL, 0,
                                                     pub, &publen, &privp)))
                         overallresult = 0;
-
                     ctx = OSSL_HPKE_CTX_new(hpke_mode, hpke_suite,
                                             testctx, NULL);
-                    if (ctx == NULL) {
-                        overallresult = 0;
-                    }
+                    if (ctx == NULL) { overallresult = 0; }
                     if (hpke_mode == OSSL_HPKE_MODE_PSK
                         || hpke_mode == OSSL_HPKE_MODE_PSKAUTH) {
                         erv = OSSL_HPKE_CTX_set1_psk(ctx, pskidp, pskp, psklen);
-                        if (erv != 1) {
-                            overallresult = 0;
-                        }
+                        if (erv != 1) { overallresult = 0; }
                     }
                     if (hpke_mode == OSSL_HPKE_MODE_AUTH
                         || hpke_mode == OSSL_HPKE_MODE_PSKAUTH) {
                         erv = OSSL_HPKE_CTX_set1_authpriv(ctx, authpriv_evp);
-                        if (erv != 1) {
-                            overallresult = 0;
-                        }
+                        if (erv != 1) { overallresult = 0; }
                     }
-                    /* randomly use a non zero sequnce */
                     if (COIN_IS_HEADS) {
                         RAND_bytes_ex(testctx,
                                       (unsigned char *) &startseq,
@@ -987,9 +965,7 @@ static int test_hpke_modes_suites(void)
                             printf("setting seq = 0x%lx\n", startseq);
 #endif
                         erv = OSSL_HPKE_CTX_set1_seq(ctx, startseq);
-                        if (erv != 1) {
-                            overallresult = 0;
-                        }
+                        if (erv != 1) { overallresult = 0; }
                     } else {
                         startseq = 0;
 #ifdef HAPPYKEY
@@ -1001,39 +977,27 @@ static int test_hpke_modes_suites(void)
                                                 cipher, &cipherlen,
                                                 pub, publen, infop, infolen,
                                                 aadp, aadlen, plain, plainlen);
-                    if (erv != 1) {
-                        overallresult = 0;
-                    }
+                    if (erv != 1) { overallresult = 0; }
                     OSSL_HPKE_CTX_free(ctx);
-
                     memset(clear, 0, clearlen);
-
                     rctx = OSSL_HPKE_CTX_new(hpke_mode, hpke_suite,
                                              testctx, NULL);
-                    if (rctx == NULL) {
-                        overallresult = 0;
-                    }
+                    if (rctx == NULL) { overallresult = 0; }
                     if (hpke_mode == OSSL_HPKE_MODE_PSK
                         || hpke_mode == OSSL_HPKE_MODE_PSKAUTH) {
                         erv = OSSL_HPKE_CTX_set1_psk(rctx, pskidp,
                                                      pskp, psklen);
-                        if (erv != 1) {
-                            overallresult = 0;
-                        }
+                        if (erv != 1) { overallresult = 0; }
                     }
                     if (hpke_mode == OSSL_HPKE_MODE_AUTH
                         || hpke_mode == OSSL_HPKE_MODE_PSKAUTH) {
                         erv = OSSL_HPKE_CTX_set1_authpub(rctx,
                                                          authpubp, authpublen);
-                        if (erv != 1) {
-                            overallresult = 0;
-                        }
+                        if (erv != 1) { overallresult = 0; }
                     }
                     if (startseq != 0) {
                         erv = OSSL_HPKE_CTX_set1_seq(rctx, startseq);
-                        if (erv != 1) {
-                            overallresult = 0;
-                        }
+                        if (erv != 1) { overallresult = 0; }
                     }
                     erv = OSSL_HPKE_recipient_open(rctx, clear, &clearlen,
                                                    senderpub, senderpublen,
@@ -1041,11 +1005,8 @@ static int test_hpke_modes_suites(void)
                                                    infop, infolen,
                                                    aadp, aadlen,
                                                    cipher, cipherlen);
-                    if (erv != 1) {
-                        overallresult = 0;
-                    }
+                    if (erv != 1) { overallresult = 0; }
                     OSSL_HPKE_CTX_free(rctx);
-
                     EVP_PKEY_free(privp);
                     privp = NULL;
                     /* check output */
