@@ -64,24 +64,47 @@
 # define OSSL_HPKE_MAXSIZE 512
 #endif
 
-/* constants defined in RFC9180 */
-#define OSSL_HPKE_VERLABEL        "HPKE-v1"  /**< version string label */
-#define OSSL_HPKE_SEC41LABEL      "KEM"      /**< "suite_id" label for 4.1 */
-#define OSSL_HPKE_SEC51LABEL      "HPKE"     /**< "suite_id" label for 5.1 */
-#define OSSL_HPKE_EAE_PRK_LABEL   "eae_prk"  /**< label in ExtractAndExpand */
-#define OSSL_HPKE_PSKIDHASH_LABEL "psk_id_hash" /**< in key_schedule_context */
-#define OSSL_HPKE_INFOHASH_LABEL  "info_hash"   /**< in key_schedule_context */
-#define OSSL_HPKE_SS_LABEL        "shared_secret" /**< Yet another label */
-#define OSSL_HPKE_NONCE_LABEL     "base_nonce"  /**< guess? */
-#define OSSL_HPKE_EXP_LABEL       "exp" /**< guess again? */
-#define OSSL_HPKE_EXP_SEC_LABEL   "sec" /**< guess again? */
-#define OSSL_HPKE_KEY_LABEL       "key" /**< guess again? */
-#define OSSL_HPKE_PSK_HASH_LABEL  "psk_hash" /**< guess again? */
-#define OSSL_HPKE_SECRET_LABEL    "secret" /**< guess again? */
-#define OSSL_HPKE_DPK_LABEL       "dkp_prk" /**< DeriveKeyPair label */
-#define OSSL_HPKE_CAND_LABEL      "candidate" /**< sk label */
-#define OSSL_HPKE_SK_LABEL        "sk" /**< sk label */
+/* Define HPKE labels from RFC 9180 in hex for EBCDIC compatibility */
+#ifdef HAPPYKEY
+/**< "HPKE-v1" -  version string label */
+static const char OSSL_HPKE_VERLABEL[] = "\x48\x50\x4B\x45\x2D\x76\x31";
+#endif
+/**< "KEM" - "suite_id" label for 4.1 */
+static const char OSSL_HPKE_SEC41LABEL[] = "\x4b\x45\x4d";
+/**< "HPKE" - "suite_id" label for 5.1 */
+static const char OSSL_HPKE_SEC51LABEL[] = "\x48\x50\x4b\x45";
+#ifdef HAPPYKEY
+/**< "eae_prk" - label in ExtractAndExpand */
+static const char OSSL_HPKE_EAE_PRK_LABEL[] = "\x65\x61\x65\x5f\x70\x72\x6b";
+#endif
+/**< "psk_id_hash" - in key_schedule_context */
+static const char OSSL_HPKE_PSKIDHASH_LABEL[] = "\x70\x73\x6b\x5f\x69\x64\x5f\x68\x61\x73\x68";
+/**<  "info_hash" - in key_schedule_context */
+static const char OSSL_HPKE_INFOHASH_LABEL[] = "\x69\x6e\x66\x6f\x5f\x68\x61\x73\x68";
+#ifdef HAPPYKEY
+/**<  "shared_secret" - shared secret calc label */
+static const char OSSL_HPKE_SS_LABEL[] = "\x73\x68\x61\x72\x65\x64\x5f\x73\x65\x63\x72\x65\x74";
+#endif
+/**<  "base_nonce" - base nonce calc label */
+static const char OSSL_HPKE_NONCE_LABEL[] = "\x62\x61\x73\x65\x5f\x6e\x6f\x6e\x63\x65";
+/**<  "exp" - internal exporter secret generation label */
+static const char OSSL_HPKE_EXP_LABEL[] = "\x65\x78\x70";
+/**<  "sec" - external label for exporting secret */
+static const char OSSL_HPKE_EXP_SEC_LABEL[] = "\x73\x65\x63";
+/**<  "key" - label for use when generating key from shared secret */
+static const char OSSL_HPKE_KEY_LABEL[] = "\x6b\x65\x79";
+/**<  "psk_hash" - for hashing PSK */
+static const char OSSL_HPKE_PSK_HASH_LABEL[] = "\x70\x73\x6b\x5f\x68\x61\x73\x68";
+/**<  "secret" - for generating shared secret */
+static const char OSSL_HPKE_SECRET_LABEL[] = "\x73\x65\x63\x72\x65\x74";
+/**<  "dkp_prk" - DeriveKeyPair label */
+static const char OSSL_HPKE_DPK_LABEL[] = "\x64\x6b\x70\x5f\x70\x72\x6b";
+/**<  "candidate" - used in deterministic key gen */
+static const char OSSL_HPKE_CAND_LABEL[] = "\x63\x61\x6e\x64\x69\x64\x61\x74\x65";
+/**<  "sk" - label used in deterministic key gen */
+static const char OSSL_HPKE_SK_LABEL[] = "\x73\x6b";
 
+#ifdef HAPPYKEY
 /* different RFC5869 "modes" used in RFC9180 */
 #define OSSL_HPKE_5869_MODE_PURE   0 /**< Do "pure" RFC5869 */
 #define OSSL_HPKE_5869_MODE_KEM    1 /**< Abide by HPKE section 4.1 */
@@ -92,7 +115,7 @@
  * for RFC5869 - that was useful in initial development and could be
  * again if we somehow break interop or the spec changes
  */
-
+#endif
 /*
  * PEM header/footer for private keys
  * PEM_STRING_PKCS8INF is just: "PRIVATE KEY"
