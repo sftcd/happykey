@@ -3533,257 +3533,6 @@ static int hpke_expansion(OSSL_HPKE_SUITE suite,
     return 1;
 }
 
-/* externally visible functions from below here */
-
-/**
- * @brief contex creator
- * @param mode is the desired HPKE mode
- * @param suite specifies the KEM, KDF and AEAD to use
- * @param libctx is the context to use
- * @param propq is a properties string
- * @return pointer to new context or NULL if error
- */
-OSSL_HPKE_CTX *OSSL_HPKE_CTX_new(int mode, OSSL_HPKE_SUITE suite,
-                                 OSSL_LIB_CTX *libctx, const char *propq)
-{
-    OSSL_HPKE_CTX *ctx = NULL;
-
-    if (hpke_suite_check(suite) != 1)
-        return NULL;
-    if (mode < 0 || mode > OSSL_HPKE_MODE_PSKAUTH)
-        return NULL;
-    ctx = OPENSSL_zalloc(sizeof(OSSL_HPKE_CTX));
-    if (ctx == NULL)
-        return ctx;
-    ctx->libctx = libctx;
-    if (propq != NULL) {
-        ctx->propq = OPENSSL_strdup(propq);
-        if (ctx->propq == NULL)
-            goto err;
-    }
-    ctx->mode = mode;
-    ctx->suite = suite;
-    return ctx;
-
-err:
-    OSSL_HPKE_CTX_free(ctx);
-    return NULL;
-}
-
-/**
- * @brief free up storage for a HPKE context
- * @param ctx is the pointer to be free'd (can be NULL)
- */
-void OSSL_HPKE_CTX_free(OSSL_HPKE_CTX *ctx)
-{
-    if (ctx == NULL)
-        return;
-    OPENSSL_free(ctx->propq);
-    if (ctx->exportersec)
-        OPENSSL_cleanse(ctx->exportersec, ctx->exporterseclen);
-    OPENSSL_free(ctx->exportersec);
-    OPENSSL_free(ctx->pskid);
-    OPENSSL_cleanse(ctx->psk, ctx->psklen);
-    OPENSSL_free(ctx->psk);
-    OPENSSL_free(ctx->shared_secret);
-    OPENSSL_free(ctx->ikme);
-
-    EVP_PKEY_free(ctx->authpriv);
-    EVP_PKEY_free(ctx->senderpriv);
-
-    OPENSSL_free(ctx->authpub);
-
-    OPENSSL_free(ctx);
-    return;
-}
-
-/**
- * @brief set a PSK for an HPKE context
- * @param ctx is the pointer for the HPKE context
- * @param pskid is a string identifying the PSK
- * @param psk is the PSK buffer
- * @param psklen is the size of the PSK
- * @return 1 for success, 0 for error
- */
-int OSSL_HPKE_CTX_set1_psk(OSSL_HPKE_CTX *ctx,
-                           const char *pskid,
-                           const unsigned char *psk, size_t psklen)
-{
-#ifdef HAPPYKEY
-    int erv = 1;
-
-#endif
-    if (ctx == NULL || pskid == NULL || psk == NULL || psklen == 0) {
-        ERR_raise(ERR_LIB_CRYPTO, ERR_R_INTERNAL_ERROR);
-        return 0;
-    }
-    if (ctx->mode != OSSL_HPKE_MODE_PSK
-        && ctx->mode != OSSL_HPKE_MODE_PSKAUTH) {
-        ERR_raise(ERR_LIB_CRYPTO, ERR_R_INTERNAL_ERROR);
-        return 0;
-    }
-    /* free previous value if any */
-    OPENSSL_free(ctx->pskid);
-    OPENSSL_cleanse(ctx->psk, ctx->psklen);
-    OPENSSL_free(ctx->psk);
-    ctx->pskid = OPENSSL_strdup(pskid);
-    if (ctx->pskid == NULL)
-        goto err;
-    ctx->psk = OPENSSL_malloc(psklen);
-    if (ctx->psk == NULL)
-        goto err;
-    memcpy(ctx->psk, psk, psklen);
-    ctx->psklen = psklen;
-    return 1;
-err:
-    /* zap any new or old psk */
-    OPENSSL_free(ctx->pskid);
-    OPENSSL_cleanse(ctx->psk, ctx->psklen);
-    OPENSSL_free(ctx->psk);
-    ctx->psklen = 0;
-    return 0;
-}
-
-/**
- * @brief set a sender private key for HPKE
- * @param ctx is the pointer for the HPKE context
- * @param privp is an EVP_PKEY form of the private key
- * @return 1 for success, 0 for error
- */
-int OSSL_HPKE_CTX_set1_senderpriv(OSSL_HPKE_CTX *ctx, EVP_PKEY *privp)
-{
-#ifdef HAPPYKEY
-    int erv = 1;
-
-#endif
-    if (ctx == NULL || privp == NULL) {
-        ERR_raise(ERR_LIB_CRYPTO, ERR_R_INTERNAL_ERROR);
-        return 0;
-    }
-    if (ctx->senderpriv != NULL)
-        EVP_PKEY_free(ctx->senderpriv);
-    ctx->senderpriv = EVP_PKEY_dup(privp);
-    if (ctx->senderpriv == NULL)
-        return 0;
-    return 1;
-}
-
-/**
- * @brief set a sender IKM for key DHKEM generation
- * @param ctx is the pointer for the HPKE context
- * @param ikme is a buffer for the IKM
- * @param ikmelen is the length of the above
- * @return 1 for success, 0 for error
- */
-int OSSL_HPKE_CTX_set1_ikme(OSSL_HPKE_CTX *ctx,
-                            const unsigned char *ikme, size_t ikmelen)
-{
-#ifdef HAPPYKEY
-    int erv = 1;
-
-#endif
-    if (ctx == NULL || ikme == NULL) {
-        ERR_raise(ERR_LIB_CRYPTO, ERR_R_INTERNAL_ERROR);
-        return 0;
-    }
-    OPENSSL_free(ctx->ikme);
-    ctx->ikme = OPENSSL_malloc(ikmelen);
-    if (ctx->ikme == NULL)
-        return 0;
-    memcpy(ctx->ikme, ikme, ikmelen);
-    ctx->ikmelen = ikmelen;
-    return 1;
-}
-
-/**
- * @brief set a private key for HPKE authenticated modes
- * @param ctx is the pointer for the HPKE context
- * @param privp is an EVP_PKEY form of the private key
- * @return 1 for success, 0 for error
- */
-int OSSL_HPKE_CTX_set1_authpriv(OSSL_HPKE_CTX *ctx, EVP_PKEY *privp)
-{
-#ifdef HAPPYKEY
-    int erv = 1;
-
-#endif
-    if (ctx == NULL || privp == NULL) {
-        ERR_raise(ERR_LIB_CRYPTO, ERR_R_INTERNAL_ERROR);
-        return 0;
-    }
-    if (ctx->mode != OSSL_HPKE_MODE_AUTH
-        && ctx->mode != OSSL_HPKE_MODE_PSKAUTH) {
-        ERR_raise(ERR_LIB_CRYPTO, ERR_R_INTERNAL_ERROR);
-        return 0;
-    }
-    if (ctx->authpriv != NULL)
-        EVP_PKEY_free(ctx->authpriv);
-    ctx->authpriv = EVP_PKEY_dup(privp);
-    if (ctx->authpriv == NULL)
-        return 0;
-    return 1;
-}
-
-/**
- * @brief set a public key for HPKE authenticated modes
- * @param ctx is the pointer for the HPKE context
- * @param pub is an buffer form of the public key
- * @param publen is the length of the above
- * @return 1 for success, 0 for error
- */
-int OSSL_HPKE_CTX_set1_authpub(OSSL_HPKE_CTX *ctx,
-                               const unsigned char *pub, size_t publen)
-{
-    if (ctx == NULL)
-        return 0;
-    if (ctx->authpub != NULL)
-        OPENSSL_free(ctx->authpub);
-    ctx->authpub = OPENSSL_malloc(publen);
-    if (ctx->authpub == NULL)
-        return 0;
-    memcpy(ctx->authpub, pub, publen);
-    ctx->authpublen = publen;
-    return 1;
-}
-
-/**
- * @brief ask for the state of the sequence of seal/open calls
- * @param ctx is the pointer for the HPKE context
- * @param seq returns the positive integer sequence number
- * @return 1 for success, 0 for error
- *
- * The value returned is the most recent used when sealing
- * or opening (successfully)
- */
-int OSSL_HPKE_CTX_get0_seq(OSSL_HPKE_CTX *ctx, uint64_t *seq)
-{
-    if (ctx == NULL || seq == NULL)
-        return 0;
-    *seq = ctx->seq;
-    return 1;
-}
-
-/**
- * @brief set the sequence value for seal/open calls
- * @param ctx is the pointer for the HPKE context
- * @param seq set the positive integer sequence number
- * @return 1 for success, 0 for error
- *
- * The value returned is the most recent used when sealing
- * or opening (successfully)
- */
-int OSSL_HPKE_CTX_set1_seq(OSSL_HPKE_CTX *ctx, uint64_t seq)
-{
-#ifdef HAPPYKEY
-    int erv = 1;
-
-#endif
-    if (ctx == NULL)
-        return 0;
-    ctx->seq = seq;
-    return 1;
-}
-
 static int hpke_seq2buf(uint64_t seq, unsigned char *buf, size_t blen)
 {
 #ifdef HAPPYKEY
@@ -4242,6 +3991,258 @@ err:
     return erv;
 }
 #endif /* not HAPPYKEY */
+
+/* externally visible functions from below here */
+
+/**
+ * @brief contex creator
+ * @param mode is the desired HPKE mode
+ * @param suite specifies the KEM, KDF and AEAD to use
+ * @param libctx is the context to use
+ * @param propq is a properties string
+ * @return pointer to new context or NULL if error
+ */
+OSSL_HPKE_CTX *OSSL_HPKE_CTX_new(int mode, OSSL_HPKE_SUITE suite,
+                                 OSSL_LIB_CTX *libctx, const char *propq)
+{
+    OSSL_HPKE_CTX *ctx = NULL;
+
+    if (hpke_suite_check(suite) != 1)
+        return NULL;
+    if (mode < 0 || mode > OSSL_HPKE_MODE_PSKAUTH)
+        return NULL;
+    ctx = OPENSSL_zalloc(sizeof(OSSL_HPKE_CTX));
+    if (ctx == NULL)
+        return ctx;
+    ctx->libctx = libctx;
+    if (propq != NULL) {
+        ctx->propq = OPENSSL_strdup(propq);
+        if (ctx->propq == NULL)
+            goto err;
+    }
+    ctx->mode = mode;
+    ctx->suite = suite;
+    return ctx;
+
+err:
+    OSSL_HPKE_CTX_free(ctx);
+    return NULL;
+}
+
+/**
+ * @brief free up storage for a HPKE context
+ * @param ctx is the pointer to be free'd (can be NULL)
+ */
+void OSSL_HPKE_CTX_free(OSSL_HPKE_CTX *ctx)
+{
+    if (ctx == NULL)
+        return;
+    OPENSSL_free(ctx->propq);
+    if (ctx->exportersec)
+        OPENSSL_cleanse(ctx->exportersec, ctx->exporterseclen);
+    OPENSSL_free(ctx->exportersec);
+    OPENSSL_free(ctx->pskid);
+    OPENSSL_cleanse(ctx->psk, ctx->psklen);
+    OPENSSL_free(ctx->psk);
+    OPENSSL_free(ctx->shared_secret);
+    OPENSSL_free(ctx->ikme);
+
+    EVP_PKEY_free(ctx->authpriv);
+    EVP_PKEY_free(ctx->senderpriv);
+
+    OPENSSL_free(ctx->authpub);
+
+    OPENSSL_free(ctx);
+    return;
+}
+
+/**
+ * @brief set a PSK for an HPKE context
+ * @param ctx is the pointer for the HPKE context
+ * @param pskid is a string identifying the PSK
+ * @param psk is the PSK buffer
+ * @param psklen is the size of the PSK
+ * @return 1 for success, 0 for error
+ */
+int OSSL_HPKE_CTX_set1_psk(OSSL_HPKE_CTX *ctx,
+                           const char *pskid,
+                           const unsigned char *psk, size_t psklen)
+{
+#ifdef HAPPYKEY
+    int erv = 1;
+
+#endif
+    if (ctx == NULL || pskid == NULL || psk == NULL || psklen == 0) {
+        ERR_raise(ERR_LIB_CRYPTO, ERR_R_INTERNAL_ERROR);
+        return 0;
+    }
+    if (ctx->mode != OSSL_HPKE_MODE_PSK
+        && ctx->mode != OSSL_HPKE_MODE_PSKAUTH) {
+        ERR_raise(ERR_LIB_CRYPTO, ERR_R_INTERNAL_ERROR);
+        return 0;
+    }
+    /* free previous value if any */
+    OPENSSL_free(ctx->pskid);
+    OPENSSL_cleanse(ctx->psk, ctx->psklen);
+    OPENSSL_free(ctx->psk);
+    ctx->pskid = OPENSSL_strdup(pskid);
+    if (ctx->pskid == NULL)
+        goto err;
+    ctx->psk = OPENSSL_malloc(psklen);
+    if (ctx->psk == NULL)
+        goto err;
+    memcpy(ctx->psk, psk, psklen);
+    ctx->psklen = psklen;
+    return 1;
+err:
+    /* zap any new or old psk */
+    OPENSSL_free(ctx->pskid);
+    OPENSSL_cleanse(ctx->psk, ctx->psklen);
+    OPENSSL_free(ctx->psk);
+    ctx->psklen = 0;
+    return 0;
+}
+
+/**
+ * @brief set a sender private key for HPKE
+ * @param ctx is the pointer for the HPKE context
+ * @param privp is an EVP_PKEY form of the private key
+ * @return 1 for success, 0 for error
+ */
+int OSSL_HPKE_CTX_set1_senderpriv(OSSL_HPKE_CTX *ctx, EVP_PKEY *privp)
+{
+#ifdef HAPPYKEY
+    int erv = 1;
+
+#endif
+    if (ctx == NULL || privp == NULL) {
+        ERR_raise(ERR_LIB_CRYPTO, ERR_R_INTERNAL_ERROR);
+        return 0;
+    }
+    if (ctx->senderpriv != NULL)
+        EVP_PKEY_free(ctx->senderpriv);
+    ctx->senderpriv = EVP_PKEY_dup(privp);
+    if (ctx->senderpriv == NULL)
+        return 0;
+    return 1;
+}
+
+/**
+ * @brief set a sender IKM for key DHKEM generation
+ * @param ctx is the pointer for the HPKE context
+ * @param ikme is a buffer for the IKM
+ * @param ikmelen is the length of the above
+ * @return 1 for success, 0 for error
+ */
+int OSSL_HPKE_CTX_set1_ikme(OSSL_HPKE_CTX *ctx,
+                            const unsigned char *ikme, size_t ikmelen)
+{
+#ifdef HAPPYKEY
+    int erv = 1;
+
+#endif
+    if (ctx == NULL || ikme == NULL) {
+        ERR_raise(ERR_LIB_CRYPTO, ERR_R_INTERNAL_ERROR);
+        return 0;
+    }
+    OPENSSL_free(ctx->ikme);
+    ctx->ikme = OPENSSL_malloc(ikmelen);
+    if (ctx->ikme == NULL)
+        return 0;
+    memcpy(ctx->ikme, ikme, ikmelen);
+    ctx->ikmelen = ikmelen;
+    return 1;
+}
+
+/**
+ * @brief set a private key for HPKE authenticated modes
+ * @param ctx is the pointer for the HPKE context
+ * @param privp is an EVP_PKEY form of the private key
+ * @return 1 for success, 0 for error
+ */
+int OSSL_HPKE_CTX_set1_authpriv(OSSL_HPKE_CTX *ctx, EVP_PKEY *privp)
+{
+#ifdef HAPPYKEY
+    int erv = 1;
+
+#endif
+    if (ctx == NULL || privp == NULL) {
+        ERR_raise(ERR_LIB_CRYPTO, ERR_R_INTERNAL_ERROR);
+        return 0;
+    }
+    if (ctx->mode != OSSL_HPKE_MODE_AUTH
+        && ctx->mode != OSSL_HPKE_MODE_PSKAUTH) {
+        ERR_raise(ERR_LIB_CRYPTO, ERR_R_INTERNAL_ERROR);
+        return 0;
+    }
+    if (ctx->authpriv != NULL)
+        EVP_PKEY_free(ctx->authpriv);
+    ctx->authpriv = EVP_PKEY_dup(privp);
+    if (ctx->authpriv == NULL)
+        return 0;
+    return 1;
+}
+
+/**
+ * @brief set a public key for HPKE authenticated modes
+ * @param ctx is the pointer for the HPKE context
+ * @param pub is an buffer form of the public key
+ * @param publen is the length of the above
+ * @return 1 for success, 0 for error
+ */
+int OSSL_HPKE_CTX_set1_authpub(OSSL_HPKE_CTX *ctx,
+                               const unsigned char *pub, size_t publen)
+{
+    if (ctx == NULL)
+        return 0;
+    if (ctx->authpub != NULL)
+        OPENSSL_free(ctx->authpub);
+    ctx->authpub = OPENSSL_malloc(publen);
+    if (ctx->authpub == NULL)
+        return 0;
+    memcpy(ctx->authpub, pub, publen);
+    ctx->authpublen = publen;
+    return 1;
+}
+
+/**
+ * @brief ask for the state of the sequence of seal/open calls
+ * @param ctx is the pointer for the HPKE context
+ * @param seq returns the positive integer sequence number
+ * @return 1 for success, 0 for error
+ *
+ * The value returned is the most recent used when sealing
+ * or opening (successfully)
+ */
+int OSSL_HPKE_CTX_get0_seq(OSSL_HPKE_CTX *ctx, uint64_t *seq)
+{
+    if (ctx == NULL || seq == NULL)
+        return 0;
+    *seq = ctx->seq;
+    return 1;
+}
+
+/**
+ * @brief set the sequence value for seal/open calls
+ * @param ctx is the pointer for the HPKE context
+ * @param seq set the positive integer sequence number
+ * @return 1 for success, 0 for error
+ *
+ * The value returned is the most recent used when sealing
+ * or opening (successfully)
+ */
+int OSSL_HPKE_CTX_set1_seq(OSSL_HPKE_CTX *ctx, uint64_t seq)
+{
+#ifdef HAPPYKEY
+    int erv = 1;
+
+#endif
+    if (ctx == NULL)
+        return 0;
+    ctx->seq = seq;
+    return 1;
+}
+
 /**
  * @brief sender seal function
  * @param ctx is the pointer for the HPKE context
