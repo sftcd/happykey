@@ -20,18 +20,6 @@
 #include "internal/packet.h"
 #endif
 
-/*
- * The largest value happens inside dhkem_extract_and_expand
- * Which consists of a max dkmlen of 2*privkeylen + suiteid + small label
- */
-#define LABELED_EXTRACT_SIZE (10 + 12 + 2 * OSSL_HPKE_MAX_PRIVATE)
-
-/*
- * The largest value happens inside dhkem_extract_and_expand
- * Which consists of a prklen of secretlen + contextlen of 3 encoded public keys
- * + suiteid + small label
- */
-#define LABELED_EXPAND_SIZE (LABELED_EXTRACT_SIZE + 3 * OSSL_HPKE_MAX_PUBLIC)
 
 /* ASCII: "HPKE-v1", in hex for EBCDIC compatibility */
 static const char LABEL_HPKEV1[] = "\x48\x50\x4B\x45\x2D\x76\x31";
@@ -94,11 +82,18 @@ int ossl_hpke_labeled_extract(EVP_KDF_CTX *kctx,
 {
     int ret = 0;
     size_t labeled_ikmlen = 0;
-    unsigned char labeled_ikm[LABELED_EXTRACT_SIZE];
+    unsigned char *labeled_ikm = NULL;
     WPACKET pkt;
 
+    labeled_ikmlen = strlen(LABEL_HPKEV1) + strlen(protocol_label)
+                     + suiteidlen + strlen(label) + ikmlen;
+    labeled_ikm = OPENSSL_malloc(labeled_ikmlen);
+    if (labeled_ikm == NULL) {
+        ERR_raise(ERR_LIB_PROV, ERR_R_MALLOC_FAILURE);
+        goto end;
+    }
     /* labeled_ikm = concat("HPKE-v1", suiteid, label, ikm) */
-    if (!WPACKET_init_static_len(&pkt, labeled_ikm, sizeof(labeled_ikm), 0)
+    if (!WPACKET_init_static_len(&pkt, labeled_ikm, labeled_ikmlen, 0)
             || !WPACKET_memcpy(&pkt, LABEL_HPKEV1, strlen(LABEL_HPKEV1))
             || !WPACKET_memcpy(&pkt, protocol_label, strlen(protocol_label))
             || !WPACKET_memcpy(&pkt, suiteid, suiteidlen)
@@ -115,6 +110,7 @@ int ossl_hpke_labeled_extract(EVP_KDF_CTX *kctx,
 end:
     WPACKET_cleanup(&pkt);
     OPENSSL_cleanse(labeled_ikm, labeled_ikmlen);
+    OPENSSL_free(labeled_ikm);
     return ret;
 }
 
@@ -131,11 +127,19 @@ int ossl_hpke_labeled_expand(EVP_KDF_CTX *kctx,
 {
     int ret = 0;
     size_t labeled_infolen = 0;
-    unsigned char labeled_info[LABELED_EXPAND_SIZE];
+    unsigned char *labeled_info = NULL;
     WPACKET pkt;
 
+    labeled_infolen = 2 + okmlen + prklen + strlen(LABEL_HPKEV1)
+                      + strlen(protocol_label) + suiteidlen + strlen(label)
+                      + infolen;
+    labeled_info = OPENSSL_malloc(labeled_infolen);
+    if (labeled_info == NULL) {
+        ERR_raise(ERR_LIB_PROV, ERR_R_MALLOC_FAILURE);
+        goto end;
+    }
     /* labeled_info = concat(okmlen, "HPKE-v1", suiteid, label, info) */
-    if (!WPACKET_init_static_len(&pkt, labeled_info, sizeof(labeled_info), 0)
+    if (!WPACKET_init_static_len(&pkt, labeled_info, labeled_infolen, 0)
             || !WPACKET_put_bytes_u16(&pkt, okmlen)
             || !WPACKET_memcpy(&pkt, LABEL_HPKEV1, strlen(LABEL_HPKEV1))
             || !WPACKET_memcpy(&pkt, protocol_label, strlen(protocol_label))
@@ -152,6 +156,7 @@ int ossl_hpke_labeled_expand(EVP_KDF_CTX *kctx,
                                prk, prklen, labeled_info, labeled_infolen);
 end:
     WPACKET_cleanup(&pkt);
+    OPENSSL_free(labeled_info);
     return ret;
 }
 
