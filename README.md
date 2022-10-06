@@ -28,6 +28,7 @@ High level notes:
 ## Recent Changes
 
 - 20221006: getting PR comments on this now...
+    - DHKEM apis handle 9180 det key gen so I could lose that code
 
 - 20221005: reduced HPKE code duplication when building with DHKEM 
   PR now having being merged (but keeping ability to build and link to
