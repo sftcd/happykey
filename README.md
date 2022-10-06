@@ -27,6 +27,8 @@ High level notes:
 
 ## Recent Changes
 
+- 20221006: getting PR comments on this now...
+
 - 20221005: reduced HPKE code duplication when building with DHKEM 
   PR now having being merged (but keeping ability to build and link to
   a released OpenSSL 3.0.0). TODO: ECH checks.

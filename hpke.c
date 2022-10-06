@@ -16,7 +16,11 @@
 #include <stdint.h>
 #include <string.h>
 
+#if !defined(OPENSSL_SYS_WINDOWS)
 #include <arpa/inet.h>
+#else
+#include <winsock.h>
+#endif
 
 #include <openssl/ssl.h>
 #include <openssl/rand.h>
@@ -3184,7 +3188,7 @@ err:
     OPENSSL_free(lpub);
     return erv;
 }
-
+#ifdef HAPPYKEY
 /*
  * @brief generate a key pair
  *
@@ -3249,6 +3253,7 @@ err:
     BIO_free_all(bfp);
     return erv;
 }
+#endif
 
 /*
  * @brief randomly pick a suite
@@ -3296,8 +3301,8 @@ static int hpke_random_suite(OSSL_LIB_CTX *libctx,
  * @param suite is the chosen or random suite
  * @param pub a random value of the appropriate length for sender public value
  * @param pub_len is the length of pub (buffer size on input)
- * @param cipher buffer with random value of the appropriate length
- * @param cipher_len is the length of cipher
+ * @param ciphertext buffer with random value of the appropriate length
+ * @param ciphertext_len is the length of cipher
  * @return 1 for success, otherwise failure
  */
 static int hpke_good4grease(OSSL_LIB_CTX *libctx, const char *propq,
@@ -3305,8 +3310,8 @@ static int hpke_good4grease(OSSL_LIB_CTX *libctx, const char *propq,
                             OSSL_HPKE_SUITE *suite,
                             unsigned char *pub,
                             size_t *pub_len,
-                            unsigned char *cipher,
-                            size_t cipher_len)
+                            unsigned char *ciphertext,
+                            size_t ciphertext_len)
 {
     OSSL_HPKE_SUITE chosen;
     int crv = 0;
@@ -3319,7 +3324,7 @@ static int hpke_good4grease(OSSL_LIB_CTX *libctx, const char *propq,
 #endif
 
     if (pub == NULL || !pub_len
-        || cipher == NULL || !cipher_len || suite == NULL)
+        || ciphertext == NULL || !ciphertext_len || suite == NULL)
         return 0;
     if (suite_in == NULL) {
         /* choose a random suite */
@@ -3364,7 +3369,8 @@ static int hpke_good4grease(OSSL_LIB_CTX *libctx, const char *propq,
     if (RAND_bytes_ex(libctx, pub, plen, OSSL_HPKE_RSTRENGTH) <= 0)
         return 0;
     *pub_len = plen;
-    if (RAND_bytes_ex(libctx, cipher, cipher_len, OSSL_HPKE_RSTRENGTH) <= 0)
+    if (RAND_bytes_ex(libctx, ciphertext, ciphertext_len,
+                      OSSL_HPKE_RSTRENGTH) <= 0)
         return 0;
 #ifdef SUPERVERBOSE
     printf("GREASEy suite:\n\tkem: %s (%d), kdf: %s (%d), aead: %s (%d)\n",
@@ -4567,6 +4573,7 @@ int OSSL_HPKE_CTX_export(OSSL_HPKE_CTX *ctx,
     return 1;
 }
 
+#ifdef HAPPYKEY
 /*
  * @brief generate a key pair
  * @param libctx is the context to use
@@ -4590,6 +4597,7 @@ int OSSL_HPKE_keygen_buf(OSSL_LIB_CTX *libctx, const char *propq,
     return hpke_kg(libctx, propq, mode, suite, ikmlen, ikm,
                    publen, pub, privlen, priv);
 }
+#endif
 
 /*
  * @brief generate a key pair but keep private inside API
@@ -4625,6 +4633,7 @@ int OSSL_HPKE_suite_check(OSSL_HPKE_SUITE suite)
     return hpke_suite_check(suite);
 }
 
+#ifdef HAPPYKEY
 /*
  * @brief: map a kem_id and a private key buffer into an EVP_PKEY
  *
@@ -4651,7 +4660,7 @@ int OSSL_HPKE_prbuf2evp(OSSL_LIB_CTX *libctx, const char *propq,
     return hpke_prbuf2evp(libctx, propq, kem_id, prbuf, prbuf_len, pubuf,
                           pubuf_len, priv);
 }
-
+#endif
 /*
  * @brief get a (possibly) random suite, public key and ciphertext for GREASErs
  *
@@ -4818,7 +4827,7 @@ int OSSL_HPKE_enc(OSSL_LIB_CTX *libctx, const char *propq,
     if (seq != NULL) {
         /* need to map to uint64_t and use setter */
         uint64_t sval = 0;
-        int i;
+        size_t i;
 
         if (seqlen > 8) {
             ERR_raise(ERR_LIB_CRYPTO, ERR_R_INTERNAL_ERROR);
@@ -5057,7 +5066,7 @@ int OSSL_HPKE_dec(OSSL_LIB_CTX *libctx, const char *propq,
     if (seq != NULL) {
         /* need to map to uint64_t and use setter */
         uint64_t sval = 0;
-        int i;
+        size_t i;
 
         if (seqlen > 8) {
             ERR_raise(ERR_LIB_CRYPTO, ERR_R_INTERNAL_ERROR);

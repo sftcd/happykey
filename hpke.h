@@ -31,7 +31,7 @@
  */
 # define OSSL_HPKE_KEM_ID_RESERVED         0x0000 /**< not used */
 # define OSSL_HPKE_KEM_ID_P256             0x0010 /**< NIST P-256 */
-# define OSSL_HPKE_KEM_ID_P384             0x0011 /**< NIST P-256 */
+# define OSSL_HPKE_KEM_ID_P384             0x0011 /**< NIST P-384 */
 # define OSSL_HPKE_KEM_ID_P521             0x0012 /**< NIST P-521 */
 # define OSSL_HPKE_KEM_ID_X25519           0x0020 /**< Curve25519 */
 # define OSSL_HPKE_KEM_ID_X448             0x0021 /**< Curve448 */
@@ -326,8 +326,8 @@ int OSSL_HPKE_suite_check(OSSL_HPKE_SUITE suite);
  * @param suite is the chosen or random suite
  * @param pub a random value of the appropriate length for a sender public value
  * @param pub_len is the length of pub (buffer size on input)
- * @param cipher is a random value of the appropriate length for a ciphertext
- * @param cipher_len is the length of cipher
+ * @param ciphertext is a random value of the appropriate length for ciphertext
+ * @param ciphertext_len is the length of cipher
  * @return 1 for success, otherwise failure
  *
  * If suite_in is provided that will be used (if supported). If
@@ -340,8 +340,8 @@ int OSSL_HPKE_good4grease(OSSL_LIB_CTX *libctx, const char *propq,
                           OSSL_HPKE_SUITE *suite,
                           unsigned char *pub,
                           size_t *pub_len,
-                          unsigned char *cipher,
-                          size_t cipher_len);
+                          unsigned char *ciphertext,
+                          size_t ciphertext_len);
 
 /**
  * @brief map a string to a HPKE suite
