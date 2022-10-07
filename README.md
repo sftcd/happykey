@@ -27,6 +27,8 @@ High level notes:
 
 ## Recent Changes
 
+- 20221007: changes to keep OpenSSL CI happy
+
 - 20221006: getting PR comments on this now...
     - DHKEM apis handle 9180 det key gen so I could lose that code
 
