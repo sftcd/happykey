@@ -1139,8 +1139,15 @@ static int test_hpke_suite_strs(void)
                          kdf_str_list[kdfind],
                          aead_str_list[aeadind]);
                 if (TEST_true(OSSL_HPKE_str2suite(sstr, &stirred)) != 1) {
+#ifdef HAPPYKEY
+                    if (verbose) { printf("Unexpected str2suite fail for %s\n",sstr); }
+#endif
                     overallresult = 0;
                 }
+#ifdef HAPPYKEY
+                else 
+                    if (verbose) { printf("str2suite ok for %s\n",sstr); }
+#endif
             }
         }
     }

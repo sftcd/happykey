@@ -3363,16 +3363,56 @@ err:
     return erv;
 }
 
-/*
- * @brief string matching for suites
+/**
+ * table with identifier and synonym strings
+ * right now, there are 4 synonyms for each - a name, a hex string
+ * a hex string with a leading zero and a decimal string - more
+ * could be added but that seems like enough
  */
-#if defined(_WIN32)
-# define HPKE_MSMATCH(inp, known) \
-    (strlen(inp) == strlen(known) && !_stricmp(inp, known))
-#else
-# define HPKE_MSMATCH(inp, known) \
-    (strlen(inp) == strlen(known) && !strcasecmp(inp, known))
-#endif
+typedef struct OSSL_HPKE_synonymtab_str {
+    uint16_t id;
+    char *synonyms[4];
+} synonymttab_t;
+
+/**
+ * synonym table for KEMs
+ */
+static synonymttab_t kemstrtab[] = {
+    {OSSL_HPKE_KEM_ID_P256,
+        {OSSL_HPKE_KEMSTR_P256, "0x10", "0x10", "16" }},
+    {OSSL_HPKE_KEM_ID_P384,
+        {OSSL_HPKE_KEMSTR_P384, "0x11", "0x11", "17" }},
+    {OSSL_HPKE_KEM_ID_P521,
+        {OSSL_HPKE_KEMSTR_P521, "0x12", "0x12", "18" }},
+    {OSSL_HPKE_KEM_ID_X25519,
+        {OSSL_HPKE_KEMSTR_X25519, "0x20", "0x20", "32" }},
+    {OSSL_HPKE_KEM_ID_X448,
+        {OSSL_HPKE_KEMSTR_X448, "0x21", "0x21", "33" }}
+};
+
+/**
+ * synonym table for KDFs
+ */
+static synonymttab_t kdfstrtab[] = {
+    {OSSL_HPKE_KDF_ID_HKDF_SHA256,
+        {OSSL_HPKE_KDFSTR_256, "0x1", "0x01", "1"}},
+    {OSSL_HPKE_KDF_ID_HKDF_SHA384,
+        {OSSL_HPKE_KDFSTR_384, "0x2", "0x02", "2"}},
+    {OSSL_HPKE_KDF_ID_HKDF_SHA512,
+        {OSSL_HPKE_KDFSTR_512, "0x3", "0x03", "3"}}
+};
+
+/**
+ * synonym table for AEADs
+ */
+static synonymttab_t aeadstrtab[] = {
+    {OSSL_HPKE_AEAD_ID_AES_GCM_128,
+        {OSSL_HPKE_AEADSTR_AES128GCM , "0x1", "0x01", "1"}},
+    {OSSL_HPKE_AEAD_ID_AES_GCM_256,
+        {OSSL_HPKE_AEADSTR_AES256GCM , "0x2", "0x02", "2"}},
+    {OSSL_HPKE_AEAD_ID_CHACHA_POLY1305,
+        {OSSL_HPKE_AEADSTR_CP , "0x3", "0x03", "3"}}
+};
 
 /*
  * @brief map a string to a HPKE suite
@@ -3388,6 +3428,7 @@ static int hpke_str2suite(const char *suitestr, OSSL_HPKE_SUITE *suite)
     char *instrcp = NULL;
     size_t inplen = 0;
     int labels = 0;
+    int i, j;
 
     if (suitestr == NULL || suite == NULL)
         return 0;
@@ -3403,58 +3444,32 @@ static int hpke_str2suite(const char *suitestr, OSSL_HPKE_SUITE *suite)
     }
     while (st != NULL && ++labels <= 3) {
         /* check if string is known or number and if so handle appropriately */
+        synonymttab_t *synp = NULL;
+        uint16_t *targ = NULL;
+        size_t outsize = 0;
+        size_t insize = 0;
+
         if (kem == 0) {
-            if (HPKE_MSMATCH(st, OSSL_HPKE_KEMSTR_P256)) {
-                kem = OSSL_HPKE_KEM_ID_P256;
-            }
-            if (HPKE_MSMATCH(st, OSSL_HPKE_KEMSTR_P384)) {
-                kem = OSSL_HPKE_KEM_ID_P384;
-            }
-            if (HPKE_MSMATCH(st, OSSL_HPKE_KEMSTR_P521)) {
-                kem = OSSL_HPKE_KEM_ID_P521;
-            }
-            if (HPKE_MSMATCH(st, OSSL_HPKE_KEMSTR_X25519)) {
-                kem = OSSL_HPKE_KEM_ID_X25519;
-            }
-            if (HPKE_MSMATCH(st, OSSL_HPKE_KEMSTR_X448)) {
-                kem = OSSL_HPKE_KEM_ID_X448;
-            }
-            if (HPKE_MSMATCH(st, "0x10")) { kem = OSSL_HPKE_KEM_ID_P256; }
-            if (HPKE_MSMATCH(st, "16")) { kem = OSSL_HPKE_KEM_ID_P256; }
-            if (HPKE_MSMATCH(st, "0x11")) { kem = OSSL_HPKE_KEM_ID_P384; }
-            if (HPKE_MSMATCH(st, "17")) { kem = OSSL_HPKE_KEM_ID_P384; }
-            if (HPKE_MSMATCH(st, "0x12")) { kem = OSSL_HPKE_KEM_ID_P521; }
-            if (HPKE_MSMATCH(st, "18")) { kem = OSSL_HPKE_KEM_ID_P521; }
-            if (HPKE_MSMATCH(st, "0x20")) { kem = OSSL_HPKE_KEM_ID_X25519; }
-            if (HPKE_MSMATCH(st, "32")) { kem = OSSL_HPKE_KEM_ID_X25519; }
-            if (HPKE_MSMATCH(st, "0x21")) { kem = OSSL_HPKE_KEM_ID_X448; }
-            if (HPKE_MSMATCH(st, "33")) { kem = OSSL_HPKE_KEM_ID_X448; }
+            synp = kemstrtab;
+            targ = &kem;
+            outsize = OSSL_NELEM(kemstrtab);
+            insize = OSSL_NELEM(kemstrtab[0].synonyms);
         } else if (kem != 0 && kdf == 0) {
-            if (HPKE_MSMATCH(st, OSSL_HPKE_KDFSTR_256)) { kdf = 1; }
-            if (HPKE_MSMATCH(st, OSSL_HPKE_KDFSTR_384)) { kdf = 2; }
-            if (HPKE_MSMATCH(st, OSSL_HPKE_KDFSTR_512)) { kdf = 3; }
-            if (HPKE_MSMATCH(st, "0x01")) { kdf = 1; }
-            if (HPKE_MSMATCH(st, "0x02")) { kdf = 2; }
-            if (HPKE_MSMATCH(st, "0x03")) { kdf = 3; }
-            if (HPKE_MSMATCH(st, "0x1")) { kdf = 1; }
-            if (HPKE_MSMATCH(st, "0x2")) { kdf = 2; }
-            if (HPKE_MSMATCH(st, "0x3")) { kdf = 3; }
-            if (HPKE_MSMATCH(st, "1")) { kdf = 1; }
-            if (HPKE_MSMATCH(st, "2")) { kdf = 2; }
-            if (HPKE_MSMATCH(st, "3")) { kdf = 3; }
+            synp = kdfstrtab;
+            targ = &kdf;
+            outsize = OSSL_NELEM(kdfstrtab);
+            insize = OSSL_NELEM(kdfstrtab[0].synonyms);
         } else if (kem != 0 && kdf != 0 && aead == 0) {
-            if (HPKE_MSMATCH(st, OSSL_HPKE_AEADSTR_AES128GCM)) { aead = 1; }
-            if (HPKE_MSMATCH(st, OSSL_HPKE_AEADSTR_AES256GCM)) { aead = 2; }
-            if (HPKE_MSMATCH(st, OSSL_HPKE_AEADSTR_CP)) { aead = 3; }
-            if (HPKE_MSMATCH(st, "0x01")) { aead = 1; }
-            if (HPKE_MSMATCH(st, "0x02")) { aead = 2; }
-            if (HPKE_MSMATCH(st, "0x03")) { aead = 3; }
-            if (HPKE_MSMATCH(st, "0x1")) { aead = 1; }
-            if (HPKE_MSMATCH(st, "0x2")) { aead = 2; }
-            if (HPKE_MSMATCH(st, "0x3")) { aead = 3; }
-            if (HPKE_MSMATCH(st, "1")) { aead = 1; }
-            if (HPKE_MSMATCH(st, "2")) { aead = 2; }
-            if (HPKE_MSMATCH(st, "3")) { aead = 3; }
+            synp = aeadstrtab;
+            targ = &aead;
+            outsize = OSSL_NELEM(aeadstrtab);
+            insize = OSSL_NELEM(aeadstrtab[0].synonyms);
+        }
+        for (i = 0; i != outsize && *targ == 0; i++) {
+            for (j= 0; j != insize && *targ == 0; j++) {
+                if (OPENSSL_strcasecmp(st, synp[i].synonyms[j]) == 0)
+                    *targ = synp[i].id;
+            }
         }
         st = strtok(NULL, ",");
     }

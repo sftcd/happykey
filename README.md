@@ -27,6 +27,8 @@ High level notes:
 
 ## Recent Changes
 
+- 20221008: changes to str2suite based on PR comments
+
 - 20221007: changes to keep OpenSSL CI happy
 
 - 20221006: getting PR comments on this now...
