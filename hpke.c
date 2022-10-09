@@ -3428,7 +3428,11 @@ static int hpke_str2suite(const char *suitestr, OSSL_HPKE_SUITE *suite)
     char *instrcp = NULL;
     size_t inplen = 0;
     int labels = 0;
-    int i, j;
+    synonymttab_t *synp = NULL;
+    uint16_t *targ = NULL;
+    size_t i, j;
+    size_t outsize = 0;
+    size_t insize = 0;
 
     if (suitestr == NULL || suite == NULL)
         return 0;
@@ -3444,10 +3448,6 @@ static int hpke_str2suite(const char *suitestr, OSSL_HPKE_SUITE *suite)
     }
     while (st != NULL && ++labels <= 3) {
         /* check if string is known or number and if so handle appropriately */
-        synonymttab_t *synp = NULL;
-        uint16_t *targ = NULL;
-        size_t outsize = 0;
-        size_t insize = 0;
 
         if (kem == 0) {
             synp = kemstrtab;
