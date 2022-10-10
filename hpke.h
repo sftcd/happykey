@@ -1,5 +1,5 @@
 /*
- * Copyright 2019-2022 The OpenSSL Project Authors. All Rights Reserved.
+ * Copyright 2022 The OpenSSL Project Authors. All Rights Reserved.
  *
  * Licensed under the OpenSSL license (the "License").  You may not use
  * this file except in compliance with the License.  You can obtain a copy
@@ -358,18 +358,35 @@ int OSSL_HPKE_good4grease(OSSL_LIB_CTX *libctx, const char *propq,
  */
 int OSSL_HPKE_str2suite(const char *str, OSSL_HPKE_SUITE *suite);
 
+
 /**
  * @brief tell the caller how big the cipertext will be
  * @param suite is the suite to be used
- * @param enclen points to what'll be enc length
  * @param clearlen is the length of plaintext
- * @param cipherlen points to what'll be ciphertext length
- * @return 1 for success, otherwise failure
+ * @return the length of the related ciphertext or zero on error
+ *
+ * AEAD algorithms add a tag for data authentication.
+ * Those are almost always, but not always, 16 octets
+ * long, and who know what'll be true in the future.
+ * So this function allows a caller to find out how
+ * much data expansion they'll see with a given
+ * suite.
  */
-int OSSL_HPKE_expansion(OSSL_HPKE_SUITE suite,
-                        size_t *enclen,
-                        size_t clearlen,
-                        size_t *cipherlen);
+size_t OSSL_HPKE_get_ciphertext_size(OSSL_HPKE_SUITE suite, size_t clearlen);
+
+/**
+ * @brief tell the caller how big the public value ``enc`` will be
+ * @param suite is the suite to be used
+ * @return size of public encap or zero on error
+ *
+ * AEAD algorithms add a tag for data authentication.
+ * Those are almost always, but not always, 16 octets
+ * long, and who know what'll be true in the future.
+ * So this function allows a caller to find out how
+ * much data expansion they'll see with a given
+ * suite.
+ */
+size_t OSSL_HPKE_get_public_encap_size(OSSL_HPKE_SUITE suite);
 
 /*
  * below are the existing enc/dec APIs that will likely be

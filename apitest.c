@@ -1,6 +1,6 @@
 #ifdef HAPPYKEY
 /*
- * Copyright 2019-2022 The OpenSSL Project Authors. All Rights Reserved.
+ * Copyright 2022 The OpenSSL Project Authors. All Rights Reserved.
  *
  * Licensed under the OpenSSL license (the "License").  You may not use
  * this file except in compliance with the License.  You can obtain a copy
@@ -1218,16 +1218,21 @@ static int test_hpke_grease(void)
         overallresult = 0;
     }
     /* expansion */
-    if (TEST_true(OSSL_HPKE_expansion(g_suite, &enclen,
-                                      clearlen, &expanded)) != 1) {
-        overallresult = 0;
-    }
+    expanded = OSSL_HPKE_get_ciphertext_size(g_suite, clearlen);
     if (expanded <= clearlen) {
 #ifdef HAPPYKEY
         printf("expanded<=clearlen fail\n");
 #endif
         overallresult = 0;
     }
+    enclen = OSSL_HPKE_get_public_encap_size(g_suite);
+    if (enclen == 0) {
+#ifdef HAPPYKEY
+        printf("enclen fail\n");
+#endif
+        overallresult = 0;
+    }
+
     return overallresult;
 }
 
