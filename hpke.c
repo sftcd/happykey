@@ -260,9 +260,9 @@ typedef struct {
  */
 static hpke_kdf_info_t hpke_kdf_tab[] = {
     { 0, NULL, 0 }, /* keep indexing correct */
-    { OSSL_HPKE_KDF_ID_HKDF_SHA256, LN_sha256, 32 },
-    { OSSL_HPKE_KDF_ID_HKDF_SHA384, LN_sha384, 48 },
-    { OSSL_HPKE_KDF_ID_HKDF_SHA512, LN_sha512, 64 }
+    { OSSL_HPKE_KDF_ID_HKDF_SHA256, LN_sha256, SHA256_DIGEST_LENGTH },
+    { OSSL_HPKE_KDF_ID_HKDF_SHA384, LN_sha384, SHA384_DIGEST_LENGTH },
+    { OSSL_HPKE_KDF_ID_HKDF_SHA512, LN_sha512, SHA512_DIGEST_LENGTH }
 };
 #if defined(SUPERVERBOSE) || defined(TESTVECTORS)
 /*
@@ -312,9 +312,8 @@ static uint16_t aead_iana2index(uint16_t codepoint)
     uint16_t i = 0;
 
     for (i = 0; i != naeads; i++) {
-        if (hpke_aead_tab[i].aead_id == codepoint) {
+        if (hpke_aead_tab[i].aead_id == codepoint)
             return i;
-        }
     }
     return 0;
 }
@@ -331,9 +330,8 @@ static uint16_t kem_iana2index(uint16_t codepoint)
     uint16_t i = 0;
 
     for (i = 0; i != nkems; i++) {
-        if (hpke_kem_tab[i].kem_id == codepoint) {
+        if (hpke_kem_tab[i].kem_id == codepoint)
             return i;
-        }
     }
     return 0;
 }
@@ -350,9 +348,8 @@ static uint16_t kdf_iana2index(uint16_t codepoint)
     uint16_t i = 0;
 
     for (i = 0; i != nkdfs; i++) {
-        if (hpke_kdf_tab[i].kdf_id == codepoint) {
+        if (hpke_kdf_tab[i].kdf_id == codepoint)
             return i;
-        }
     }
     return 0;
 }
@@ -532,40 +529,22 @@ static EVP_PKEY * EVP_PKEY_new_raw_nist_public_key(OSSL_LIB_CTX *libctx,
      * can be useful if the upstream code changes
      */
 #endif
-    int erv = 1;
+    int erv = 0;
     EVP_PKEY *ret = NULL;
     EVP_PKEY_CTX *cctx = EVP_PKEY_CTX_new_from_name(libctx, "EC", propq);
 
-    if (cctx == NULL) {
-        erv = 0;
-        ERR_raise(ERR_LIB_CRYPTO, ERR_R_INTERNAL_ERROR);
-        goto err;
-    }
-    if (EVP_PKEY_paramgen_init(cctx) <= 0) {
-        erv = 0;
-        ERR_raise(ERR_LIB_CRYPTO, ERR_R_INTERNAL_ERROR);
-        goto err;
-    }
-    if (EVP_PKEY_CTX_set_ec_paramgen_curve_nid(cctx, curve) <= 0) {
-        erv = 0;
-        ERR_raise(ERR_LIB_CRYPTO, ERR_R_INTERNAL_ERROR);
-        goto err;
-    }
-    if (EVP_PKEY_paramgen(cctx, &ret) <= 0) {
-        erv = 0;
-        ERR_raise(ERR_LIB_CRYPTO, ERR_R_INTERNAL_ERROR);
-        goto err;
-    }
-    if (EVP_PKEY_set1_encoded_public_key(ret, buf, buflen) != 1) {
-        EVP_PKEY_free(ret);
+    if (cctx == NULL
+        || EVP_PKEY_paramgen_init(cctx) <= 0
+        || EVP_PKEY_CTX_set_ec_paramgen_curve_nid(cctx, curve) <= 0
+        || EVP_PKEY_paramgen(cctx, &ret) <= 0
+        || EVP_PKEY_set1_encoded_public_key(ret, buf, buflen) != 1) {
 #if defined(SUPERVERBOSE) || defined(TESTVECTORS)
         /* needed for printing below */
         ret = NULL;
 #endif
-        erv = 0;
-        ERR_raise(ERR_LIB_CRYPTO, ERR_R_INTERNAL_ERROR);
         goto err;
     }
+    erv = 1;
 
 err:
 #if defined(SUPERVERBOSE) || defined(TESTVECTORS)
@@ -580,8 +559,11 @@ err:
     EVP_PKEY_CTX_free(cctx);
     if (erv == 1)
         return ret;
-    else
+    else {
+        EVP_PKEY_free(ret);
+        ERR_raise(ERR_LIB_CRYPTO, ERR_R_INTERNAL_ERROR);
         return NULL;
+    }
 }
 
 /*
