@@ -3864,53 +3864,55 @@ static int hpke_do_rest(OSSL_HPKE_CTX *ctx, int operation,
         ERR_raise(ERR_LIB_CRYPTO, ERR_R_INTERNAL_ERROR);
         goto err;
     }
-    noncelen = hpke_aead_tab[aead_ind].Nn;
-    erv = ossl_hpke_labeled_expand(kctx,
-                                   nonce, noncelen,
-                                   secret, secretlen, /* salt */
-                                   OSSL_HPKE_SEC51LABEL, /* protocol label */
-                                   suitebuf, 6, /* suiteid */
-                                   OSSL_HPKE_NONCE_LABEL, /* label */
-                                   ks_context, ks_contextlen); /* ikmlen */
-    if (erv != 1) {
-        ERR_raise(ERR_LIB_CRYPTO, ERR_R_INTERNAL_ERROR);
-        goto err;
-    }
-    seqlen = hpke_seq2buf(ctx->seq, seqbuf, 12);
-    if (seqlen == 0) {
-        erv = 0;
-        ERR_raise(ERR_LIB_CRYPTO, ERR_R_INTERNAL_ERROR);
-        return 0;
-    } else {
-        size_t sind;
-        unsigned char cv;
-
-        if (seqlen > noncelen) {
-            erv = 0;
+    /* if we're doing a read encrypt or decrypt we need nonce
+     * and secret, but not if we're only exporting */
+    if (operation != OSSL_HPKE_OP_EXPONLY) {
+        noncelen = hpke_aead_tab[aead_ind].Nn;
+        erv = ossl_hpke_labeled_expand(kctx, nonce, noncelen,
+                                       secret, secretlen,
+                                       OSSL_HPKE_SEC51LABEL,
+                                       suitebuf, 6,
+                                       OSSL_HPKE_NONCE_LABEL,
+                                       ks_context, ks_contextlen);
+        if (erv != 1) {
             ERR_raise(ERR_LIB_CRYPTO, ERR_R_INTERNAL_ERROR);
             goto err;
         }
-        /* non constant time - does it matter? maybe no */
-        for (sind = 0; sind != noncelen; sind++) {
-            if (sind < seqlen) {
-                cv = seqbuf[seqlen - 1 - (sind % seqlen)];
-            } else {
-                cv = 0x00;
+        seqlen = hpke_seq2buf(ctx->seq, seqbuf, 12);
+        if (seqlen == 0) {
+            erv = 0;
+            ERR_raise(ERR_LIB_CRYPTO, ERR_R_INTERNAL_ERROR);
+            return 0;
+        } else {
+            size_t sind;
+            unsigned char cv;
+ 
+            if (seqlen > noncelen) {
+                erv = 0;
+                ERR_raise(ERR_LIB_CRYPTO, ERR_R_INTERNAL_ERROR);
+                goto err;
             }
-            nonce[noncelen - 1 - sind] ^= cv;
+            /* non constant time - does it matter? maybe no */
+            for (sind = 0; sind != noncelen; sind++) {
+                if (sind < seqlen) {
+                    cv = seqbuf[seqlen - 1 - (sind % seqlen)];
+                } else {
+                    cv = 0x00;
+                }
+                nonce[noncelen - 1 - sind] ^= cv;
+            }
         }
-    }
-    keylen = hpke_aead_tab[aead_ind].Nk;
-    erv = ossl_hpke_labeled_expand(kctx,
-                                   key, keylen,
-                                   secret, secretlen, /* salt */
-                                   OSSL_HPKE_SEC51LABEL, /* protocol label */
-                                   suitebuf, 6, /* suiteid */
-                                   OSSL_HPKE_KEY_LABEL, /* label */
-                                   ks_context, ks_contextlen); /* ikmlen */
-    if (erv != 1) {
-        ERR_raise(ERR_LIB_CRYPTO, ERR_R_INTERNAL_ERROR);
-        goto err;
+        keylen = hpke_aead_tab[aead_ind].Nk;
+        erv = ossl_hpke_labeled_expand(kctx, key, keylen,
+                                       secret, secretlen,
+                                       OSSL_HPKE_SEC51LABEL,
+                                       suitebuf, 6,
+                                       OSSL_HPKE_KEY_LABEL,
+                                       ks_context, ks_contextlen);
+        if (erv != 1) {
+            ERR_raise(ERR_LIB_CRYPTO, ERR_R_INTERNAL_ERROR);
+            goto err;
+        }
     }
     if (ctx->exportersec == NULL) {
         ctx->exporterseclen = hpke_kdf_tab[kdf_ind].Nh;
