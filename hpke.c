@@ -296,8 +296,10 @@ struct ossl_hpke_ctx_st
     char *pskid; /**< PSK stuff */
     unsigned char *psk;
     size_t psklen;
+#ifdef HAPPYKEY
     EVP_PKEY *senderpriv; /**< sender's ephemeral private key */
-    char *ikme;
+#endif
+    unsigned char *ikme;
     size_t ikmelen;
     EVP_PKEY *authpriv; /**< sender's authentication private key */
     unsigned char *authpub; /**< auth public key */
@@ -470,7 +472,7 @@ static int hpke_pbuf(FILE *fout, const char *msg,
     return 1;
 }
 #endif
-
+#ifdef HAPPYKEY
 /*
  * @brief Check if kem_id is ok/known to us
  * @param kem_id is the externally supplied kem_id
@@ -490,7 +492,7 @@ static int hpke_kem_id_check(uint16_t kem_id)
     }
     return 1;
 }
-
+#endif
 /*
  * @brief check if KEM uses NIST curve or not
  * @param kem_id is the externally supplied kem_id
@@ -1538,7 +1540,7 @@ static int hpke_psk_check(unsigned int mode,
         return 0;
     return 1;
 }
-#endif
+
 /*
  * @brief map a kem_id and a private key buffer into an EVP_PKEY
  *
@@ -1779,6 +1781,7 @@ err:
     OSSL_PARAM_free(params);
     return erv;
 }
+#endif
 
 /**
  * @brief check if a suite is supported locally
@@ -4036,7 +4039,9 @@ void OSSL_HPKE_CTX_free(OSSL_HPKE_CTX *ctx)
     OPENSSL_free(ctx->ikme);
 
     EVP_PKEY_free(ctx->authpriv);
+#ifdef HAPPYKEY
     EVP_PKEY_free(ctx->senderpriv);
+#endif
 
     OPENSSL_free(ctx->authpub);
 
@@ -4091,6 +4096,7 @@ err:
     return 0;
 }
 
+#ifdef HAPPYKEY
 /**
  * @brief set a sender private key for HPKE
  * @param ctx is the pointer for the HPKE context
@@ -4114,6 +4120,7 @@ int OSSL_HPKE_CTX_set1_senderpriv(OSSL_HPKE_CTX *ctx, EVP_PKEY *privp)
         return 0;
     return 1;
 }
+#endif
 
 /**
  * @brief set a sender IKM for key DHKEM generation
@@ -4847,6 +4854,7 @@ size_t OSSL_HPKE_get_public_encap_size(OSSL_HPKE_SUITE suite)
     return enclen;
 }
 
+#ifdef HAPPYKEY
 /* the "legacy" enc/dec API functions below here. will likely disappear */
 
 /*
@@ -5268,3 +5276,4 @@ err:
                         clearlen, clear);
 #endif
 }
+#endif

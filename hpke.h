@@ -125,6 +125,7 @@ int OSSL_HPKE_CTX_set1_psk(OSSL_HPKE_CTX *ctx,
                            const char *pskid,
                            const unsigned char *psk, size_t psklen);
 
+#ifdef HAPPYKEY
 /**
  * @brief set a sender KEM private key for HPKE
  * @param ctx is the pointer for the HPKE context
@@ -138,6 +139,7 @@ int OSSL_HPKE_CTX_set1_psk(OSSL_HPKE_CTX *ctx,
  * clients.
  */
 int OSSL_HPKE_CTX_set1_senderpriv(OSSL_HPKE_CTX *ctx, EVP_PKEY *privp);
+#endif
 
 /**
  * @brief set a sender IKM for key DHKEM generation
@@ -423,6 +425,7 @@ size_t OSSL_HPKE_get_ciphertext_size(OSSL_HPKE_SUITE suite, size_t clearlen);
  */
 size_t OSSL_HPKE_get_public_encap_size(OSSL_HPKE_SUITE suite);
 
+#ifdef HAPPYKEY
 /*
  * below are the existing enc/dec APIs that will likely be
  * dropped, once new ones work ok
@@ -535,5 +538,5 @@ int OSSL_HPKE_dec(OSSL_LIB_CTX *libctx, const char *propq,
                   const unsigned char *info, size_t infolen,
                   const unsigned char *seq, size_t seqlen,
                   unsigned char *clear, size_t *clearlen);
-
+#endif
 #endif

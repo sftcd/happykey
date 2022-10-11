@@ -226,8 +226,10 @@ static int do_testhpke(const TEST_BASEDATA *base,
     if (!TEST_ptr(sealctx = OSSL_HPKE_CTX_new(base->mode, base->suite,
                                               libctx, propq)))
         goto end;
+#ifdef HAPPYKEY
     if (!TEST_true(OSSL_HPKE_CTX_set1_senderpriv(sealctx, privE)))
         goto end;
+#endif
     if (!TEST_true(OSSL_HPKE_CTX_set1_ikme(sealctx, base->ikmE, base->ikmElen)))
         goto end;
     if (base->mode == OSSL_HPKE_MODE_AUTH
@@ -1341,7 +1343,7 @@ static int test_hpke_grease(void)
 
     return overallresult;
 }
-
+#ifdef HAPPYKEY
 /**
  * @brief try some fuzzy-ish kg, enc & dec calls
  * @return 1 for success, other otherwise
@@ -1467,6 +1469,7 @@ static int test_hpke_badcalls(void)
     EVP_PKEY_free(privp);
     return overallresult;
 }
+#endif
 
 /* from RFC 9180 Appendix A.1.1 */
 static unsigned char ikm25519[] = {
@@ -1647,10 +1650,11 @@ static int test_hpke(void)
     if (res != 1)
         return res;
 
+#ifdef HAPPYKEY
     res = test_hpke_badcalls();
     if (res != 1)
         return res;
-
+#endif
     res = test_hpke_ikms();
     if (res != 1)
         return res;
