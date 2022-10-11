@@ -27,6 +27,9 @@ High level notes:
 
 ## Recent Changes
 
+- 20221011: more changes based on PR comments, incl. export-only
+  mode and tests
+
 - 20221010: more changes based on PR comments
 
 - 20221008: changes to str2suite based on PR comments

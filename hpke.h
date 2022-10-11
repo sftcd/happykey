@@ -205,7 +205,6 @@ int OSSL_HPKE_CTX_set1_seq(OSSL_HPKE_CTX *ctx, uint64_t seq);
  * @param ctlen is the size the above
  * @param pub is the recipient public key octets
  * @param publen is the size the above
- * @param recip is the EVP_PKEY form of recipient public value
  * @param info is the info parameter
  * @param infolen is the size the above
  * @param aad is the aad parameter
@@ -267,11 +266,47 @@ int OSSL_HPKE_recipient_open(OSSL_HPKE_CTX *ctx,
                              const unsigned char *aad, size_t aadlen,
                              const unsigned char *ct, size_t ctlen);
 
+
+/**
+ * @brief sender export-only encapsulation function
+ * @param ctx is the pointer for the HPKE context
+ * @param enc is the sender's ephemeral public value
+ * @param enclen is the size the above
+ * @param pub is the recipient public key octets
+ * @param publen is the size the above
+ * @param info is the info parameter
+ * @param infolen is the size the above
+ * @return 1 for success, 0 for error
+ *
+ * Following this, OSSL_HPKE_CTX_export can be called.
+ */
+int OSSL_HPKE_sender_export_encap(OSSL_HPKE_CTX *ctx,
+                                  unsigned char *enc, size_t *enclen,
+                                  unsigned char *pub, size_t publen,
+                                  const unsigned char *info, size_t infolen);
+
+/**
+ * @brief recipient export-only encapsulation function
+ * @param ctx is the pointer for the HPKE context
+ * @param enc is the sender's ephemeral public value
+ * @param enclen is the size the above
+ * @param recippriv is the EVP_PKEY form of recipient private value
+ * @param info is the info parameter
+ * @param infolen is the size the above
+ * @return 1 for success, 0 for error
+ *
+ * Following this, OSSL_HPKE_CTX_export can be called.
+ */
+int OSSL_HPKE_recipient_export_decap(OSSL_HPKE_CTX *ctx,
+                                     const unsigned char *enc, size_t enclen,
+                                     EVP_PKEY *recippriv,
+                                     const unsigned char *info, size_t infolen);
+
 /**
  * @brief generate a given-length secret based on context and label
  * @param ctx is the HPKE context
  * @param secret is the resulting secret that will be of length...
- * @param secret_len is the desired output length
+ * @param secretlen is the desired output length
  * @param label is a buffer to provide separation between secrets
  * @param labellen is the length of the above
  * @return 1 for good, 0 for error
@@ -282,7 +317,7 @@ int OSSL_HPKE_recipient_open(OSSL_HPKE_CTX *ctx,
  */
 int OSSL_HPKE_CTX_export(OSSL_HPKE_CTX *ctx,
                          unsigned char *secret,
-                         size_t secret_len,
+                         size_t secretlen,
                          const unsigned char *label,
                          size_t labellen);
 

@@ -271,7 +271,17 @@ static int do_testhpke(const TEST_BASEDATA *base,
                                    aead[i].expected_ctlen)))
             goto end;
     }
-
+    if ((int)aeadsz == 0) {
+        /* we must be doing an export only test */
+        if (!TEST_true(OSSL_HPKE_sender_export_encap(sealctx,
+                                                     enc, &enclen,
+                                                     rpub, rpublen,
+                                                     base->ksinfo,
+                                                     base->ksinfolen)))
+            goto end;
+        if (!TEST_true(cmpkey(privE, enc, enclen)))
+            goto end;
+    }
     if (!TEST_ptr(openctx = OSSL_HPKE_CTX_new(base->mode, base->suite,
                                               libctx, propq)))
         goto end;
@@ -303,6 +313,17 @@ static int do_testhpke(const TEST_BASEDATA *base,
                                                 aead[i].expected_ctlen)))
             goto end;
         if (!TEST_mem_eq(aead[i].pt, aead[i].ptlen, ptout, ptoutlen))
+            goto end;
+    }
+    if ((int)aeadsz == 0) {
+        /* we must be doing an export only test */
+        if (!TEST_true(OSSL_HPKE_recipient_export_decap(sealctx,
+                                                        enc, enclen,
+                                                        privR,
+                                                        base->ksinfo,
+                                                        base->ksinfolen)))
+            goto end;
+        if (!TEST_true(cmpkey(privE, enc, enclen)))
             goto end;
     }
     /* reset seq in sealctx */
@@ -763,6 +784,98 @@ static int P256kdfsha256_hkdfsha256_aes128gcm_base_test(void)
                        exportdata, OSSL_NELEM(exportdata));
 }
 
+static const unsigned char fourth_ikme[] = {
+    0x55, 0xbc, 0x24, 0x5e, 0xe4, 0xef, 0xda, 0x25,
+    0xd3, 0x8f, 0x2d, 0x54, 0xd5, 0xbb, 0x66, 0x65,
+    0x29, 0x1b, 0x99, 0xf8, 0x10, 0x8a, 0x8c, 0x4b,
+    0x68, 0x6c, 0x2b, 0x14, 0x89, 0x3e, 0xa5, 0xd9
+};
+static const unsigned char fourth_ikmepub[] = {
+    0xe5, 0xe8, 0xf9, 0xbf, 0xff, 0x6c, 0x2f, 0x29,
+    0x79, 0x1f, 0xc3, 0x51, 0xd2, 0xc2, 0x5c, 0xe1,
+    0x29, 0x9a, 0xa5, 0xea, 0xca, 0x78, 0xa7, 0x57,
+    0xc0, 0xb4, 0xfb, 0x4b, 0xcd, 0x83, 0x09, 0x18
+};
+static const unsigned char fourth_ikmr[] = {
+    0x68, 0x3a, 0xe0, 0xda, 0x1d, 0x22, 0x18, 0x1e,
+    0x74, 0xed, 0x2e, 0x50, 0x3e, 0xbf, 0x82, 0x84,
+    0x0d, 0xeb, 0x1d, 0x5e, 0x87, 0x2c, 0xad, 0xe2,
+    0x0f, 0x4b, 0x45, 0x8d, 0x99, 0x78, 0x3e, 0x31
+};
+static const unsigned char fourth_ikmrpub[] = {
+    0x19, 0x41, 0x41, 0xca, 0x6c, 0x3c, 0x3b, 0xeb,
+    0x47, 0x92, 0xcd, 0x97, 0xba, 0x0e, 0xa1, 0xfa,
+    0xff, 0x09, 0xd9, 0x84, 0x35, 0x01, 0x23, 0x45,
+    0x76, 0x6e, 0xe3, 0x3a, 0xae, 0x2d, 0x76, 0x64
+};
+static const unsigned char fourth_ikmrpriv[] = {
+    0x33, 0xd1, 0x96, 0xc8, 0x30, 0xa1, 0x2f, 0x9a,
+    0xc6, 0x5d, 0x6e, 0x56, 0x5a, 0x59, 0x0d, 0x80,
+    0xf0, 0x4e, 0xe9, 0xb1, 0x9c, 0x83, 0xc8, 0x7f,
+    0x2c, 0x17, 0x0d, 0x97, 0x2a, 0x81, 0x28, 0x48
+};
+static const unsigned char fourth_expected_shared_secret[] = {
+    0xe8, 0x17, 0x16, 0xce, 0x8f, 0x73, 0x14, 0x1d,
+    0x4f, 0x25, 0xee, 0x90, 0x98, 0xef, 0xc9, 0x68,
+    0xc9, 0x1e, 0x5b, 0x8c, 0xe5, 0x2f, 0xff, 0xf5,
+    0x9d, 0x64, 0x03, 0x9e, 0x82, 0x91, 0x8b, 0x66
+};
+static const unsigned char fourth_export1[] = {
+    0x7a, 0x36, 0x22, 0x1b, 0xd5, 0x6d, 0x50, 0xfb,
+    0x51, 0xee, 0x65, 0xed, 0xfd, 0x98, 0xd0, 0x6a,
+    0x23, 0xc4, 0xdc, 0x87, 0x08, 0x5a, 0xa5, 0x86,
+    0x6c, 0xb7, 0x08, 0x72, 0x44, 0xbd, 0x2a, 0x36
+};
+static const unsigned char fourth_context2[] = { 0x00 };
+static const unsigned char fourth_export2[] = {
+    0xd5, 0x53, 0x5b, 0x87, 0x09, 0x9c, 0x6c, 0x3c,
+    0xe8, 0x0d, 0xc1, 0x12, 0xa2, 0x67, 0x1c, 0x6e,
+    0xc8, 0xe8, 0x11, 0xa2, 0xf2, 0x84, 0xf9, 0x48,
+    0xce, 0xc6, 0xdd, 0x17, 0x08, 0xee, 0x33, 0xf0
+};
+static const unsigned char fourth_context3[] = {
+    0x54, 0x65, 0x73, 0x74, 0x43, 0x6f, 0x6e, 0x74,
+    0x65, 0x78, 0x74
+};
+static const unsigned char fourth_export3[] = {
+    0xff, 0xaa, 0xbc, 0x85, 0xa7, 0x76, 0x13, 0x6c,
+    0xa0, 0xc3, 0x78, 0xe5, 0xd0, 0x84, 0xc9, 0x14,
+    0x0a, 0xb5, 0x52, 0xb7, 0x8f, 0x03, 0x9d, 0x2e,
+    0x87, 0x75, 0xf2, 0x6e, 0xff, 0xf4, 0xc7, 0x0e
+};
+
+static int export_only_test(void)
+{
+    /* based on RFC9180 A.7 */
+    const TEST_BASEDATA basedata = {
+        OSSL_HPKE_MODE_BASE,
+        {
+            OSSL_HPKE_KEM_ID_X25519,
+            OSSL_HPKE_KDF_ID_HKDF_SHA256,
+            OSSL_HPKE_AEAD_ID_EXPORTONLY
+        },
+        fourth_ikme, sizeof(fourth_ikme),
+        fourth_ikmepub, sizeof(fourth_ikmepub),
+        fourth_ikmr, sizeof(fourth_ikmr),
+        fourth_ikmrpub, sizeof(fourth_ikmrpub),
+        fourth_ikmrpriv, sizeof(fourth_ikmrpriv),
+        fourth_expected_shared_secret, sizeof(fourth_expected_shared_secret),
+        ksinfo, sizeof(ksinfo),
+        NULL, 0, /* no auth */
+        NULL, 0, NULL /* PSK stuff */
+    };
+    const TEST_AEADDATA aeaddata[] = { };
+    const TEST_EXPORTDATA exportdata[] = {
+        { NULL, 0, fourth_export1, sizeof(fourth_export1) },
+        { fourth_context2, sizeof(fourth_context2),
+          fourth_export2, sizeof(fourth_export2) },
+        { fourth_context3, sizeof(fourth_context3),
+          fourth_export3, sizeof(fourth_export3) },
+    };
+    return do_testhpke(&basedata, aeaddata, OSSL_NELEM(aeaddata),
+                       exportdata, OSSL_NELEM(exportdata));
+}
+
 /*
  * Randomly toss a coin
  */
@@ -1069,7 +1182,7 @@ static int test_hpke_modes_suites(void)
 }
 
 /**
- * @brief check roundtrpi for export
+ * @brief check roundtrip for export
  * @return 1 for success, other otherwise
  */
 static int test_hpke_export(void)
@@ -1098,11 +1211,9 @@ static int test_hpke_export(void)
                                     NULL, 0,
                                     pub, &publen, &privp)))
         goto end;
-
     if (!TEST_ptr(ctx = OSSL_HPKE_CTX_new(hpke_mode, hpke_suite,
                                           testctx, NULL)))
         goto end;
-
     if (!TEST_true(OSSL_HPKE_sender_seal(ctx, enc, &enclen,
                                          cipher, &cipherlen, pub, publen,
                                          NULL, 0, NULL, 0, /* no add, info */
@@ -1111,7 +1222,6 @@ static int test_hpke_export(void)
     if (!TEST_true(OSSL_HPKE_CTX_export(ctx, exp, 32,
                                         (unsigned char *)estr, strlen(estr))))
         goto end;
-
     if (!TEST_ptr(rctx = OSSL_HPKE_CTX_new(hpke_mode, hpke_suite,
                                            testctx, NULL)))
         goto end;
@@ -1121,14 +1231,11 @@ static int test_hpke_export(void)
                                             NULL, 0, NULL, 0,
                                             cipher, cipherlen)))
         goto end;
-
     if (!TEST_true(OSSL_HPKE_CTX_export(rctx, rexp, 32,
                                         (unsigned char *)estr, strlen(estr))))
         goto end;
-
     if (!TEST_true(TEST_mem_eq(exp, 32, rexp, 32)))
         goto end;
-
     OSSL_HPKE_CTX_free(ctx);
     OSSL_HPKE_CTX_free(rctx);
     EVP_PKEY_free(privp);
@@ -1607,6 +1714,21 @@ int main(int argc, char **argv)
             printf("Test vector 3 fail (%d)\n", apires);
             return apires;
         }
+#ifndef HAPPYKEY
+        apires = export_only_test();
+        if (apires == 1) {
+            printf("Test vector 4 success\n");
+        } else {
+            printf("Test vector 4 fail (%d)\n", apires);
+            return apires;
+        }
+#else
+        /* This'll be doable once HPKE is in the library but for
+         * now depends on the new DHKEM stuff which isn't in a
+         * released version, so we'll only do this test vector
+         * when running using a built library with DHKEM support  */
+        printf("Export-only suite/export skipped in this build\n");
+#endif
     }
     return apires;
 }
@@ -1617,6 +1739,7 @@ int setup_tests(void)
     ADD_TEST(x25519kdfsha256_hkdfsha256_aes128gcm_base_test);
     ADD_TEST(x25519kdfsha256_hkdfsha256_aes128gcm_psk_test);
     ADD_TEST(P256kdfsha256_hkdfsha256_aes128gcm_base_test);
+    ADD_TEST(export_only_test);
     ADD_TEST(test_hpke);
     return 1;
 }
