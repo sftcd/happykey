@@ -864,7 +864,6 @@ static int export_only_test(void)
         NULL, 0, /* no auth */
         NULL, 0, NULL /* PSK stuff */
     };
-    const TEST_AEADDATA aeaddata[] = { };
     const TEST_EXPORTDATA exportdata[] = {
         { NULL, 0, fourth_export1, sizeof(fourth_export1) },
         { fourth_context2, sizeof(fourth_context2),
@@ -872,7 +871,7 @@ static int export_only_test(void)
         { fourth_context3, sizeof(fourth_context3),
           fourth_export3, sizeof(fourth_export3) },
     };
-    return do_testhpke(&basedata, aeaddata, OSSL_NELEM(aeaddata),
+    return do_testhpke(&basedata, NULL, 0,
                        exportdata, OSSL_NELEM(exportdata));
 }
 
