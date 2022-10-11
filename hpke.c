@@ -2916,8 +2916,6 @@ static int hpke_kg_evp(OSSL_LIB_CTX *libctx, const char *propq,
     int erv = 1; /* Our error return value - 1 is success */
     EVP_PKEY_CTX *pctx = NULL;
     EVP_PKEY *skR = NULL;
-    unsigned char *lpub = NULL;
-    size_t lpublen = 0;
     uint16_t kem_ind = 0;
 #ifndef HAPPYKEY
     OSSL_PARAM params[3], *p = params;
@@ -3131,28 +3129,20 @@ static int hpke_kg_evp(OSSL_LIB_CTX *libctx, const char *propq,
 #endif // HAPPYKEY
     EVP_PKEY_CTX_free(pctx);
     pctx = NULL;
-    lpublen = EVP_PKEY_get1_encoded_public_key(skR, &lpub);
-    if (lpub == NULL || lpublen == 0) {
+    if (EVP_PKEY_get_octet_string_param(skR, OSSL_PKEY_PARAM_ENCODED_PUBLIC_KEY,
+                                        pub,  *publen, publen) != 1) {
         erv = 0;
         ERR_raise(ERR_LIB_CRYPTO, ERR_R_INTERNAL_ERROR);
         goto err;
     }
 #ifdef SUPERVERBOSE
-    hpke_pbuf(stdout, "\tkg_evp pub", lpub, lpublen);
+    hpke_pbuf(stdout, "\tkg_evp pub", pub, *publen);
 #endif
-    if (lpublen > *publen) {
-        erv = 0;
-        ERR_raise(ERR_LIB_CRYPTO, ERR_R_INTERNAL_ERROR);
-        goto err;
-    }
-    *publen = lpublen;
-    memcpy(pub, lpub, lpublen);
     *priv = skR;
 
 err:
     if (erv != 1) { EVP_PKEY_free(skR); }
     EVP_PKEY_CTX_free(pctx);
-    OPENSSL_free(lpub);
     return erv;
 }
 #ifdef HAPPYKEY
