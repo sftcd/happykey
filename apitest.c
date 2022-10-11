@@ -1212,9 +1212,9 @@ static int test_hpke_grease(void)
 
     memset(&g_suite, 0, sizeof(OSSL_HPKE_SUITE));
     /* GREASEing */
-    if (TEST_true(OSSL_HPKE_good4grease(testctx, NULL, NULL, &g_suite,
-                                        g_pub, &g_pub_len,
-                                        g_cipher, g_cipher_len)) != 1) {
+    if (TEST_true(OSSL_HPKE_get_grease_value(testctx, NULL, NULL, &g_suite,
+                                             g_pub, &g_pub_len,
+                                             g_cipher, g_cipher_len)) != 1) {
         overallresult = 0;
     }
     /* expansion */

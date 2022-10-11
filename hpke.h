@@ -335,13 +335,13 @@ int OSSL_HPKE_suite_check(OSSL_HPKE_SUITE suite);
  * be selected. In all cases the output pub and cipher values
  * will be appropriate random values for the selected suite.
  */
-int OSSL_HPKE_good4grease(OSSL_LIB_CTX *libctx, const char *propq,
-                          OSSL_HPKE_SUITE *suite_in,
-                          OSSL_HPKE_SUITE *suite,
-                          unsigned char *pub,
-                          size_t *pub_len,
-                          unsigned char *ciphertext,
-                          size_t ciphertext_len);
+int OSSL_HPKE_get_grease_value(OSSL_LIB_CTX *libctx, const char *propq,
+                               OSSL_HPKE_SUITE *suite_in,
+                               OSSL_HPKE_SUITE *suite,
+                               unsigned char *pub,
+                               size_t *pub_len,
+                               unsigned char *ciphertext,
+                               size_t ciphertext_len);
 
 /**
  * @brief map a string to a HPKE suite
