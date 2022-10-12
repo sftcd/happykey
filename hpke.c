@@ -115,13 +115,13 @@ static const char OSSL_HPKE_SK_LABEL[] = "\x73\x6b";
  * for RFC5869 - that was useful in initial development and could be
  * again if we somehow break interop or the spec changes
  */
-#endif
 /*
  * PEM header/footer for private keys
  * PEM_STRING_PKCS8INF is just: "PRIVATE KEY"
  */
 #define PEM_PRIVATEHEADER "-----BEGIN "PEM_STRING_PKCS8INF"-----\n"
 #define PEM_PRIVATEFOOTER "\n-----END "PEM_STRING_PKCS8INF"-----\n"
+#endif
 
 /* max string len we'll try map to a suite */
 #define OSSL_HPKE_MAX_SUITESTR 38
