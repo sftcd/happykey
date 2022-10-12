@@ -689,7 +689,7 @@ static int hpke_aead_dec(OSSL_LIB_CTX *libctx, const char *propq,
 err:
     EVP_CIPHER_CTX_free(ctx);
     EVP_CIPHER_free(enc);
-    OPENSSL_free(plaintext);
+    OPENSSL_clear_free(plaintext, plaintextlen);
     return erv;
 }
 
@@ -995,6 +995,7 @@ static int hpke_extract(OSSL_LIB_CTX *libctx, const char *propq,
     *secretlen = lsecretlen;
 
 err:
+    OPENSSL_cleanse(labeled_ikmbuf, 2 * OSSL_HPKE_MAXSIZE);
     WPACKET_cleanup(&pkt);
     EVP_KDF_free(kdf);
     EVP_KDF_CTX_free(kctx);
@@ -1148,6 +1149,7 @@ static int hpke_expand(OSSL_LIB_CTX *libctx, const char *propq,
     *outlen = loutlen;
 
 err:
+    OPENSSL_cleanse(libuf, 2 * OSSL_HPKE_MAXSIZE);
     EVP_KDF_free(kdf);
     EVP_KDF_CTX_free(kctx);
     memset(libuf, 0, sizeof(libuf));
@@ -1214,6 +1216,7 @@ static int hpke_extract_and_expand(OSSL_LIB_CTX *libctx, const char *propq,
     hpke_pbuf(stdout, "\tshared secret", secret, *secretlen);
 #endif
 err:
+    OPENSSL_cleanse(eae_prkbuf, OSSL_HPKE_MAXSIZE);
     memset(eae_prkbuf, 0, sizeof(eae_prkbuf));
     return erv;
 }
@@ -1495,6 +1498,9 @@ static int hpke_do_kem(OSSL_LIB_CTX *libctx, const char *propq,
     *sslen = lsslen;
 
 err:
+    OPENSSL_cleanse(zz, 2 * OSSL_HPKE_MAXSIZE);
+    OPENSSL_cleanse(kem_context, OSSL_HPKE_MAXSIZE);
+    OPENSSL_cleanse(lss, OSSL_HPKE_MAXSIZE);
     EVP_PKEY_CTX_free(pctx);
     return erv;
 }
@@ -1774,7 +1780,9 @@ err:
     BN_free(calc_priv);
     EC_POINT_free(calc_pub);
     EC_GROUP_free(curve);
+    OPENSSL_cleanse(calc_pubuf, OSSL_HPKE_MAXSIZE);
 #endif
+    OPENSSL_cleanse(hf_prbuf, OSSL_HPKE_MAXSIZE);
     BN_free(priv);
     EVP_PKEY_CTX_free(ctx);
     OSSL_PARAM_BLD_free(param_bld);
@@ -2073,19 +2081,19 @@ static int hpke_enc_int(OSSL_LIB_CTX *libctx, const char *propq,
             erv = hpke_ah_decode(strlen(ltv->pkEm), ltv->pkEm,
                                  &bin_pkElen, &bin_pkE);
             if (erv != 1) {
-                OPENSSL_free(bin_skE);
+                OPENSSL_clear_free(bin_skE, bin_skElen);
                 ERR_raise(ERR_LIB_CRYPTO, ERR_R_INTERNAL_ERROR);
                 goto err;
             }
             if (hpke_prbuf2evp(libctx, propq, ltv->kem_id, bin_skE, bin_skElen,
                                bin_pkE, bin_pkElen, &pkE) != 1) {
-                OPENSSL_free(bin_skE);
+                OPENSSL_clear_free(bin_skE, bin_skElen);
                 OPENSSL_free(bin_pkE);
                 erv = 0;
                 ERR_raise(ERR_LIB_CRYPTO, ERR_R_INTERNAL_ERROR);
                 goto err;
             }
-            OPENSSL_free(bin_skE);
+            OPENSSL_clear_free(bin_skE, bin_skElen);
             OPENSSL_free(bin_pkE);
         } else {
             if (EVP_PKEY_keygen(pctx, &pkE) <= 0) {
@@ -2400,6 +2408,12 @@ err:
     }
 
 #endif
+    OPENSSL_cleanse(ks_context, OSSL_HPKE_MAXSIZE);
+    OPENSSL_cleanse(secret, OSSL_HPKE_MAXSIZE);
+    OPENSSL_cleanse(psk_hash, OSSL_HPKE_MAXSIZE);
+    OPENSSL_cleanse(nonce, OSSL_HPKE_MAXSIZE);
+    OPENSSL_cleanse(key, OSSL_HPKE_MAXSIZE);
+    OPENSSL_cleanse(exportersec, OSSL_HPKE_MAXSIZE);
     OPENSSL_free(mypub);
     BIO_free_all(bfp);
     EVP_PKEY_free(pkR);
@@ -2407,7 +2421,7 @@ err:
     if (authpriv_evp == NULL)
         EVP_PKEY_free(skI);
     EVP_PKEY_CTX_free(pctx);
-    OPENSSL_free(shared_secret);
+    OPENSSL_clear_free(shared_secret, shared_secretlen);
     OPENSSL_free(enc);
     return erv;
 }
@@ -2807,12 +2821,18 @@ err:
     else
         printf("clearlen = OSSL_HPKE_MAXSIZE, so decryption probably failed\n");
 #endif
+    OPENSSL_cleanse(ks_context, OSSL_HPKE_MAXSIZE);
+    OPENSSL_cleanse(secret, OSSL_HPKE_MAXSIZE);
+    OPENSSL_cleanse(nonce, OSSL_HPKE_MAXSIZE);
+    OPENSSL_cleanse(psk_hash, OSSL_HPKE_MAXSIZE);
+    OPENSSL_cleanse(key, OSSL_HPKE_MAXSIZE);
+    OPENSSL_cleanse(exportersec, OSSL_HPKE_MAXSIZE);
     BIO_free_all(bfp);
     if (evppriv == NULL) { EVP_PKEY_free(skR); }
     EVP_PKEY_free(pkE);
     EVP_PKEY_free(pkI);
     EVP_PKEY_CTX_free(pctx);
-    OPENSSL_free(shared_secret);
+    OPENSSL_clear_free(shared_secret, shared_secretlen);
     OPENSSL_free(mypub);
     return erv;
 }
@@ -3054,8 +3074,8 @@ static int hpke_kg_evp(OSSL_LIB_CTX *libctx, const char *propq,
 #endif
             erv = hpke_prbuf2evp(libctx, propq, suite.kem_id, sk, sklen,
                                  NULL, 0, &skR);
-            memset(sk, 0, sklen);
-            memset(tmp, 0, sizeof(tmp));
+            OPENSSL_cleanse(sk, sklen);
+            OPENSSL_cleanse(tmp, sizeof(tmp));
             if (erv != 1) { goto err; }
         }
 #ifdef SUPERVERBOSE
@@ -3106,8 +3126,8 @@ static int hpke_kg_evp(OSSL_LIB_CTX *libctx, const char *propq,
 #endif
             erv = hpke_prbuf2evp(libctx, propq, suite.kem_id, sk, sklen,
                                  NULL, 0, &skR);
-            memset(sk, 0, sklen);
-            memset(tmp, 0, sizeof(tmp));
+            OPENSSL_cleanse(sk, sklen);
+            OPENSSL_cleanse(tmp, sizeof(tmp));
             if (erv != 1) { goto err; }
 
         }
@@ -3206,6 +3226,7 @@ static int hpke_kg(OSSL_LIB_CTX *libctx, const char *propq,
     memcpy(priv, lpriv, lprivlen);
 
 err:
+    OPENSSL_cleanse(lpriv, OSSL_HPKE_MAXSIZE);
     EVP_PKEY_free(skR);
     BIO_free_all(bfp);
     return erv;
@@ -3616,7 +3637,9 @@ static int hpke_encap(OSSL_HPKE_CTX *ctx, unsigned char *enc, size_t *enclen,
                                ctx->shared_secret,
                                &ctx->shared_secretlen);
     if (erv != 1) {
+        OPENSSL_clear_free(ctx->shared_secret, ctx->shared_secretlen);
         ctx->shared_secretlen = 0;
+        ctx->shared_secret = NULL;
         ERR_raise(ERR_LIB_CRYPTO, ERR_R_INTERNAL_ERROR);
         goto err;
     }
@@ -3715,7 +3738,7 @@ static int hpke_decap(OSSL_HPKE_CTX *ctx,
     }
     EVP_PKEY_CTX_free(pctx);
     pctx = NULL;
-    OPENSSL_free(ctx->shared_secret); /* in case of 2nd call */
+    OPENSSL_clear_free(ctx->shared_secret, ctx->shared_secretlen); /* in case of 2nd call */
     ctx->shared_secret = OPENSSL_malloc(lsslen);
     if (ctx->shared_secret == NULL) {
         erv = 0;
@@ -3969,6 +3992,11 @@ err:
         hpke_pbuf(stdout, "\tpsk", ctx->psk, ctx->psklen);
     }
 #endif
+    OPENSSL_cleanse(ks_context, OSSL_HPKE_MAXSIZE);
+    OPENSSL_cleanse(psk_hash, OSSL_HPKE_MAXSIZE);
+    OPENSSL_cleanse(secret, OSSL_HPKE_MAXSIZE);
+    OPENSSL_cleanse(nonce, OSSL_HPKE_MAXSIZE);
+    OPENSSL_cleanse(key, OSSL_HPKE_MAXSIZE);
     EVP_KDF_CTX_free(kctx);
     return erv;
 }
@@ -4019,14 +4047,11 @@ void OSSL_HPKE_CTX_free(OSSL_HPKE_CTX *ctx)
     if (ctx == NULL)
         return;
     OPENSSL_free(ctx->propq);
-    if (ctx->exportersec)
-        OPENSSL_cleanse(ctx->exportersec, ctx->exporterseclen);
-    OPENSSL_free(ctx->exportersec);
+    OPENSSL_clear_free(ctx->exportersec, ctx->exporterseclen);
     OPENSSL_free(ctx->pskid);
-    OPENSSL_cleanse(ctx->psk, ctx->psklen);
-    OPENSSL_free(ctx->psk);
-    OPENSSL_free(ctx->shared_secret);
-    OPENSSL_free(ctx->ikme);
+    OPENSSL_clear_free(ctx->psk, ctx->psklen);
+    OPENSSL_clear_free(ctx->shared_secret, ctx->shared_secretlen);
+    OPENSSL_clear_free(ctx->ikme, ctx->ikmelen);
 
     EVP_PKEY_free(ctx->authpriv);
 #ifdef HAPPYKEY
@@ -4066,8 +4091,7 @@ int OSSL_HPKE_CTX_set1_psk(OSSL_HPKE_CTX *ctx,
     }
     /* free previous value if any */
     OPENSSL_free(ctx->pskid);
-    OPENSSL_cleanse(ctx->psk, ctx->psklen);
-    OPENSSL_free(ctx->psk);
+    OPENSSL_clear_free(ctx->psk, ctx->psklen);
     ctx->pskid = OPENSSL_strdup(pskid);
     if (ctx->pskid == NULL)
         goto err;
@@ -4080,8 +4104,7 @@ int OSSL_HPKE_CTX_set1_psk(OSSL_HPKE_CTX *ctx,
 err:
     /* zap any new or old psk */
     OPENSSL_free(ctx->pskid);
-    OPENSSL_cleanse(ctx->psk, ctx->psklen);
-    OPENSSL_free(ctx->psk);
+    OPENSSL_clear_free(ctx->psk, ctx->psklen);
     ctx->psklen = 0;
     return 0;
 }
@@ -4130,7 +4153,7 @@ int OSSL_HPKE_CTX_set1_ikme(OSSL_HPKE_CTX *ctx,
         ERR_raise(ERR_LIB_CRYPTO, ERR_R_INTERNAL_ERROR);
         return 0;
     }
-    OPENSSL_free(ctx->ikme);
+    OPENSSL_clear_free(ctx->ikme, ctx->ikmelen);
     ctx->ikme = OPENSSL_malloc(ikmelen);
     if (ctx->ikme == NULL)
         return 0;
@@ -4338,6 +4361,7 @@ int OSSL_HPKE_sender_seal(OSSL_HPKE_CTX *ctx,
     if (erv == 1) {
         ctx->seq++;
         if (ctx->seq == 0) { /* error wrap around 64 bits */
+            OPENSSL_cleanse(exportersec, OSSL_HPKE_MAXSIZE);
             ERR_raise(ERR_LIB_CRYPTO, ERR_R_INTERNAL_ERROR);
             return 0;
         }
@@ -4345,11 +4369,13 @@ int OSSL_HPKE_sender_seal(OSSL_HPKE_CTX *ctx,
             /* just record once */
             ctx->exportersec = OPENSSL_malloc(exporterseclen);
             if (ctx->exportersec == NULL) {
+                OPENSSL_cleanse(exportersec, OSSL_HPKE_MAXSIZE);
                 ERR_raise(ERR_LIB_CRYPTO, ERR_R_INTERNAL_ERROR);
                 return 0;
             }
             memcpy(ctx->exportersec, exportersec, exporterseclen);
             ctx->exporterseclen = exporterseclen;
+            OPENSSL_cleanse(exportersec, OSSL_HPKE_MAXSIZE);
         }
     }
 #endif
@@ -4443,11 +4469,13 @@ int OSSL_HPKE_recipient_open(OSSL_HPKE_CTX *ctx,
             /* just record once */
             ctx->exportersec = OPENSSL_malloc(exporterseclen);
             if (ctx->exportersec == NULL) {
+                OPENSSL_cleanse(exportersec, OSSL_HPKE_MAXSIZE);
                 ERR_raise(ERR_LIB_CRYPTO, ERR_R_INTERNAL_ERROR);
                 return 0;
             }
             memcpy(ctx->exportersec, exportersec, exporterseclen);
             ctx->exporterseclen = exporterseclen;
+            OPENSSL_cleanse(exportersec, OSSL_HPKE_MAXSIZE);
         }
         ctx->seq++;
         if (ctx->seq == 0) { /* error wrap around 64 bits */

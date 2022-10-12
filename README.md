@@ -28,7 +28,8 @@ High level notes:
 ## Recent Changes
 
 - 20221011: more changes based on PR comments, incl. export-only
-  mode and tests, removed "legacy" APIs
+  mode and tests, removed "legacy" APIs, added ``OPENSSL_clear_free()``
+  and ``OPENSSL_cleanse()`` calls
 
 - 20221010: more changes based on PR comments
 
