@@ -27,9 +27,14 @@ High level notes:
 
 ## Recent Changes
 
+- 20221012: added API (needed for ECH) to recmmmend the length of
+  IKM to use with a given suite
+
 - 20221011: more changes based on PR comments, incl. export-only
   mode and tests, removed "legacy" APIs, added ``OPENSSL_clear_free()``
-  and ``OPENSSL_cleanse()`` calls
+  and ``OPENSSL_cleanse()`` calls, I might need to add an API to
+  allow ECH code to know how much randomness to generate for an
+  IKM, but can do that tomorrow
 
 - 20221010: more changes based on PR comments
 

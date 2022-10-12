@@ -425,6 +425,18 @@ size_t OSSL_HPKE_get_ciphertext_size(OSSL_HPKE_SUITE suite, size_t clearlen);
  */
 size_t OSSL_HPKE_get_public_encap_size(OSSL_HPKE_SUITE suite);
 
+/**
+ * @brief recommend an IKM size in octets for a given suite
+ * @param suite is the suite to be used
+ * @return the recommended size or zero on error
+ *
+ * Today, this really only uses the KEM to recommend
+ * the number of random octets to use based on the
+ * size of a private value. In future, it could also
+ * factor in e.g. the AEAD.
+ */
+size_t OSSL_HPKE_recommend_ikmelen(OSSL_HPKE_SUITE suite);
+
 #ifdef HAPPYKEY
 /*
  * below are the existing enc/dec APIs that will likely be
