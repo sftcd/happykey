@@ -27,7 +27,10 @@
 # define OSSL_HPKE_MODE_PSKAUTH           3 /**< PSK+authenticated mode */
 
 /*
- * The (16bit) HPKE algorithn IDs
+ * The (16bit) HPKE algorithn ID IANA codepoints
+ *
+ * If/when new IANA codepoints are added there are tables in
+ * the library implementation that must also be updated.
  */
 # define OSSL_HPKE_KEM_ID_RESERVED         0x0000 /**< not used */
 # define OSSL_HPKE_KEM_ID_P256             0x0010 /**< NIST P-256 */
@@ -87,10 +90,6 @@ typedef struct {
         OSSL_HPKE_AEAD_ID_AES_GCM_128 \
     }
 
-# ifndef OSSL_HPKE_MAXSIZE
-#  define OSSL_HPKE_MAXSIZE 512
-# endif
-
 /**
  * @brief opaque type for HPKE contexts
  */
@@ -124,8 +123,7 @@ void OSSL_HPKE_CTX_free(OSSL_HPKE_CTX *ctx);
 int OSSL_HPKE_CTX_set1_psk(OSSL_HPKE_CTX *ctx,
                            const char *pskid,
                            const unsigned char *psk, size_t psklen);
-
-#ifdef HAPPYKEY
+# ifdef HAPPYKEY
 /**
  * @brief set a sender KEM private key for HPKE
  * @param ctx is the pointer for the HPKE context
@@ -139,7 +137,7 @@ int OSSL_HPKE_CTX_set1_psk(OSSL_HPKE_CTX *ctx,
  * clients.
  */
 int OSSL_HPKE_CTX_set1_senderpriv(OSSL_HPKE_CTX *ctx, EVP_PKEY *privp);
-#endif
+# endif
 
 /**
  * @brief set a sender IKM for key DHKEM generation
@@ -268,7 +266,6 @@ int OSSL_HPKE_recipient_open(OSSL_HPKE_CTX *ctx,
                              const unsigned char *aad, size_t aadlen,
                              const unsigned char *ct, size_t ctlen);
 
-
 /**
  * @brief sender export-only encapsulation function
  * @param ctx is the pointer for the HPKE context
@@ -395,7 +392,6 @@ int OSSL_HPKE_get_grease_value(OSSL_LIB_CTX *libctx, const char *propq,
  */
 int OSSL_HPKE_str2suite(const char *str, OSSL_HPKE_SUITE *suite);
 
-
 /**
  * @brief tell the caller how big the cipertext will be
  * @param suite is the suite to be used
@@ -437,7 +433,7 @@ size_t OSSL_HPKE_get_public_encap_size(OSSL_HPKE_SUITE suite);
  */
 size_t OSSL_HPKE_recommend_ikmelen(OSSL_HPKE_SUITE suite);
 
-#ifdef HAPPYKEY
+# ifdef HAPPYKEY
 /*
  * below are the existing enc/dec APIs that will likely be
  * dropped, once new ones work ok
@@ -477,7 +473,7 @@ size_t OSSL_HPKE_recommend_ikmelen(OSSL_HPKE_SUITE suite);
  * @param cipherlen is the length of the input buffer for ciphertext
  * @return 1 for success, other for error (error returns can be non-zero)
  */
-# ifdef TESTVECTORS
+#  ifdef TESTVECTORS
 int OSSL_HPKE_enc(OSSL_LIB_CTX *libctx, const char *propq,
                   unsigned int mode, OSSL_HPKE_SUITE suite,
                   const char *pskid,
@@ -493,7 +489,7 @@ int OSSL_HPKE_enc(OSSL_LIB_CTX *libctx, const char *propq,
                   EVP_PKEY *senderpriv,
                   unsigned char *cipher, size_t *cipherlen,
                   void *tv);
-# else
+#  else
 int OSSL_HPKE_enc(OSSL_LIB_CTX *libctx, const char *propq,
                   unsigned int mode, OSSL_HPKE_SUITE suite,
                   const char *pskid,
@@ -508,7 +504,7 @@ int OSSL_HPKE_enc(OSSL_LIB_CTX *libctx, const char *propq,
                   unsigned char *senderpub, size_t *senderpublen,
                   EVP_PKEY *senderpriv,
                   unsigned char *cipher, size_t *cipherlen);
-# endif
+#  endif
 
 /**
  * @brief HPKE single-shot decryption function
@@ -550,5 +546,5 @@ int OSSL_HPKE_dec(OSSL_LIB_CTX *libctx, const char *propq,
                   const unsigned char *info, size_t infolen,
                   const unsigned char *seq, size_t seqlen,
                   unsigned char *clear, size_t *clearlen);
-#endif
+# endif
 #endif

@@ -29,11 +29,11 @@
 #include "hpketv.h"
 #endif
 
-#ifndef OSSL_HPKE_MAXSIZE
-#define OSSL_HPKE_MAXSIZE 1024
+#ifndef HPKEMAIN_MAXSIZE
+#define HPKEMAIN_MAXSIZE 1024
 #endif
-#ifndef OSSL_HPKE_DEFSIZE
-#define OSSL_HPKE_DEFSIZE (4 * 1024)
+#ifndef HPKEMAIN_DEFSIZE
+#define HPKEMAIN_DEFSIZE (4 * 1024)
 #endif
 
 static int verbose=0; ///< global var for verbosity
@@ -191,9 +191,9 @@ static int map_input(const char *inp, size_t *outlen, unsigned char **outbuf, in
 {
     if (!outlen || !outbuf) return(__LINE__);
     /* on-stack buffer/length to handle various cases */
-    size_t toutlen=OSSL_HPKE_DEFSIZE;
-    unsigned char tbuf[OSSL_HPKE_DEFSIZE];
-    memset(tbuf,0,OSSL_HPKE_DEFSIZE); /* need this so valgrind doesn't complain about b64 strspn below with short values */
+    size_t toutlen=HPKEMAIN_DEFSIZE;
+    unsigned char tbuf[HPKEMAIN_DEFSIZE];
+    memset(tbuf,0,HPKEMAIN_DEFSIZE); /* need this so valgrind doesn't complain about b64 strspn below with short values */
     /* asci hex is easy:-) either case allowed*/
     const char *AH_alphabet="0123456789ABCDEFabcdef\n";
     /* and base64 isn't much harder */
@@ -201,12 +201,12 @@ static int map_input(const char *inp, size_t *outlen, unsigned char **outbuf, in
 
     /* if no input, try stdin */
     if (!inp) {
-        toutlen=fread(tbuf,1,OSSL_HPKE_DEFSIZE,stdin);
+        toutlen=fread(tbuf,1,HPKEMAIN_DEFSIZE,stdin);
         if (verbose) fprintf(stderr,"got %lu bytes from stdin\n",(unsigned long)toutlen);
         if (!feof(stdin)) return(__LINE__);
     } else {
         toutlen=strlen(inp);
-        if (toutlen>OSSL_HPKE_DEFSIZE) return(__LINE__);
+        if (toutlen>HPKEMAIN_DEFSIZE) return(__LINE__);
         FILE *fp=fopen(inp,"r"); /* check if inp is file name */
         if (fp) {
             /* that worked - so read file up to max into buffer */
@@ -228,7 +228,7 @@ static int map_input(const char *inp, size_t *outlen, unsigned char **outbuf, in
             memcpy(tbuf,inp,toutlen);
         }
     }
-    if (toutlen>OSSL_HPKE_DEFSIZE) return(__LINE__);
+    if (toutlen>HPKEMAIN_DEFSIZE) return(__LINE__);
 
     /* ascii-hex or b64 decode as needed */
     /* try from most constrained to least in that order */
@@ -300,8 +300,8 @@ static int hpkemain_write_keys(
     FILE *fp=NULL;
     size_t frv=0;
     BIO *bfp = NULL;
-    unsigned char lpriv[OSSL_HPKE_MAXSIZE];
-    size_t lprivlen = OSSL_HPKE_MAXSIZE;
+    unsigned char lpriv[HPKEMAIN_MAXSIZE];
+    size_t lprivlen = HPKEMAIN_MAXSIZE;
 
     bfp = BIO_new(BIO_s_mem());
     if (bfp == NULL) {
@@ -310,7 +310,7 @@ static int hpkemain_write_keys(
     if (!PEM_write_bio_PrivateKey(bfp, privp, NULL, NULL, 0, NULL, NULL)) {
         return(__LINE__);
     }
-    lprivlen = BIO_read(bfp, lpriv, OSSL_HPKE_MAXSIZE);
+    lprivlen = BIO_read(bfp, lpriv, HPKEMAIN_MAXSIZE);
     if (lprivlen <= 0) {
         return(__LINE__);
     }
@@ -344,9 +344,9 @@ static int hpkemain_write_keys(
             return(__LINE__);
         }
 
-        char b64pub[OSSL_HPKE_MAXSIZE];
-        size_t b64publen=OSSL_HPKE_MAXSIZE;
-        if (publen>OSSL_HPKE_MAXSIZE) {
+        char b64pub[HPKEMAIN_MAXSIZE];
+        size_t b64publen=HPKEMAIN_MAXSIZE;
+        if (publen>HPKEMAIN_MAXSIZE) {
             fprintf(stderr,"Error key too big %lu bytes\n",(unsigned long)publen);
             return(__LINE__);
         }
@@ -394,7 +394,7 @@ static int hpkemain_write_ct(const char *fname,
         fprintf(stderr,"Error allocating %lu bytes\n",(unsigned long)eblen);
         return(__LINE__);
     }
-    if (splen>OSSL_HPKE_MAXSIZE) {
+    if (splen>HPKEMAIN_MAXSIZE) {
         fprintf(stderr,"Error key too big %lu bytes\n",(unsigned long)splen);
         OPENSSL_free(eb);
         return(__LINE__);
@@ -461,8 +461,8 @@ static int hpkemain_read_ct(const char *fname,
     if (!fname || fname[0]=='\0') {
         fin=stdin;
         pfname="STDIN";
-        fsize=OSSL_HPKE_DEFSIZE;
-        fbuf=OPENSSL_malloc(OSSL_HPKE_DEFSIZE);
+        fsize=HPKEMAIN_DEFSIZE;
+        fbuf=OPENSSL_malloc(HPKEMAIN_DEFSIZE);
         if (!fbuf) return(__LINE__);
     } else {
         int frv;
@@ -642,9 +642,9 @@ int main(int argc, char **argv)
     /* if we're just greasing get that out of the way and exit */
     if (doing_grease==1) {
         OSSL_HPKE_SUITE g_suite;
-        unsigned char g_pub[OSSL_HPKE_MAXSIZE];
-        size_t g_pub_len=OSSL_HPKE_MAXSIZE;
-        unsigned char g_cipher[OSSL_HPKE_MAXSIZE];
+        unsigned char g_pub[HPKEMAIN_MAXSIZE];
+        size_t g_pub_len=HPKEMAIN_MAXSIZE;
+        unsigned char g_cipher[HPKEMAIN_MAXSIZE];
         size_t g_cipher_len=266;
 
         if (OSSL_HPKE_get_grease_value(NULL,NULL,NULL,&g_suite,g_pub,&g_pub_len,g_cipher,g_cipher_len)!=1) {
@@ -791,8 +791,8 @@ int main(int argc, char **argv)
      * Call one of our functions
      */
     if (generate) {
-        size_t publen=OSSL_HPKE_MAXSIZE; unsigned char pub[OSSL_HPKE_MAXSIZE];
-        size_t privlen=OSSL_HPKE_MAXSIZE; unsigned char priv[OSSL_HPKE_MAXSIZE];
+        size_t publen=HPKEMAIN_MAXSIZE; unsigned char pub[HPKEMAIN_MAXSIZE];
+        size_t privlen=HPKEMAIN_MAXSIZE; unsigned char priv[HPKEMAIN_MAXSIZE];
         EVP_PKEY *privp = NULL;
         int rv=OSSL_HPKE_keygen(
             NULL, NULL, hpke_mode, hpke_suite,
@@ -812,7 +812,7 @@ int main(int argc, char **argv)
         }
         
     } else if (doing_enc) {
-        size_t senderpublen=OSSL_HPKE_MAXSIZE; unsigned char senderpub[OSSL_HPKE_MAXSIZE];
+        size_t senderpublen=HPKEMAIN_MAXSIZE; unsigned char senderpub[HPKEMAIN_MAXSIZE];
         size_t cipherlen=plainlen+32; unsigned char *cipher=NULL;
         int rv;
         cipher=malloc(cipherlen);
@@ -856,7 +856,7 @@ int main(int argc, char **argv)
                             tv->encs[0].ciphertext,
                             &bcipherlen,
                             &bcipher);
-                if ((cipherlen==0 || cipherlen==OSSL_HPKE_MAXSIZE) || cipher==NULL) { 
+                if ((cipherlen==0 || cipherlen==HPKEMAIN_MAXSIZE) || cipher==NULL) { 
                     printf("Re-generated ciphertext is NULL sorry. \n");
                     goodres=0;
                 } else if (bcipherlen!=cipherlen) {
@@ -889,7 +889,8 @@ int main(int argc, char **argv)
         /*
          * try decode and then decrypt so
          */
-        size_t senderpublen=OSSL_HPKE_MAXSIZE; unsigned char senderpub[OSSL_HPKE_MAXSIZE];
+        size_t senderpublen=HPKEMAIN_MAXSIZE;
+        unsigned char senderpub[HPKEMAIN_MAXSIZE];
         size_t cipherlen=0; unsigned char *cipher=NULL;
         size_t clearlen=0; unsigned char *clear=NULL;
 

@@ -1,4 +1,5 @@
 #ifdef HAPPYKEY
+
 /*
  * Copyright 2022 The OpenSSL Project Authors. All Rights Reserved.
  *
@@ -111,12 +112,10 @@ static void usage(char *prog, char *errmsg)
 #include <openssl/rand.h>
 #include <openssl/hpke.h>
 #include "testutil.h"
-
-
 #endif
 
 #ifndef OSSL_HPKE_MAXSIZE
-# define OSSL_HPKE_MAXSIZE 1024
+# define OSSL_HPKE_MAXSIZE 512
 #endif
 
 static OSSL_LIB_CTX *testctx = NULL;
@@ -367,10 +366,10 @@ static const unsigned char ksinfo[] = {
 /*
  * static const char *pskid = "Ennyn Durin aran Moria";
  */
-static const unsigned char pskid[]={
+static const unsigned char pskid[] = {
     0x45, 0x6e, 0x6e, 0x79, 0x6e, 0x20, 0x44, 0x75,
     0x72, 0x69, 0x6e, 0x20, 0x61, 0x72, 0x61, 0x6e,
-    0x20, 0x4d, 0x6f, 0x72, 0x69, 0x61, 0x00 
+    0x20, 0x4d, 0x6f, 0x72, 0x69, 0x61, 0x00
 };
 static const unsigned char psk[] = {
     0x02, 0x47, 0xfd, 0x33, 0xb9, 0x13, 0x76, 0x0f,
@@ -1282,7 +1281,7 @@ static int test_hpke_suite_strs(void)
                     overallresult = 0;
                 }
 #ifdef HAPPYKEY
-                else 
+                else
                     if (verbose) { printf("str2suite ok for %s\n",sstr); }
 #endif
             }
