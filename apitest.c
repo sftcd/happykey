@@ -225,10 +225,6 @@ static int do_testhpke(const TEST_BASEDATA *base,
     if (!TEST_ptr(sealctx = OSSL_HPKE_CTX_new(base->mode, base->suite,
                                               libctx, propq)))
         goto end;
-#ifdef HAPPYKEY
-    if (!TEST_true(OSSL_HPKE_CTX_set1_senderpriv(sealctx, privE)))
-        goto end;
-#endif
     if (!TEST_true(OSSL_HPKE_CTX_set1_ikme(sealctx, base->ikmE, base->ikmElen)))
         goto end;
     if (base->mode == OSSL_HPKE_MODE_AUTH
@@ -254,9 +250,22 @@ static int do_testhpke(const TEST_BASEDATA *base,
                                               base->psk, base->psklen)))
             goto end;
     }
+#define NEWWAY
+#ifdef NEWWAY
+    if (!TEST_true(OSSL_HPKE_encap(sealctx, enc, &enclen,
+                                   rpub, rpublen,
+                                   base->ksinfo, base->ksinfolen)))
+        goto end;
+#endif
     for (i = 0; i < (int)aeadsz; ++i) {
         ctlen = sizeof(ct);
         OPENSSL_cleanse(ct, ctlen);
+#ifdef NEWWAY
+        if (!TEST_true(OSSL_HPKE_seal(sealctx, ct, &ctlen,
+                                      aead[i].aad, aead[i].aadlen,
+                                      aead[i].pt, aead[i].ptlen)))
+            goto end;
+#else
         if (!TEST_true(OSSL_HPKE_sender_seal(sealctx,
                                              enc, &enclen,
                                              ct, &ctlen,
@@ -265,6 +274,7 @@ static int do_testhpke(const TEST_BASEDATA *base,
                                              aead[i].aad, aead[i].aadlen,
                                              aead[i].pt, aead[i].ptlen)))
             goto end;
+#endif
         if (!TEST_true(cmpkey(privE, enc, enclen)))
             goto end;
         if (!TEST_true(TEST_mem_eq(ct, ctlen,
@@ -272,6 +282,7 @@ static int do_testhpke(const TEST_BASEDATA *base,
                                    aead[i].expected_ctlen)))
             goto end;
     }
+#ifndef NEWWAY
     if ((int)aeadsz == 0) {
         /* we must be doing an export only test */
         if (!TEST_true(OSSL_HPKE_sender_export_encap(sealctx,
@@ -283,6 +294,7 @@ static int do_testhpke(const TEST_BASEDATA *base,
         if (!TEST_true(cmpkey(privE, enc, enclen)))
             goto end;
     }
+#endif
     if (!TEST_ptr(openctx = OSSL_HPKE_CTX_new(base->mode, base->suite,
                                               libctx, propq)))
         goto end;
@@ -301,10 +313,21 @@ static int do_testhpke(const TEST_BASEDATA *base,
                                                   authpub, authpublen)))
             goto end;
     }
-
+#ifdef NEWWAY
+    if (!TEST_true(OSSL_HPKE_decap(openctx, enc, enclen, privR,
+                                   base->ksinfo, base->ksinfolen)))
+        goto end;
+#endif
     for (i = 0; i < (int)aeadsz; ++i) {
         ptoutlen = sizeof(ptout);
         OPENSSL_cleanse(ptout, ptoutlen);
+#ifdef NEWWAY
+        if (!TEST_true(OSSL_HPKE_open(openctx, ptout, &ptoutlen,
+                                      aead[i].aad, aead[i].aadlen,
+                                      aead[i].expected_ct,
+                                      aead[i].expected_ctlen)))
+            goto end;
+#else
         if (!TEST_true(OSSL_HPKE_recipient_open(openctx, ptout, &ptoutlen,
                                                 enc, enclen,
                                                 privR,
@@ -313,9 +336,11 @@ static int do_testhpke(const TEST_BASEDATA *base,
                                                 aead[i].expected_ct,
                                                 aead[i].expected_ctlen)))
             goto end;
+#endif
         if (!TEST_mem_eq(aead[i].pt, aead[i].ptlen, ptout, ptoutlen))
             goto end;
     }
+#ifdef NEWWAY
     if ((int)aeadsz == 0) {
         /* we must be doing an export only test */
         if (!TEST_true(OSSL_HPKE_recipient_export_decap(sealctx,
@@ -327,6 +352,7 @@ static int do_testhpke(const TEST_BASEDATA *base,
         if (!TEST_true(cmpkey(privE, enc, enclen)))
             goto end;
     }
+#endif
     /* reset seq in sealctx */
     for (i = 0; i < (int)exportsz; ++i) {
         size_t len = export[i].expected_secretlen;
@@ -334,9 +360,9 @@ static int do_testhpke(const TEST_BASEDATA *base,
 
         if (len > sizeof(eval))
             goto end;
-        if (!TEST_true(OSSL_HPKE_CTX_export(sealctx, eval, len,
-                                            export[i].context,
-                                            export[i].contextlen)))
+        if (!TEST_true(OSSL_HPKE_export(sealctx, eval, len,
+                                        export[i].context,
+                                        export[i].contextlen)))
             goto end;
         if (!TEST_true(TEST_mem_eq(eval, len, export[i].expected_secret,
                                    export[i].expected_secretlen)))
@@ -1219,8 +1245,8 @@ static int test_hpke_export(void)
                                          NULL, 0, NULL, 0, /* no add, info */
                                          plain, plainlen)))
         goto end;
-    if (!TEST_true(OSSL_HPKE_CTX_export(ctx, exp, 32,
-                                        (unsigned char *)estr, strlen(estr))))
+    if (!TEST_true(OSSL_HPKE_export(ctx, exp, 32,
+                                    (unsigned char *)estr, strlen(estr))))
         goto end;
     if (!TEST_ptr(rctx = OSSL_HPKE_CTX_new(hpke_mode, hpke_suite,
                                            testctx, NULL)))
@@ -1231,8 +1257,8 @@ static int test_hpke_export(void)
                                             NULL, 0, NULL, 0,
                                             cipher, cipherlen)))
         goto end;
-    if (!TEST_true(OSSL_HPKE_CTX_export(rctx, rexp, 32,
-                                        (unsigned char *)estr, strlen(estr))))
+    if (!TEST_true(OSSL_HPKE_export(rctx, rexp, 32,
+                                    (unsigned char *)estr, strlen(estr))))
         goto end;
     if (!TEST_true(TEST_mem_eq(exp, 32, rexp, 32)))
         goto end;
@@ -1725,7 +1751,6 @@ int main(int argc, char **argv)
             printf("Test vector 3 fail (%d)\n", apires);
             return apires;
         }
-#ifndef HAPPYKEY
         apires = export_only_test();
         if (apires == 1) {
             printf("Test vector 4 success\n");
@@ -1733,13 +1758,6 @@ int main(int argc, char **argv)
             printf("Test vector 4 fail (%d)\n", apires);
             return apires;
         }
-#else
-        /* This'll be doable once HPKE is in the library but for
-         * now depends on the new DHKEM stuff which isn't in a
-         * released version, so we'll only do this test vector
-         * when running using a built library with DHKEM support  */
-        printf("Export-only suite/export skipped in this build\n");
-#endif
     }
     return apires;
 }

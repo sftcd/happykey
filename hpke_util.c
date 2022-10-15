@@ -20,7 +20,6 @@
 #include "internal/packet.h"
 #endif
 
-
 /* ASCII: "HPKE-v1", in hex for EBCDIC compatibility */
 static const char LABEL_HPKEV1[] = "\x48\x50\x4B\x45\x2D\x76\x31";
 
@@ -86,7 +85,7 @@ int ossl_hpke_labeled_extract(EVP_KDF_CTX *kctx,
     WPACKET pkt;
 
     labeled_ikmlen = strlen(LABEL_HPKEV1) + strlen(protocol_label)
-                     + suiteidlen + strlen(label) + ikmlen;
+        + suiteidlen + strlen(label) + ikmlen;
     labeled_ikm = OPENSSL_malloc(labeled_ikmlen);
     if (labeled_ikm == NULL)
         return 0;
@@ -130,8 +129,7 @@ int ossl_hpke_labeled_expand(EVP_KDF_CTX *kctx,
     WPACKET pkt;
 
     labeled_infolen = 2 + okmlen + prklen + strlen(LABEL_HPKEV1)
-                      + strlen(protocol_label) + suiteidlen + strlen(label)
-                      + infolen;
+        + strlen(protocol_label) + suiteidlen + strlen(label) + infolen;
     labeled_info = OPENSSL_malloc(labeled_infolen);
     if (labeled_info == NULL)
         return 0;

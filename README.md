@@ -27,6 +27,11 @@ High level notes:
 
 ## Recent Changes
 
+- 20221015: various code re-arrangements to make it easier to build
+  against an system-installed OpenSSL library; added yet another 
+  re-spin of external OpenSSL API (but why not, we've had so many
+  already:-) 
+
 - 20221012: added API (needed for ECH) to recmmmend the length of
   IKM to use with a given suite
 

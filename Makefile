@@ -26,53 +26,21 @@ NINCL=  -I../nss/lib \
 		-I../nss/lib/smime \
 		-I../dist/Debug/include/nspr
 
-# There are test vectors for this - see comments in hpketv.h.
-# If you want to compile in test vector checks then uncomment 
-# the next line:
-# testvectors=-D TESTVECTORS -I ../json-c
-
-# Define this if linking with an OpenSSL 3.0.x release 
-# and use HPKE via linked objects (mainly hpke.o)
-useopenssl_3?=y
-
-# Define this if linking with an OpenSSL ``master`` branch build
-# that includes HPKE APIs
-useopenssl_master?=n
-
-ifeq ($(useopenssl_3),y)
-ifeq ($(useopenssl_master),y)
-$(error "Error: can't have both useopenssl_3 and useopenssl_master set")
-endif
-endif
-ifneq ($(useopenssl_3),y)
-ifneq ($(useopenssl_master),y)
-$(error "Error: need one of useopenssl_3 or useopenssl_master set")
-endif
-endif
-
-ifeq ($(useopenssl_3),y)
-CFLAGS=-g ${testvectors} -DHPKEOBJS -DHAPPYKEY
-endif
-ifeq ($(useopenssl_master),y)
-CFLAGS=-g ${testvectors} -DHPKEAPI -DHAPPYKEY
-ifdef testvectors
-$(error "testvectors can't be used with useopenssl_master build")
-endif
-endif
-
 CC=gcc
+CFLAGS=-D HAPPYKEY -g
 
-# testvectors isn't compatible with apitest
-ifdef testvectors
-all: hpkemain
-else
+# There are test vectors for this - see comments in hpketv.h.
+# If you want to compile in test vector checks then uncomment
+# the next line:
+# CFLAGS=-D HAPPYKEY -g -D TESTVECTORS -I ../json-c
+
 all: hpkemain apitest
-endif
 
 # hpke.c, hpke.h and apitest.c include additional tracing and test vector
 # support that's not desirable in the version we'd like to see merged
 # with OpenSSL - we use the unifdef tool to generate files for using in
 # an openssl build from the ones here. 
+
 #
 # The "-x 1" below is just to get unifdef to return zero if the input
 # and output differ, which should be the case for us.
@@ -127,28 +95,14 @@ packet.o: packet.c
 hpketv.o: hpketv.c hpketv.h hpke.h
 	${CC} ${CFLAGS} -I ${INCL} -c $<
 
-ifeq ($(useopenssl_3),y)
 apitest: apitest.o hpke.o hpke_util.o packet.o
 	${CC} ${CFLAGS} -o $@ apitest.o hpke.o hpke_util.o packet.o -lssl -lcrypto
-endif
-ifeq ($(useopenssl_master),y)
-apitest: apitest.o hpke.o hpke_util.o packet.o
-	${CC} ${CFLAGS} -o $@ apitest.o -L ${OSSL} -lssl -lcrypto
-endif
 
-ifdef testvectors
-hpkemain: hpkemain.o hpke.o hpke_util.o hpketv.o packet.o
-	${CC} ${CFLAGS} -o $@ hpkemain.o hpke.o hpke_util.o packet.o hpketv.o -L ${OSSL} -lssl -lcrypto -L ../json-c/ -ljson-c
-else
-ifeq ($(useopenssl_3),y)
+apitest-forlib: apitest.o hpke-forlib.o hpke_util.o packet.o
+	${CC} ${CFLAGS} -o $@ apitest.o hpke-forlib.o hpke_util.o packet.o -L ${OSSL} -lssl -lcrypto
+
 hpkemain: hpkemain.o hpke.o hpke_util.o packet.o
 	${CC} ${CFLAGS} -o $@ hpkemain.o hpke.o hpke_util.o packet.o -lssl -lcrypto
-endif
-ifeq ($(useopenssl_master),y)
-hpkemain: hpkemain.o hpke.o hpke_util.o packet.o
-	${CC} ${CFLAGS} -o $@ hpkemain.o -L ${OSSL} -lssl -lcrypto
-endif
-endif
 
 doc: hpke.c hpke.h hpketv.h hpketv.c apitest.c
 	doxygen hpke.doxy
