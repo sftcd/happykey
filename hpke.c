@@ -2016,7 +2016,7 @@ static int hpke_decap(OSSL_HPKE_CTX *ctx,
             goto err;
         }
     }
-    erv = hpke_do_kem(ctx->libctx, ctx->propq, 0, ctx->suite, 
+    erv = hpke_do_kem(ctx->libctx, ctx->propq, 0, ctx->suite,
                       priv, mypublen, mypub,
                       pkE, enclen, enc,
                       akey, ctx->authpublen, ctx->authpub,
@@ -2892,8 +2892,8 @@ int OSSL_HPKE_export(OSSL_HPKE_CTX *ctx,
     return 1;
 }
 
-/* 
- * Some even newer APIs below that separate out encap/decap from 
+/*
+ * Some even newer APIs below that separate out encap/decap from
  * seal/open/export
  */
 
