@@ -3110,7 +3110,6 @@ int OSSL_HPKE_open(OSSL_HPKE_CTX *ctx,
     return 1;
 }
 
-
 #ifdef HAPPYKEY
 static int local_hpke_kg_evp(OSSL_LIB_CTX *libctx, const char *propq,
                              unsigned int mode, OSSL_HPKE_SUITE suite,
