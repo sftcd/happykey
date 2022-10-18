@@ -35,6 +35,9 @@ static const char LABEL_HPKEV1[] = "\x48\x50\x4B\x45\x2D\x76\x31";
  * and the tables below, corresponding additions should also be
  * made to the synonymtab tables a little further down so that
  * OSSL_HPKE_str2suite() continues to function correctly.
+ *
+ * The canonical place to check for IANA registered codepoints
+ * is: https://www.iana.org/assignments/hpke/hpke.xhtml
  */
 
 /*
