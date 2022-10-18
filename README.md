@@ -27,6 +27,9 @@ High level notes:
 
 ## Recent Changes
 
+- 20221018: moved KEM table to ``hpke_util.c`` using @slontis work - did
+  same with KDF and AEAD tables for consistency
+
 - 20221016: confirmed that latest APIs changes work for ECH and 
   updated OpenSSL forks accordingly
 

@@ -6,13 +6,10 @@
  * in the file LICENSE in the source distribution or at
  * https://www.openssl.org/source/license.html
  */
-
 #ifdef HAPPYKEY
-/*
- * emptiness :-(
- * Unless one of the ifdef's triggers something unifef complains
- */
+/* just a thing to force a change */
 #endif
+
 #ifndef OSSL_CRYPTO_HPKE_H
 # define OSSL_CRYPTO_HPKE_H
 # pragma once
@@ -23,6 +20,62 @@
 # define OSSL_HPKE_MAX_PRIVATE 66
 # define OSSL_HPKE_MAX_NONCE 12
 # define OSSL_HPKE_MAX_KDF_INPUTLEN 64
+
+/*
+ * @brief info about a KEM
+ * Used to store constants from Section 7.1 "Table 2 KEM IDs"
+ * and the bitmask for EC curves described in Section 7.1.3 DeriveKeyPair
+ */
+typedef struct {
+    uint16_t      kem_id; /**< code point for key encipherment method */
+    const char    *keytype; /**< string form of algtype "EC"/"X25519"/"X448" */
+    const char    *groupname; /**< string form of EC group for NIST curves  */
+    const char    *mdname; /**< hash alg name for the HKDF */
+    size_t        Nsecret; /**< size of secrets */
+    size_t        Nenc; /**< length of encapsulated key */
+    size_t        Npk; /**< length of public key */
+    size_t        Npriv; /**< length of raw private key */
+    uint8_t       bitmask;
+} OSSL_HPKE_KEM_INFO;
+
+/*
+ * @brief info about a KDF
+ */
+typedef struct {
+    uint16_t       kdf_id; /**< code point for KDF */
+    const char     *mdname; /**< hash alg name for the HKDF */
+    size_t         Nh; /**< length of hash/extract output */
+} OSSL_HPKE_KDF_INFO;
+
+/*
+ * @brief info about an AEAD
+ */
+typedef struct {
+    uint16_t            aead_id; /**< code point for aead alg */
+    const char *        name;   /* alg name */
+    size_t              taglen; /**< aead tag len */
+    size_t              Nk; /**< size of a key for this aead */
+    size_t              Nn; /**< length of a nonce for this aead */
+} OSSL_HPKE_AEAD_INFO;
+
+/*
+ * table with identifier and synonym strings
+ * right now, there are 4 synonyms for each - a name, a hex string
+ * a hex string with a leading zero and a decimal string - more
+ * could be added but that seems like enough
+ */
+typedef struct OSSL_HPKE_synonymtab_str {
+    uint16_t id;
+    char *synonyms[4];
+} synonymttab_t;
+
+const OSSL_HPKE_KEM_INFO *ossl_HPKE_KEM_INFO_find_curve(const char *curve);
+const OSSL_HPKE_KEM_INFO *ossl_HPKE_KEM_INFO_find_id(uint16_t kemid);
+const OSSL_HPKE_KEM_INFO *ossl_HPKE_KEM_INFO_find_random(OSSL_LIB_CTX *ctx);
+const OSSL_HPKE_KDF_INFO *ossl_HPKE_KDF_INFO_find_id(uint16_t kdfid);
+const OSSL_HPKE_KDF_INFO *ossl_HPKE_KDF_INFO_find_random(OSSL_LIB_CTX *ctx);
+const OSSL_HPKE_AEAD_INFO *ossl_HPKE_AEAD_INFO_find_id(uint16_t kdfid);
+const OSSL_HPKE_AEAD_INFO *ossl_HPKE_AEAD_INFO_find_random(OSSL_LIB_CTX *ctx);
 
 int ossl_hpke_kdf_extract(EVP_KDF_CTX *kctx,
                           unsigned char *prk, size_t prklen,
@@ -52,4 +105,5 @@ int ossl_hpke_labeled_expand(EVP_KDF_CTX *kctx,
 EVP_KDF_CTX *ossl_kdf_ctx_create(const char *kdfname, const char *mdname,
                                  OSSL_LIB_CTX *libctx, const char *propq);
 
+int ossl_hpke_str2suite(const char *suitestr, OSSL_HPKE_SUITE *suite);
 #endif

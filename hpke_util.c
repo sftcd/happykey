@@ -12,6 +12,10 @@
 #include <openssl/params.h>
 #include <openssl/err.h>
 #include <openssl/proverr.h>
+#include <openssl/hpke.h>
+#include <openssl/sha.h>
+#include <openssl/rand.h>
+#include "crypto/ecx.h"
 #ifdef HAPPYKEY
 #include "hpke_util.h"
 #include "packet.h"
@@ -20,8 +24,202 @@
 #include "internal/packet.h"
 #endif
 
+/* max string len we'll try map to a suite */
+#define OSSL_HPKE_MAX_SUITESTR 38
+
 /* ASCII: "HPKE-v1", in hex for EBCDIC compatibility */
 static const char LABEL_HPKEV1[] = "\x48\x50\x4B\x45\x2D\x76\x31";
+
+/*
+ * Note that if additions are made to the set of IANA codepoints
+ * and the tables below, corresponding additions should also be
+ * made to the synonymtab tables a little further down so that
+ * OSSL_HPKE_str2suite() continues to function correctly.
+ */
+
+/*
+ * @brief table of KEMs
+ * See Section 7.1 "Table 2 KEM IDs"
+ */
+static const OSSL_HPKE_KEM_INFO hpke_kem_tab[] = {
+    { OSSL_HPKE_KEM_ID_P256, "EC", OSSL_HPKE_KEMSTR_P256,
+      LN_sha256, SHA256_DIGEST_LENGTH, 65, 65, 32, 0xFF },
+    { OSSL_HPKE_KEM_ID_P384, "EC", OSSL_HPKE_KEMSTR_P384,
+      LN_sha384, SHA384_DIGEST_LENGTH, 97, 97, 48, 0xFF },
+    { OSSL_HPKE_KEM_ID_P521, "EC", OSSL_HPKE_KEMSTR_P521,
+      LN_sha512, SHA512_DIGEST_LENGTH, 133, 133, 66, 0x01 },
+#ifndef OPENSSL_NO_EC
+    { OSSL_HPKE_KEM_ID_X25519, OSSL_HPKE_KEMSTR_X25519, NULL,
+      LN_sha256, SHA256_DIGEST_LENGTH,
+      X25519_KEYLEN, X25519_KEYLEN, X25519_KEYLEN },
+    { OSSL_HPKE_KEM_ID_X448, OSSL_HPKE_KEMSTR_X448, NULL,
+      LN_sha512, SHA512_DIGEST_LENGTH, X448_KEYLEN, X448_KEYLEN, X448_KEYLEN }
+#endif
+};
+
+/*
+ * @brief table of AEADs
+ */
+static const OSSL_HPKE_AEAD_INFO hpke_aead_tab[] = {
+    { OSSL_HPKE_AEAD_ID_AES_GCM_128, LN_aes_128_gcm, 16, 16, 12 },
+    { OSSL_HPKE_AEAD_ID_AES_GCM_256, LN_aes_256_gcm, 16, 32, 12 },
+#ifndef OPENSSL_NO_CHACHA20
+# ifndef OPENSSL_NO_POLY1305
+    { OSSL_HPKE_AEAD_ID_CHACHA_POLY1305, LN_chacha20_poly1305, 16, 32, 12 },
+# endif
+    { OSSL_HPKE_AEAD_ID_EXPORTONLY, NULL, 0, 0, 0 }
+#endif
+};
+
+/*
+ * @brief table of KDFs
+ */
+static const OSSL_HPKE_KDF_INFO hpke_kdf_tab[] = {
+    { OSSL_HPKE_KDF_ID_HKDF_SHA256, LN_sha256, SHA256_DIGEST_LENGTH },
+    { OSSL_HPKE_KDF_ID_HKDF_SHA384, LN_sha384, SHA384_DIGEST_LENGTH },
+    { OSSL_HPKE_KDF_ID_HKDF_SHA512, LN_sha512, SHA512_DIGEST_LENGTH }
+};
+
+/**
+ * Synonym tables for KEMs, KDFs and AEADs: idea is to allow
+ * mapping strings to suites with a little flexibility in terms
+ * of allowing a name or a couple of forms of number (for
+ * the IANA codepoint). If new IANA codepoints are allocated
+ * then these tables should be updated at the same time as the
+ * others above.
+ *
+ * The function to use these is ossl_hpke_str2suite() further down
+ * this file and shouln't need modification so long as the table
+ * sizes (i.e. allow exactly 4 synonyms) don't change.
+ */
+static synonymttab_t kemstrtab[] = {
+    {OSSL_HPKE_KEM_ID_P256,
+     {OSSL_HPKE_KEMSTR_P256, "0x10", "0x10", "16" }},
+    {OSSL_HPKE_KEM_ID_P384,
+     {OSSL_HPKE_KEMSTR_P384, "0x11", "0x11", "17" }},
+    {OSSL_HPKE_KEM_ID_P521,
+     {OSSL_HPKE_KEMSTR_P521, "0x12", "0x12", "18" }},
+    {OSSL_HPKE_KEM_ID_X25519,
+     {OSSL_HPKE_KEMSTR_X25519, "0x20", "0x20", "32" }},
+    {OSSL_HPKE_KEM_ID_X448,
+     {OSSL_HPKE_KEMSTR_X448, "0x21", "0x21", "33" }}
+};
+static synonymttab_t kdfstrtab[] = {
+    {OSSL_HPKE_KDF_ID_HKDF_SHA256,
+     {OSSL_HPKE_KDFSTR_256, "0x1", "0x01", "1"}},
+    {OSSL_HPKE_KDF_ID_HKDF_SHA384,
+     {OSSL_HPKE_KDFSTR_384, "0x2", "0x02", "2"}},
+    {OSSL_HPKE_KDF_ID_HKDF_SHA512,
+     {OSSL_HPKE_KDFSTR_512, "0x3", "0x03", "3"}}
+};
+static synonymttab_t aeadstrtab[] = {
+    {OSSL_HPKE_AEAD_ID_AES_GCM_128,
+     {OSSL_HPKE_AEADSTR_AES128GCM, "0x1", "0x01", "1"}},
+    {OSSL_HPKE_AEAD_ID_AES_GCM_256,
+     {OSSL_HPKE_AEADSTR_AES256GCM, "0x2", "0x02", "2"}},
+    {OSSL_HPKE_AEAD_ID_CHACHA_POLY1305,
+     {OSSL_HPKE_AEADSTR_CP, "0x3", "0x03", "3"}}
+};
+
+/* Return an object containing KEM constants associated with a EC curve name */
+const OSSL_HPKE_KEM_INFO *ossl_HPKE_KEM_INFO_find_curve(const char *curve)
+{
+    int i;
+    int sz = OSSL_NELEM(hpke_kem_tab);
+
+    for (i = 0; i != sz; ++i) {
+        const char *group = hpke_kem_tab[i].groupname;
+
+        if (group == NULL)
+            group = hpke_kem_tab[i].keytype;
+        if (OPENSSL_strcasecmp(curve, group) == 0)
+            return &hpke_kem_tab[i];
+    }
+    ERR_raise(ERR_LIB_PROV, PROV_R_INVALID_CURVE);
+    return NULL;
+}
+
+const OSSL_HPKE_KEM_INFO *ossl_HPKE_KEM_INFO_find_id(uint16_t kemid)
+{
+    int i;
+    int sz = OSSL_NELEM(hpke_kem_tab);
+
+    for (i = 0; i != sz; ++i) {
+        if (hpke_kem_tab[i].kem_id == kemid)
+            return &hpke_kem_tab[i];
+    }
+    ERR_raise(ERR_LIB_PROV, PROV_R_INVALID_CURVE);
+    return NULL;
+}
+
+const OSSL_HPKE_KEM_INFO *ossl_HPKE_KEM_INFO_find_random(OSSL_LIB_CTX *ctx)
+{
+    unsigned char rval = 0;
+    int sz = OSSL_NELEM(hpke_kem_tab);
+
+    if (RAND_bytes_ex(ctx, &rval, sizeof(rval), 0) <= 0)
+        return NULL;
+    return &hpke_kem_tab[rval % sz];
+}
+
+/*
+ * TODO: add new values to include/openssl/proverr.h
+ * not sure how to allocate numbers just yet though
+ * or maybe there're better error numbers
+ */
+#ifndef PROV_R_INVALID_KDF
+# define PROV_R_INVALID_KDF PROV_R_INVALID_DIGEST
+#endif
+#ifndef PROV_R_INVALID_AEAD
+# define PROV_R_INVALID_AEAD PROV_R_INVALID_KEY
+#endif
+
+const OSSL_HPKE_KDF_INFO *ossl_HPKE_KDF_INFO_find_id(uint16_t kdfid)
+{
+    int i;
+    int sz = OSSL_NELEM(hpke_kdf_tab);
+
+    for (i = 0; i != sz; ++i) {
+        if (hpke_kdf_tab[i].kdf_id == kdfid)
+            return &hpke_kdf_tab[i];
+    }
+    ERR_raise(ERR_LIB_PROV, PROV_R_INVALID_KDF);
+    return NULL;
+}
+
+const OSSL_HPKE_KDF_INFO *ossl_HPKE_KDF_INFO_find_random(OSSL_LIB_CTX *ctx)
+{
+    unsigned char rval = 0;
+    int sz = OSSL_NELEM(hpke_kdf_tab);
+
+    if (RAND_bytes_ex(ctx, &rval, sizeof(rval), 0) <= 0)
+        return NULL;
+    return &hpke_kdf_tab[rval % sz];
+}
+
+const OSSL_HPKE_AEAD_INFO *ossl_HPKE_AEAD_INFO_find_id(uint16_t aeadid)
+{
+    int i;
+    int sz = OSSL_NELEM(hpke_aead_tab);
+
+    for (i = 0; i != sz; ++i) {
+        if (hpke_aead_tab[i].aead_id == aeadid)
+            return &hpke_aead_tab[i];
+    }
+    ERR_raise(ERR_LIB_PROV, PROV_R_INVALID_AEAD);
+    return NULL;
+}
+
+const OSSL_HPKE_AEAD_INFO *ossl_HPKE_AEAD_INFO_find_random(OSSL_LIB_CTX *ctx)
+{
+    unsigned char rval = 0;
+    int sz = OSSL_NELEM(hpke_aead_tab);
+
+    if (RAND_bytes_ex(ctx, &rval, sizeof(rval), 0) <= 0)
+        return NULL;
+    /* the minus 1 below is so we don't pick the EXPORTONLY codepoint */
+    return &hpke_aead_tab[rval % (sz - 1)];
+}
 
 static int kdf_derive(EVP_KDF_CTX *kctx,
                       unsigned char *out, size_t outlen, int mode,
@@ -182,4 +380,71 @@ EVP_KDF_CTX *ossl_kdf_ctx_create(const char *kdfname, const char *mdname,
         }
     }
     return kctx;
+}
+
+/*
+ * @brief map a string to a HPKE suite based on synonym tables
+ * @param str is the string value
+ * @param suite is the resulting suite
+ * @return 1 for success, otherwise failure
+ */
+int ossl_hpke_str2suite(const char *suitestr, OSSL_HPKE_SUITE *suite)
+{
+    uint16_t kem = 0, kdf = 0, aead = 0;
+    char *st = NULL;
+    char *instrcp = NULL;
+    size_t inplen = 0;
+    int labels = 0;
+    synonymttab_t *synp = NULL;
+    uint16_t *targ = NULL;
+    size_t i, j;
+    size_t outsize = 0;
+    size_t insize = 0;
+
+    if (suitestr == NULL || suite == NULL)
+        return 0;
+    /* See if it contains a mix of our strings and numbers  */
+    inplen = OPENSSL_strnlen(suitestr, OSSL_HPKE_MAX_SUITESTR);
+    if (inplen >= OSSL_HPKE_MAX_SUITESTR)
+        return 0;
+    instrcp = OPENSSL_strndup(suitestr, inplen);
+    st = strtok(instrcp, ",");
+    if (st == NULL) {
+        OPENSSL_free(instrcp);
+        return 0;
+    }
+    while (st != NULL && ++labels <= 3) {
+        /* check if string is known or number and if so handle appropriately */
+        if (kem == 0) {
+            synp = kemstrtab;
+            targ = &kem;
+            outsize = OSSL_NELEM(kemstrtab);
+            insize = OSSL_NELEM(kemstrtab[0].synonyms);
+        } else if (kem != 0 && kdf == 0) {
+            synp = kdfstrtab;
+            targ = &kdf;
+            outsize = OSSL_NELEM(kdfstrtab);
+            insize = OSSL_NELEM(kdfstrtab[0].synonyms);
+        } else if (kem != 0 && kdf != 0 && aead == 0) {
+            synp = aeadstrtab;
+            targ = &aead;
+            outsize = OSSL_NELEM(aeadstrtab);
+            insize = OSSL_NELEM(aeadstrtab[0].synonyms);
+        }
+        for (i = 0; i != outsize && *targ == 0; i++) {
+            for (j = 0; j != insize && *targ == 0; j++) {
+                if (OPENSSL_strcasecmp(st, synp[i].synonyms[j]) == 0)
+                    *targ = synp[i].id;
+            }
+        }
+        st = strtok(NULL, ",");
+    }
+    OPENSSL_free(instrcp);
+    if ((st != NULL && labels > 3) || kem == 0 || kdf == 0 || aead == 0) {
+        return 0;
+    }
+    suite->kem_id = kem;
+    suite->kdf_id = kdf;
+    suite->aead_id = aead;
+    return 1;
 }
