@@ -165,16 +165,19 @@ const OSSL_HPKE_KEM_INFO *ossl_HPKE_KEM_INFO_find_random(OSSL_LIB_CTX *ctx)
     return &hpke_kem_tab[rval % sz];
 }
 
+#ifdef HAPPYKEY
 /*
- * TODO: add new values to include/openssl/proverr.h
- * not sure how to allocate numbers just yet though
- * or maybe there're better error numbers
+ * new values for include/openssl/proverr.h
+ * require doing a ``make update`` in the openssl
+ * tree, if that's not done, we'll re-define it
+ * locally
  */
 #ifndef PROV_R_INVALID_KDF
-# define PROV_R_INVALID_KDF PROV_R_INVALID_DIGEST
+# define PROV_R_INVALID_KDF 232
 #endif
 #ifndef PROV_R_INVALID_AEAD
-# define PROV_R_INVALID_AEAD PROV_R_INVALID_KEY
+# define PROV_R_INVALID_AEAD 231
+#endif
 #endif
 
 const OSSL_HPKE_KDF_INFO *ossl_HPKE_KDF_INFO_find_id(uint16_t kdfid)

@@ -104,6 +104,12 @@ apitest-forlib: apitest.o hpke-forlib.o hpke_util.o packet.o
 hpkemain: hpkemain.o hpke.o hpke_util.o packet.o
 	${CC} ${CFLAGS} -o $@ hpkemain.o hpke.o hpke_util.o packet.o -lssl -lcrypto
 
+pod_example.o: pod_example.c hpke.h
+	${CC} ${CFLAGS} -I ${INCL} -c $<
+
+pod_example: pod_example.o
+	${CC} ${CFLAGS} -o $@ pod_example.o hpke.o hpke_util.o packet.o -lssl -lcrypto
+
 doc: hpke.c hpke.h hpketv.h hpketv.c apitest.c
 	doxygen hpke.doxy
 	(cd doxy/latex; make; mv refman.pdf ../../hpke-api.pdf )
@@ -114,6 +120,7 @@ docclean:
 clean: forlibclean docclean oddityclean
 	- rm -f hpkemain.o hpke.o hpke_util.o hpketv.o hpkemain 
 	- rm -f apitest apitest.o packet.o
+	- rm -f pod_example pod_example.o
 
 # stuff below here are various odd tests done now and then
 # can probably be deleted now

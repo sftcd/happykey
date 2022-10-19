@@ -1172,7 +1172,7 @@ static int hpke_psk_check(unsigned int mode,
  * @brief check if a suite is supported locally
  *
  * @param suite is the suite to check
- * @return 1 for good/supported, not 1 otherwise
+ * @return 1 for good/supported, 0 otherwise
  */
 static int hpke_suite_check(OSSL_HPKE_SUITE suite)
 {
@@ -1201,7 +1201,7 @@ static int hpke_suite_check(OSSL_HPKE_SUITE suite)
  * @return 1 for good (OpenSSL style), not 1 for error
  */
 static int hpke_kg_evp(OSSL_LIB_CTX *libctx, const char *propq,
-                       unsigned int mode, OSSL_HPKE_SUITE suite,
+                       OSSL_HPKE_SUITE suite,
                        size_t ikmlen, const unsigned char *ikm,
                        size_t *publen, unsigned char *pub,
                        EVP_PKEY **priv)
@@ -1337,9 +1337,9 @@ static int hpke_get_grease_value(OSSL_LIB_CTX *libctx, const char *propq,
     int erv = 0;
     size_t plen = 0;
     const OSSL_HPKE_KEM_INFO *kem_info = NULL;
+    const OSSL_HPKE_AEAD_INFO *aead_info = NULL;
 #ifdef SUPERVERBOSE
     const OSSL_HPKE_KDF_INFO *kdf_info = NULL;
-    const OSSL_HPKE_AEAD_INFO *aead_info = NULL;
 #endif
 
     if (pub == NULL || !pub_len
@@ -1360,13 +1360,13 @@ static int hpke_get_grease_value(OSSL_LIB_CTX *libctx, const char *propq,
         ERR_raise(ERR_LIB_CRYPTO, ERR_R_INTERNAL_ERROR);
         goto err;
     }
-#ifdef SUPERVERBOSE
     aead_info = ossl_HPKE_AEAD_INFO_find_id(chosen.aead_id);
     if (aead_info == NULL) {
         erv = 0;
         ERR_raise(ERR_LIB_CRYPTO, ERR_R_INTERNAL_ERROR);
         goto err;
     }
+#ifdef SUPERVERBOSE
     kdf_info = ossl_HPKE_KDF_INFO_find_id(chosen.kdf_id);
     if (kdf_info == NULL) {
         erv = 0;
@@ -1382,6 +1382,9 @@ static int hpke_get_grease_value(OSSL_LIB_CTX *libctx, const char *propq,
     if ((crv = hpke_suite_check(chosen)) != 1)
         return 0;
     *suite = chosen;
+    /* make sure room for tag and one plaintext octet */
+    if (aead_info->taglen >= ciphertext_len)
+        return 0;
     /* publen */
     plen = kem_info->Npk;
     if (plen > *pub_len)
@@ -1517,7 +1520,7 @@ static int hpke_encap(OSSL_HPKE_CTX *ctx, unsigned char *enc, size_t *enclen,
         ERR_raise(ERR_LIB_CRYPTO, ERR_R_INTERNAL_ERROR);
         goto err;
     }
-    erv = OSSL_HPKE_keygen(ctx->libctx, ctx->propq, ctx->mode, ctx->suite,
+    erv = OSSL_HPKE_keygen(ctx->libctx, ctx->propq, ctx->suite,
                            ctx->ikme, ctx->ikmelen, enc, enclen, &pkE);
     if (pkE == NULL) {
         erv = 0;
@@ -2244,7 +2247,7 @@ int OSSL_HPKE_CTX_set1_authpub(OSSL_HPKE_CTX *ctx,
  * The value returned is the most recent used when sealing
  * or opening (successfully)
  */
-int OSSL_HPKE_CTX_get0_seq(OSSL_HPKE_CTX *ctx, uint64_t *seq)
+int OSSL_HPKE_CTX_get_seq(OSSL_HPKE_CTX *ctx, uint64_t *seq)
 {
     if (ctx == NULL || seq == NULL)
         return 0;
@@ -2261,7 +2264,7 @@ int OSSL_HPKE_CTX_get0_seq(OSSL_HPKE_CTX *ctx, uint64_t *seq)
  * The value returned is the most recent used when sealing
  * or opening (successfully)
  */
-int OSSL_HPKE_CTX_set1_seq(OSSL_HPKE_CTX *ctx, uint64_t seq)
+int OSSL_HPKE_CTX_set_seq(OSSL_HPKE_CTX *ctx, uint64_t seq)
 {
     if (ctx == NULL)
         return 0;
@@ -2601,7 +2604,7 @@ int OSSL_HPKE_export(OSSL_HPKE_CTX *ctx,
 #ifdef HAPPYKEY
 
 static int local_hpke_kg_evp(OSSL_LIB_CTX *libctx, const char *propq,
-                             unsigned int mode, OSSL_HPKE_SUITE suite,
+                             OSSL_HPKE_SUITE suite,
                              size_t ikmlen, const unsigned char *ikm,
                              size_t *publen, unsigned char *pub,
                              EVP_PKEY **priv);
@@ -2610,7 +2613,6 @@ static int local_hpke_kg_evp(OSSL_LIB_CTX *libctx, const char *propq,
  * @brief generate a key pair
  * @param libctx is the context to use
  * @param propq is a properties string
- * @param mode is the mode (currently unused)
  * @param suite is the ciphersuite (currently unused)
  * @param ikmlen is the length of IKM, if supplied
  * @param ikm is IKM, if supplied
@@ -2620,16 +2622,16 @@ static int local_hpke_kg_evp(OSSL_LIB_CTX *libctx, const char *propq,
  * @return 1 for good (OpenSSL style), not-1 for error
  */
 int OSSL_HPKE_keygen(OSSL_LIB_CTX *libctx, const char *propq,
-                     unsigned int mode, OSSL_HPKE_SUITE suite,
+                     OSSL_HPKE_SUITE suite,
                      const unsigned char *ikm, size_t ikmlen,
                      unsigned char *pub, size_t *publen,
                      EVP_PKEY **priv)
 {
 #ifdef HAPPYKEY
-    return local_hpke_kg_evp(libctx, propq, mode, suite,
+    return local_hpke_kg_evp(libctx, propq, suite,
                              ikmlen, ikm, publen, pub, priv);
 #else
-    return hpke_kg_evp(libctx, propq, mode, suite,
+    return hpke_kg_evp(libctx, propq, suite,
                        ikmlen, ikm, publen, pub, priv);
 #endif
 }
@@ -2739,7 +2741,7 @@ size_t OSSL_HPKE_get_public_encap_size(OSSL_HPKE_SUITE suite)
  * size of a private value. In future, it could also
  * factor in e.g. the AEAD.
  */
-size_t OSSL_HPKE_recommend_ikmelen(OSSL_HPKE_SUITE suite)
+size_t OSSL_HPKE_get_recommended_ikmelen(OSSL_HPKE_SUITE suite)
 {
     const OSSL_HPKE_KEM_INFO *kem_info = NULL;
 
@@ -4111,7 +4113,7 @@ static int hpke_kg_comp2order(uint32_t kemid, size_t buflen,
  * @return 1 for good (OpenSSL style), not 1 for error
  */
 static int local_hpke_kg_evp(OSSL_LIB_CTX *libctx, const char *propq,
-                             unsigned int mode, OSSL_HPKE_SUITE suite,
+                             OSSL_HPKE_SUITE suite,
                              size_t ikmlen, const unsigned char *ikm,
                              size_t *publen, unsigned char *pub,
                              EVP_PKEY **priv)
@@ -4333,7 +4335,7 @@ static int hpke_kg(OSSL_LIB_CTX *libctx, const char *propq,
         return 0;
     if (pub == NULL || priv == NULL)
         return 0;
-    erv = local_hpke_kg_evp(libctx, propq, mode, suite, ikmlen, ikm,
+    erv = local_hpke_kg_evp(libctx, propq, suite, ikmlen, ikm,
                             publen, pub, &skR);
     if (erv != 1) {
         return erv;

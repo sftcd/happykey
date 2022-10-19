@@ -185,7 +185,7 @@ int OSSL_HPKE_CTX_set1_authpub(OSSL_HPKE_CTX *ctx,
  * seq is a uint64_t as that's what two other implementations
  * chose
  */
-int OSSL_HPKE_CTX_get0_seq(OSSL_HPKE_CTX *ctx, uint64_t *seq);
+int OSSL_HPKE_CTX_get_seq(OSSL_HPKE_CTX *ctx, uint64_t *seq);
 
 /**
  * @brief set the sequence value for seal/open calls
@@ -195,7 +195,7 @@ int OSSL_HPKE_CTX_get0_seq(OSSL_HPKE_CTX *ctx, uint64_t *seq);
  *
  * The next seal or open operation will use this value.
  */
-int OSSL_HPKE_CTX_set1_seq(OSSL_HPKE_CTX *ctx, uint64_t seq);
+int OSSL_HPKE_CTX_set_seq(OSSL_HPKE_CTX *ctx, uint64_t seq);
 
 /**
  * @brief sender encapsulation function
@@ -289,7 +289,6 @@ int OSSL_HPKE_export(OSSL_HPKE_CTX *ctx,
  * @brief generate a key pair
  * @param libctx is the context to use (normally NULL)
  * @param propq is a properties string
- * @param mode is the mode (currently unused)
  * @param suite is the ciphersuite (currently unused)
  * @param ikm is IKM, if supplied
  * @param ikmlen is the length of IKM, if supplied
@@ -306,7 +305,7 @@ int OSSL_HPKE_export(OSSL_HPKE_CTX *ctx,
  * (Or authenticate HPKE values from that sender.)
  */
 int OSSL_HPKE_keygen(OSSL_LIB_CTX *libctx, const char *propq,
-                     unsigned int mode, OSSL_HPKE_SUITE suite,
+                     OSSL_HPKE_SUITE suite,
                      const unsigned char *ikm, size_t ikmlen,
                      unsigned char *pub, size_t *publen, EVP_PKEY **priv);
 
@@ -396,7 +395,7 @@ size_t OSSL_HPKE_get_public_encap_size(OSSL_HPKE_SUITE suite);
  * size of a private value. In future, it could also
  * factor in e.g. the AEAD.
  */
-size_t OSSL_HPKE_recommend_ikmelen(OSSL_HPKE_SUITE suite);
+size_t OSSL_HPKE_get_recommended_ikmelen(OSSL_HPKE_SUITE suite);
 # ifdef HAPPYKEY
 
 /*

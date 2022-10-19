@@ -51,11 +51,11 @@ typedef struct {
  * @brief info about an AEAD
  */
 typedef struct {
-    uint16_t            aead_id; /**< code point for aead alg */
-    const char *        name;   /* alg name */
-    size_t              taglen; /**< aead tag len */
-    size_t              Nk; /**< size of a key for this aead */
-    size_t              Nn; /**< length of a nonce for this aead */
+    uint16_t       aead_id; /**< code point for aead alg */
+    const char     *name;   /* alg name */
+    size_t         taglen; /**< aead tag len */
+    size_t         Nk; /**< size of a key for this aead */
+    size_t         Nn; /**< length of a nonce for this aead */
 } OSSL_HPKE_AEAD_INFO;
 
 /*
@@ -74,7 +74,7 @@ const OSSL_HPKE_KEM_INFO *ossl_HPKE_KEM_INFO_find_id(uint16_t kemid);
 const OSSL_HPKE_KEM_INFO *ossl_HPKE_KEM_INFO_find_random(OSSL_LIB_CTX *ctx);
 const OSSL_HPKE_KDF_INFO *ossl_HPKE_KDF_INFO_find_id(uint16_t kdfid);
 const OSSL_HPKE_KDF_INFO *ossl_HPKE_KDF_INFO_find_random(OSSL_LIB_CTX *ctx);
-const OSSL_HPKE_AEAD_INFO *ossl_HPKE_AEAD_INFO_find_id(uint16_t kdfid);
+const OSSL_HPKE_AEAD_INFO *ossl_HPKE_AEAD_INFO_find_id(uint16_t aeadid);
 const OSSL_HPKE_AEAD_INFO *ossl_HPKE_AEAD_INFO_find_random(OSSL_LIB_CTX *ctx);
 
 int ossl_hpke_kdf_extract(EVP_KDF_CTX *kctx,
