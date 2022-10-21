@@ -3,8 +3,6 @@
 #include <openssl/hpke.h>
 #include <openssl/evp.h>
 
-/* this is sample code for inclusio in OSSL_HPKE_CTX_new.pod */
-
 /* 
  * this is big enough for this example, real code would need different 
  * handling
@@ -14,55 +12,56 @@
 /* we'll do a round-trip, generating a key, encrypting and decrypting */
 int main(int argc, char **argv)
 {
-    int hpke_mode=OSSL_HPKE_MODE_BASE;
+    int ok = 0;
+    int hpke_mode = OSSL_HPKE_MODE_BASE;
     OSSL_HPKE_SUITE hpke_suite = OSSL_HPKE_SUITE_DEFAULT;
-    OSSL_HPKE_CTX *ctx = NULL, *rctx = NULL;
-    size_t publen=LBUFSIZE; unsigned char pub[LBUFSIZE];
+    OSSL_HPKE_CTX *sctx = NULL, *rctx = NULL;
     EVP_PKEY *priv = NULL;
-    size_t enclen=LBUFSIZE; unsigned char enc[LBUFSIZE];
-    size_t ctlen=LBUFSIZE; unsigned char ct[LBUFSIZE];
-    size_t ptlen=LBUFSIZE; unsigned char pt[LBUFSIZE];
-    size_t clearlen=LBUFSIZE; unsigned char clear[LBUFSIZE];
-    size_t aadlen=LBUFSIZE; unsigned char aad[LBUFSIZE];
-    size_t infolen=LBUFSIZE; unsigned char info[LBUFSIZE];
+    unsigned char pub[LBUFSIZE];
+    size_t publen = sizeof(pub);
+    unsigned char enc[LBUFSIZE];
+    size_t enclen = sizeof(enc);
+    unsigned char ct[LBUFSIZE];
+    size_t ctlen = sizeof(ct);
+    unsigned char clear[LBUFSIZE];
+    size_t clearlen = sizeof(clear);
+    
+    const unsigned char *pt = "a message not in a bottle";
+    size_t ptlen = strlen((char *)pt);
+    const unsigned char *info = "Some info";
+    size_t infolen = strlen((char *)info);
+    unsigned char aad[] = { 1, 2, 3, 4, 5, 6, 7, 8 };
+    size_t aadlen = sizeof(aad);
 
-    memset(pt,0,LBUFSIZE);
-    memset(aad,0,LBUFSIZE);
-    memset(info,0,LBUFSIZE);
-    strcpy((char*)pt,"a message not in a bottle");
-    ptlen=strlen((char*)pt);
-
-    /* generate receiver's key pair */
+    /*
+     * Generate receiver's key pair.
+     * The receiver gives this public key to the sender.
+     */
     if (OSSL_HPKE_keygen(NULL, NULL, hpke_suite, NULL, 0,
                          pub, &publen, &priv) != 1)
         goto err;
 
-    /* sender's actions */
-    if ((ctx = OSSL_HPKE_CTX_new(hpke_mode, hpke_suite, NULL, NULL)) == NULL)
+    /* sender's actions - encrypt data using the receivers public key */
+    if ((sctx = OSSL_HPKE_CTX_new(hpke_mode, hpke_suite, NULL, NULL)) == NULL)
         goto err;
-    if (OSSL_HPKE_encap(ctx, enc, &enclen, pub, publen, info, infolen) != 1)
+    if (OSSL_HPKE_encap(sctx, enc, &enclen, pub, publen, info, infolen) != 1)
         goto err;
-    if (OSSL_HPKE_seal(ctx, ct, &ctlen, aad, aadlen, pt, ptlen) != 1)
+    if (OSSL_HPKE_seal(sctx, ct, &ctlen, aad, aadlen, pt, ptlen) != 1)
         goto err;
 
-    /* receiver's actions */
+    /* receiver's actions - decrypt data using the recievers private key */
     if ((rctx = OSSL_HPKE_CTX_new(hpke_mode, hpke_suite, NULL, NULL)) == NULL)
         goto err;
     if (OSSL_HPKE_decap(rctx, enc, enclen, priv, info, infolen) != 1) 
         goto err;
     if (OSSL_HPKE_open(rctx, clear, &clearlen, aad, aadlen, ct, ctlen) != 1)
         goto err;
-    OSSL_HPKE_CTX_free(rctx);
-    OSSL_HPKE_CTX_free(ctx);
-    EVP_PKEY_free(priv);
-    printf("All good\n");
-    return 1;
-
+    ok = 1;
 err:
     /* clean up */
-    printf("Error!\n");
+    printf(ok ? "All Good!\n" : "Error!\n");
     OSSL_HPKE_CTX_free(rctx);
-    OSSL_HPKE_CTX_free(ctx);
+    OSSL_HPKE_CTX_free(sctx);
     EVP_PKEY_free(priv);
     return 0;
 }

@@ -1181,7 +1181,9 @@ static int test_hpke_export(void)
     OSSL_HPKE_CTX *ctx = NULL;
     OSSL_HPKE_CTX *rctx = NULL;
     unsigned char exp[32];
+    unsigned char exp2[32];
     unsigned char rexp[32];
+    unsigned char rexp2[32];
     unsigned char plain[] = "quick brown fox";
     size_t plainlen = sizeof(plain);
     unsigned char enc[OSSL_HPKE_MAXSIZE];
@@ -1207,6 +1209,12 @@ static int test_hpke_export(void)
     if (!TEST_true(OSSL_HPKE_export(ctx, exp, 32,
                                     (unsigned char *)estr, strlen(estr))))
         goto end;
+    /* check a 2nd call with same input gives same output */
+    if (!TEST_true(OSSL_HPKE_export(ctx, exp2, 32,
+                                    (unsigned char *)estr, strlen(estr))))
+        goto end;
+    if (!TEST_true(TEST_mem_eq(exp, 32, exp2, 32)))
+        goto end;
     if (!TEST_ptr(rctx = OSSL_HPKE_CTX_new(hpke_mode, hpke_suite,
                                            testctx, NULL)))
         goto end;
@@ -1217,6 +1225,12 @@ static int test_hpke_export(void)
         goto end;
     if (!TEST_true(OSSL_HPKE_export(rctx, rexp, 32,
                                     (unsigned char *)estr, strlen(estr))))
+        goto end;
+    /* check a 2nd call with same input gives same output */
+    if (!TEST_true(OSSL_HPKE_export(rctx, rexp2, 32,
+                                    (unsigned char *)estr, strlen(estr))))
+        goto end;
+    if (!TEST_true(TEST_mem_eq(rexp, 32, rexp2, 32)))
         goto end;
     if (!TEST_true(TEST_mem_eq(exp, 32, rexp, 32)))
         goto end;
