@@ -90,17 +90,17 @@ void OSSL_HPKE_CTX_free(OSSL_HPKE_CTX *ctx);
 
 int OSSL_HPKE_encap(OSSL_HPKE_CTX *ctx,
                     unsigned char *enc, size_t *enclen,
-                    unsigned char *pub, size_t publen,
+                    const unsigned char *pub, size_t publen,
                     const unsigned char *info, size_t infolen);
 int OSSL_HPKE_seal(OSSL_HPKE_CTX *ctx,
                    unsigned char *ct, size_t *ctlen,
                    const unsigned char *aad, size_t aadlen,
                    const unsigned char *pt, size_t ptlen);
 
-int OSSL_HPKE_keygen(OSSL_LIB_CTX *libctx, const char *propq,
-                     OSSL_HPKE_SUITE suite,
+int OSSL_HPKE_keygen(OSSL_HPKE_SUITE suite,
                      const unsigned char *ikm, size_t ikmlen,
-                     unsigned char *pub, size_t *publen, EVP_PKEY **priv);
+                     unsigned char *pub, size_t *publen, EVP_PKEY **priv,
+                     OSSL_LIB_CTX *libctx, const char *propq);
 int OSSL_HPKE_decap(OSSL_HPKE_CTX *ctx,
                     const unsigned char *enc, size_t enclen,
                     EVP_PKEY *recippriv,

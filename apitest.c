@@ -217,9 +217,8 @@ static int do_testhpke(const TEST_BASEDATA *base,
     int ret = 0, i;
     uint64_t lastseq = 0;
 
-    if (!TEST_true(OSSL_HPKE_keygen(libctx, propq, base->suite,
-                                    base->ikmE, base->ikmElen,
-                                    pub, &publen, &privE)))
+    if (!TEST_true(OSSL_HPKE_keygen(base->suite, base->ikmE, base->ikmElen,
+                                    pub, &publen, &privE, libctx, propq)))
         goto end;
     if (!TEST_true(cmpkey(privE, base->expected_pkEm, base->expected_pkEmlen)))
         goto end;
@@ -232,16 +231,16 @@ static int do_testhpke(const TEST_BASEDATA *base,
         || base->mode == OSSL_HPKE_MODE_PSKAUTH) {
         if (!TEST_true(base->ikmAuth != NULL && base->ikmAuthlen > 0))
             goto end;
-        if (!TEST_true(OSSL_HPKE_keygen(libctx, propq, base->suite,
+        if (!TEST_true(OSSL_HPKE_keygen(base->suite,
                                         base->ikmAuth, base->ikmAuthlen,
-                                        authpub, &authpublen, &authpriv)))
+                                        authpub, &authpublen, &authpriv,
+                                        libctx, propq)))
             goto end;
         if (!TEST_true(OSSL_HPKE_CTX_set1_authpriv(sealctx, authpriv)))
             goto end;
     }
-    if (!TEST_true(OSSL_HPKE_keygen(libctx, propq, base->suite,
-                                    base->ikmR, base->ikmRlen,
-                                    rpub, &rpublen, &privR)))
+    if (!TEST_true(OSSL_HPKE_keygen(base->suite, base->ikmR, base->ikmRlen,
+                                    rpub, &rpublen, &privR, libctx, propq)))
         goto end;
     if (!TEST_true(cmpkey(privR, base->expected_pkRm, base->expected_pkRmlen)))
         goto end;
@@ -1030,10 +1029,10 @@ static int test_hpke_modes_suites(void)
             hpke_suite.kem_id = kem_id;
             if ((hpke_mode == OSSL_HPKE_MODE_AUTH) ||
                 (hpke_mode == OSSL_HPKE_MODE_PSKAUTH)) {
-                if (TEST_true(OSSL_HPKE_keygen(testctx, NULL, hpke_suite,
-                                               NULL, 0,
+                if (TEST_true(OSSL_HPKE_keygen(hpke_suite, NULL, 0,
                                                authpub, &authpublen,
-                                               &authpriv_evp)) != 1) {
+                                               &authpriv_evp,
+                                               testctx, NULL)) != 1) {
                     overallresult = 0;
                 }
                 authpubp = authpub;
@@ -1068,9 +1067,9 @@ static int test_hpke_modes_suites(void)
                                hpke_mode, kem_id, kdf_id, aead_id);
                     }
 #endif
-                    if (!TEST_true(OSSL_HPKE_keygen(testctx, NULL, hpke_suite,
-                                                    NULL, 0,
-                                                    pub, &publen, &privp)))
+                    if (!TEST_true(OSSL_HPKE_keygen(hpke_suite, NULL, 0,
+                                                    pub, &publen, &privp,
+                                                    testctx, NULL)))
                         overallresult = 0;
                     ctx = OSSL_HPKE_CTX_new(hpke_mode, hpke_suite,
                                             testctx, NULL);
@@ -1194,9 +1193,8 @@ static int test_hpke_export(void)
     size_t clearlen = sizeof(clear);
     char * estr = "foo";
 
-    if (!TEST_true(OSSL_HPKE_keygen(testctx, NULL, hpke_suite,
-                                    NULL, 0,
-                                    pub, &publen, &privp)))
+    if (!TEST_true(OSSL_HPKE_keygen(hpke_suite, NULL, 0, pub, &publen, &privp,
+                                    testctx, NULL)))
         goto end;
     if (!TEST_ptr(ctx = OSSL_HPKE_CTX_new(hpke_mode, hpke_suite,
                                           testctx, NULL)))
@@ -1392,8 +1390,8 @@ static int test_hpke_badcalls(void)
     unsigned char *authprivp = NULL;
 
     /* pub is NULL now */
-    if (TEST_false(OSSL_HPKE_keygen(testctx, NULL, hpke_suite,
-                                    NULL, 0, pub, &publen, &privp)) != 1) {
+    if (TEST_false(OSSL_HPKE_keygen(hpke_suite, NULL, 0, pub, &publen, &privp,
+                                    testctx, NULL)) != 1) {
         overallresult = 0;
     }
 
@@ -1401,15 +1399,15 @@ static int test_hpke_badcalls(void)
     publen = sizeof(buf1);
     /* bogus kem_id */
     hpke_suite.kem_id = 100;
-    if (TEST_false(OSSL_HPKE_keygen(testctx, NULL, hpke_suite,
-                                    NULL, 0, pub, &publen, &privp)) != 1) {
+    if (TEST_false(OSSL_HPKE_keygen(hpke_suite, NULL, 0, pub, &publen, &privp,
+                                    testctx, NULL)) != 1) {
         overallresult = 0;
     }
 
     /* a good key to tee up bad calls below */
     hpke_suite.kem_id = 0x20;
-    if (TEST_true(OSSL_HPKE_keygen(testctx, NULL, hpke_suite,
-                                   NULL, 0, pub, &publen, &privp)) != 1) {
+    if (TEST_true(OSSL_HPKE_keygen(hpke_suite, NULL, 0, pub, &publen, &privp,
+                                   testctx, NULL )) != 1) {
         overallresult = 0;
     }
 
@@ -1593,8 +1591,8 @@ static int test_hpke_one_ikm_gen(uint16_t kem_id,
     EVP_PKEY *sk = NULL;
 
     hpke_suite.kem_id = kem_id;
-    if (OSSL_HPKE_keygen(testctx, NULL, hpke_suite,
-                         ikm, ikmlen, lpub, &lpublen, &sk) != 1) {
+    if (OSSL_HPKE_keygen(hpke_suite, ikm, ikmlen, lpub, &lpublen, &sk,
+                         testctx, NULL) != 1) {
         return - __LINE__;
     }
     if (sk == NULL)
