@@ -22,6 +22,12 @@
 # define OSSL_HPKE_MAX_KDF_INPUTLEN 64
 
 /*
+ * max length of a base-nonce (the Nn field from OSSL_HPKE_AEAD_INFO), this
+ * is used for a local stack array size
+ */
+#define OSSL_HPKE_MAX_NONCELEN 12
+
+/*
  * @brief info about a KEM
  * Used to store constants from Section 7.1 "Table 2 KEM IDs"
  * and the bitmask for EC curves described in Section 7.1.3 DeriveKeyPair

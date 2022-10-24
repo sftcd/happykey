@@ -1,6 +1,7 @@
 .gitignore
 *.o
 *-forlib
+deleak
 apitest
 kgikm
 os2evp

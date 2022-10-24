@@ -24,9 +24,10 @@
 #include "internal/packet.h"
 #endif
 
-/* max string len we'll try map to a suite */
+/* max length of string we'll try map to a suite */
 #define OSSL_HPKE_MAX_SUITESTR 38
 
+/* Define HPKE labels from RFC9180 in hex for EBCDIC compatibility */
 /* ASCII: "HPKE-v1", in hex for EBCDIC compatibility */
 static const char LABEL_HPKEV1[] = "\x48\x50\x4B\x45\x2D\x76\x31";
 
@@ -42,7 +43,7 @@ static const char LABEL_HPKEV1[] = "\x48\x50\x4B\x45\x2D\x76\x31";
 
 /*
  * @brief table of KEMs
- * See Section 7.1 "Table 2 KEM IDs"
+ * See RFC9180 Section 7.1 "Table 2 KEM IDs"
  */
 static const OSSL_HPKE_KEM_INFO hpke_kem_tab[] = {
     { OSSL_HPKE_KEM_ID_P256, "EC", OSSL_HPKE_KEMSTR_P256,
@@ -62,6 +63,7 @@ static const OSSL_HPKE_KEM_INFO hpke_kem_tab[] = {
 
 /*
  * @brief table of AEADs
+ * See RFC9180 Section 7.2 "Table 3 KDF IDs"
  */
 static const OSSL_HPKE_AEAD_INFO hpke_aead_tab[] = {
     { OSSL_HPKE_AEAD_ID_AES_GCM_128, LN_aes_128_gcm, 16, 16, 12 },
@@ -76,6 +78,7 @@ static const OSSL_HPKE_AEAD_INFO hpke_aead_tab[] = {
 
 /*
  * @brief table of KDFs
+ * See RFC9180 Section 7.3 "Table 5 AEAD IDs"
  */
 static const OSSL_HPKE_KDF_INFO hpke_kdf_tab[] = {
     { OSSL_HPKE_KDF_ID_HKDF_SHA256, LN_sha256, SHA256_DIGEST_LENGTH },
@@ -218,12 +221,12 @@ const OSSL_HPKE_AEAD_INFO *ossl_HPKE_AEAD_INFO_find_id(uint16_t aeadid)
 const OSSL_HPKE_AEAD_INFO *ossl_HPKE_AEAD_INFO_find_random(OSSL_LIB_CTX *ctx)
 {
     unsigned char rval = 0;
-    int sz = OSSL_NELEM(hpke_aead_tab);
+    /* the minus 1 below is so we don't pick the EXPORTONLY codepoint */
+    int sz = OSSL_NELEM(hpke_aead_tab) - 1;
 
     if (RAND_bytes_ex(ctx, &rval, sizeof(rval), 0) <= 0)
         return NULL;
-    /* the minus 1 below is so we don't pick the EXPORTONLY codepoint */
-    return &hpke_aead_tab[rval % (sz - 1)];
+    return &hpke_aead_tab[rval % sz];
 }
 
 static int kdf_derive(EVP_KDF_CTX *kctx,

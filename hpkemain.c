@@ -794,8 +794,8 @@ int main(int argc, char **argv)
         size_t publen=HPKEMAIN_MAXSIZE; unsigned char pub[HPKEMAIN_MAXSIZE];
         size_t privlen=HPKEMAIN_MAXSIZE; unsigned char priv[HPKEMAIN_MAXSIZE];
         EVP_PKEY *privp = NULL;
-        int rv=OSSL_HPKE_keygen(hpke_suite, NULL, 0, pub, &publen, &privp,
-                                NULL, NULL);
+        int rv=OSSL_HPKE_keygen(hpke_suite, pub, &publen, &privp,
+                                NULL, 0, NULL, NULL);
         if (rv!=1) {
             fprintf(stderr,"Error (%d) from OSSL_HPKE_keygen\n",rv);
             exit(3);

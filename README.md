@@ -27,6 +27,8 @@ High level notes:
 
 ## Recent Changes
 
+- 20221024: many more tweaks from PR review
+
 - 20221022: documentation tweaks and tidy up
 
 - 20221021: more documentation changes (but not quite done yet)

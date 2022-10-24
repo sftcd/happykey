@@ -98,8 +98,8 @@ int OSSL_HPKE_seal(OSSL_HPKE_CTX *ctx,
                    const unsigned char *pt, size_t ptlen);
 
 int OSSL_HPKE_keygen(OSSL_HPKE_SUITE suite,
-                     const unsigned char *ikm, size_t ikmlen,
                      unsigned char *pub, size_t *publen, EVP_PKEY **priv,
+                     const unsigned char *ikm, size_t ikmlen,
                      OSSL_LIB_CTX *libctx, const char *propq);
 int OSSL_HPKE_decap(OSSL_HPKE_CTX *ctx,
                     const unsigned char *enc, size_t enclen,
