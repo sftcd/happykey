@@ -133,8 +133,15 @@ oddityclean:
 	- rm -rf scratch/*
 	- rm -f kgikm kgikm.o
 	- rm -f os2evp os2evp.o
+	- rm -f deleak
 
 oddity: neod oeod test2evp osslplayground kgikm os2evp
+
+deleak.o: deleak.c
+	${CC} ${CFLAGS} -g -I ${INCL} -c $<
+
+deleak: deleak.o
+	LD_LIBRARY_PATH=${OSSL} ${CC} ${CFLAGS} -g -o $@ deleak.o -L ${OSSL} -lssl -lcrypto
 
 os2evp: os2evp.o hpke.o hpke_util.o packet.o
 	LD_LIBRARY_PATH=${OSSL} ${CC} ${CFLAGS} -g -o $@ os2evp.o hpke.o hpke_util.o packet.o -L ${OSSL} -lcrypto -L ${NSSL} -lnss3 -lnspr4
