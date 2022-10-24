@@ -1158,14 +1158,14 @@ static int hpke_random_suite(OSSL_LIB_CTX *libctx,
  *
  * AEAD algorithms add a tag for data authentication.
  * Those are almost always, but not always, 16 octets
- * long, and who knows what'll be true in the future.
+ * long, and who knows what will be true in the future.
  * So this function allows a caller to find out how
- * much data expansion they'll see with a given suite.
+ * much data expansion they will see with a given suite.
  *
  * @param suite is the suite to be used
- * @param enclen points to what'll be enc length
+ * @param enclen points to what will be enc length
  * @param clearlen is the length of plaintext
- * @param cipherlen points to what'll be ciphertext length
+ * @param cipherlen points to what will be ciphertext length
  * @return 1 for success, 0 otherwise
  */
 static int hpke_expansion(OSSL_HPKE_SUITE suite,
@@ -2486,7 +2486,7 @@ static int hpke_kem_id_check(uint16_t kem_id)
  *
  * Note that the buffer is expected to be some form of the encoded
  * private key, and could still have the PEM header or not, and might
- * or might not be base64 encoded. We'll try handle all those options.
+ * or might not be base64 encoded. We will try handle all those options.
  *
  * @param libctx is the context to use
  * @param propq is a properties string
@@ -4114,7 +4114,7 @@ int OSSL_HPKE_keygen_buf(OSSL_LIB_CTX *libctx, const char *propq,
  *
  * Note that the buffer is expected to be some form of the PEM encoded
  * private key, but could still have the PEM header or not, and might
- * or might not be base64 encoded. We'll try handle all those options.
+ * or might not be base64 encoded. We will try handle all those options.
  */
 int OSSL_HPKE_prbuf2evp(OSSL_LIB_CTX *libctx, const char *propq,
                         unsigned int kem_id,
