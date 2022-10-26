@@ -1107,6 +1107,22 @@ static int test_hpke_modes_suites(void)
                                                    pub, publen,
                                                    infop, infolen)))
                         overallresult = 0;
+                    /* throw in a call with a too-short cipherlen */
+#ifdef HAPPYKEY
+                    if (verbose)
+                        printf("bad call to _seal should fail\n");
+#endif
+                    cipherlen = 15;
+                    if (!TEST_false(OSSL_HPKE_seal(ctx, cipher, &cipherlen,
+                                                  aadp, aadlen,
+                                                  plain, plainlen)))
+                        overallresult = 0;
+#ifdef HAPPYKEY
+                    if (verbose)
+                        printf("bad call to _seal failed as planned\n");
+#endif
+                    /* fix back real cipherlen */
+                    cipherlen = OSSL_HPKE_TSTSIZE;
                     if (!TEST_true(OSSL_HPKE_seal(ctx, cipher, &cipherlen,
                                                   aadp, aadlen,
                                                   plain, plainlen)))
@@ -1138,6 +1154,14 @@ static int test_hpke_modes_suites(void)
                                                    senderpublen, privp,
                                                    infop, infolen)))
                         overallresult = 0;
+                    /* throw in a call with a too-short clearlen */
+                    clearlen = 15;
+                    if (!TEST_false(OSSL_HPKE_open(rctx, clear, &clearlen,
+                                                   aadp, aadlen, cipher,
+                                                   cipherlen)))
+                        overallresult = 0;
+                    /* fix up real clearlen again */
+                    clearlen = OSSL_HPKE_TSTSIZE;
                     if (!TEST_true(OSSL_HPKE_open(rctx, clear, &clearlen,
                                                   aadp, aadlen, cipher,
                                                   cipherlen)))

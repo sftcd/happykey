@@ -33,14 +33,14 @@
  * and the bitmask for EC curves described in Section 7.1.3 DeriveKeyPair
  */
 typedef struct {
-    uint16_t      kem_id; /**< code point for key encipherment method */
-    const char    *keytype; /**< string form of algtype "EC"/"X25519"/"X448" */
-    const char    *groupname; /**< string form of EC group for NIST curves  */
-    const char    *mdname; /**< hash alg name for the HKDF */
-    size_t        Nsecret; /**< size of secrets */
-    size_t        Nenc; /**< length of encapsulated key */
-    size_t        Npk; /**< length of public key */
-    size_t        Npriv; /**< length of raw private key */
+    uint16_t      kem_id; /* code point for key encipherment method */
+    const char    *keytype; /* string form of algtype "EC"/"X25519"/"X448" */
+    const char    *groupname; /* string form of EC group for NIST curves  */
+    const char    *mdname; /* hash alg name for the HKDF */
+    size_t        Nsecret; /* size of secrets */
+    size_t        Nenc; /* length of encapsulated key */
+    size_t        Npk; /* length of public key */
+    size_t        Npriv; /* length of raw private key */
     uint8_t       bitmask;
 } OSSL_HPKE_KEM_INFO;
 
@@ -48,20 +48,20 @@ typedef struct {
  * @brief info about a KDF
  */
 typedef struct {
-    uint16_t       kdf_id; /**< code point for KDF */
-    const char     *mdname; /**< hash alg name for the HKDF */
-    size_t         Nh; /**< length of hash/extract output */
+    uint16_t       kdf_id; /* code point for KDF */
+    const char     *mdname; /* hash alg name for the HKDF */
+    size_t         Nh; /* length of hash/extract output */
 } OSSL_HPKE_KDF_INFO;
 
 /*
  * @brief info about an AEAD
  */
 typedef struct {
-    uint16_t       aead_id; /**< code point for aead alg */
+    uint16_t       aead_id; /* code point for aead alg */
     const char     *name;   /* alg name */
-    size_t         taglen; /**< aead tag len */
-    size_t         Nk; /**< size of a key for this aead */
-    size_t         Nn; /**< length of a nonce for this aead */
+    size_t         taglen; /* aead tag len */
+    size_t         Nk; /* size of a key for this aead */
+    size_t         Nn; /* length of a nonce for this aead */
 } OSSL_HPKE_AEAD_INFO;
 
 /*
