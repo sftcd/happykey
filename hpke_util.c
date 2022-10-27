@@ -448,9 +448,8 @@ int ossl_hpke_str2suite(const char *suitestr, OSSL_HPKE_SUITE *suite)
         st = strtok(NULL, ",");
     }
     OPENSSL_free(instrcp);
-    if ((st != NULL && labels > 3) || kem == 0 || kdf == 0 || aead == 0) {
+    if ((st != NULL && labels > 3) || kem == 0 || kdf == 0 || aead == 0)
         return 0;
-    }
     suite->kem_id = kem;
     suite->kdf_id = kdf;
     suite->aead_id = aead;

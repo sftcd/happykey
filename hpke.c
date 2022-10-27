@@ -1403,9 +1403,8 @@ static int hpke_encap(OSSL_HPKE_CTX *ctx, unsigned char *enc, size_t *enclen,
         goto err;
     }
     ctx->shared_secret = OPENSSL_malloc(lsslen);
-    if (ctx->shared_secret == NULL) {
+    if (ctx->shared_secret == NULL)
         goto err;
-    }
     ctx->shared_secretlen = lsslen;
     if (EVP_PKEY_encapsulate(pctx, enc, enclen, ctx->shared_secret,
                              &ctx->shared_secretlen) != 1) {
@@ -1536,7 +1535,6 @@ static int hpke_decap(OSSL_HPKE_CTX *ctx,
     EVP_PKEY *spub = NULL;
     OSSL_PARAM params[3], *p = params;
     size_t lsslen = 0;
-    unsigned char lss[OSSL_HPKE_MAXSIZE];
 
     if (ctx == NULL || enc == NULL || enclen == 0 || priv == NULL) {
         ERR_raise(ERR_LIB_CRYPTO, ERR_R_INTERNAL_ERROR);
@@ -1549,7 +1547,6 @@ static int hpke_decap(OSSL_HPKE_CTX *ctx,
     }
     pctx = EVP_PKEY_CTX_new_from_pkey(ctx->libctx, priv, ctx->propq);
     if (pctx == NULL) {
-        erv = 0;
         ERR_raise(ERR_LIB_CRYPTO, ERR_R_INTERNAL_ERROR);
         goto err;
     }
@@ -1579,18 +1576,15 @@ static int hpke_decap(OSSL_HPKE_CTX *ctx,
                                                   ctx->authpublen);
         }
         if (spub == NULL) {
-            erv = 0;
             ERR_raise(ERR_LIB_CRYPTO, ERR_R_INTERNAL_ERROR);
             goto err;
         }
         if (EVP_PKEY_auth_decapsulate_init(pctx, spub, params) != 1) {
-            erv = 0;
             ERR_raise(ERR_LIB_CRYPTO, ERR_R_INTERNAL_ERROR);
             goto err;
         }
     } else {
         if (EVP_PKEY_decapsulate_init(pctx, params) != 1) {
-            erv = 0;
             ERR_raise(ERR_LIB_CRYPTO, ERR_R_INTERNAL_ERROR);
             goto err;
         }
@@ -1599,22 +1593,15 @@ static int hpke_decap(OSSL_HPKE_CTX *ctx,
         ERR_raise(ERR_LIB_CRYPTO, ERR_R_INTERNAL_ERROR);
         goto err;
     }
-    if (lsslen > OSSL_HPKE_MAXSIZE) {
-        ERR_raise(ERR_LIB_CRYPTO, ERR_R_INTERNAL_ERROR);
-        goto err;
-    }
-    if (EVP_PKEY_decapsulate(pctx, lss, &lsslen, enc, enclen) != 1) {
-        ERR_raise(ERR_LIB_CRYPTO, ERR_R_INTERNAL_ERROR);
-        goto err;
-    }
-    EVP_PKEY_CTX_free(pctx);
-    pctx = NULL;
     ctx->shared_secret = OPENSSL_malloc(lsslen);
     if (ctx->shared_secret == NULL) {
         goto err;
     }
+    if (EVP_PKEY_decapsulate(pctx, ctx->shared_secret, &lsslen, enc, enclen) != 1) {
+        ERR_raise(ERR_LIB_CRYPTO, ERR_R_INTERNAL_ERROR);
+        goto err;
+    }
     ctx->shared_secretlen = lsslen;
-    memcpy(ctx->shared_secret, lss, lsslen);
     erv = 1;
 
 err:
@@ -1625,7 +1612,11 @@ err:
 #endif
     EVP_PKEY_CTX_free(pctx);
     EVP_PKEY_free(spub);
-    OPENSSL_cleanse(lss, sizeof(lss));
+    if (erv == 0 && lsslen != 0 && ctx->shared_secret != NULL) {
+        OPENSSL_clear_free(ctx->shared_secret, lsslen);
+        ctx->shared_secret = NULL;
+        ctx->shared_secretlen = 0;
+    }
     return erv;
 }
 #endif
@@ -1689,11 +1680,6 @@ static int hpke_do_middle(OSSL_HPKE_CTX *ctx,
         return 0;
     }
     mdname = kdf_info->mdname;
-    kctx = ossl_kdf_ctx_create("HKDF", mdname, ctx->libctx, ctx->propq);
-    if (kctx == NULL) {
-        ERR_raise(ERR_LIB_CRYPTO, ERR_R_INTERNAL_ERROR);
-        return 0;
-    }
     /* create key schedule context */
     memset(ks_context, 0, sizeof(ks_context));
     ks_context[0] = (unsigned char)(ctx->mode % 256);
@@ -1710,6 +1696,11 @@ static int hpke_do_middle(OSSL_HPKE_CTX *ctx,
             ERR_raise(ERR_LIB_CRYPTO, ERR_R_INTERNAL_ERROR);
             return 0;
         }
+    }
+    kctx = ossl_kdf_ctx_create("HKDF", mdname, ctx->libctx, ctx->propq);
+    if (kctx == NULL) {
+        ERR_raise(ERR_LIB_CRYPTO, ERR_R_INTERNAL_ERROR);
+        return 0;
     }
     pskidlen = (ctx->psk == NULL ? 0 : strlen(ctx->pskid));
     /* full suite details as per RFC9180 sec 5.1 */
@@ -2224,9 +2215,8 @@ int OSSL_HPKE_export(OSSL_HPKE_CTX *ctx,
                                    OSSL_HPKE_EXP_SEC_LABEL,
                                    label, labellen);
     EVP_KDF_CTX_free(kctx);
-    if (erv != 1) {
+    if (erv != 1)
         ERR_raise(ERR_LIB_CRYPTO, ERR_R_INTERNAL_ERROR);
-    }
 #if defined(SUPERVERBOSE)
     printf("Exporting (%lu)\n", secretlen);
     hpke_pbuf(stdout, "\tctx->exportersec", ctx->exportersec,
