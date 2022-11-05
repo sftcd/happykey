@@ -46,13 +46,13 @@ static const char LABEL_HPKEV1[] = "\x48\x50\x4B\x45\x2D\x76\x31";
  * See RFC9180 Section 7.1 "Table 2 KEM IDs"
  */
 static const OSSL_HPKE_KEM_INFO hpke_kem_tab[] = {
+#ifndef OPENSSL_NO_EC
     { OSSL_HPKE_KEM_ID_P256, "EC", OSSL_HPKE_KEMSTR_P256,
       LN_sha256, SHA256_DIGEST_LENGTH, 65, 65, 32, 0xFF },
     { OSSL_HPKE_KEM_ID_P384, "EC", OSSL_HPKE_KEMSTR_P384,
       LN_sha384, SHA384_DIGEST_LENGTH, 97, 97, 48, 0xFF },
     { OSSL_HPKE_KEM_ID_P521, "EC", OSSL_HPKE_KEMSTR_P521,
       LN_sha512, SHA512_DIGEST_LENGTH, 133, 133, 66, 0x01 },
-#ifndef OPENSSL_NO_EC
     { OSSL_HPKE_KEM_ID_X25519, OSSL_HPKE_KEMSTR_X25519, NULL,
       LN_sha256, SHA256_DIGEST_LENGTH,
       X25519_KEYLEN, X25519_KEYLEN, X25519_KEYLEN },
@@ -428,12 +428,12 @@ int ossl_hpke_str2suite(const char *suitestr, OSSL_HPKE_SUITE *suite)
             targ = &kem;
             outsize = OSSL_NELEM(kemstrtab);
             insize = OSSL_NELEM(kemstrtab[0].synonyms);
-        } else if (kem != 0 && kdf == 0) {
+        } else if (kdf == 0) {
             synp = kdfstrtab;
             targ = &kdf;
             outsize = OSSL_NELEM(kdfstrtab);
             insize = OSSL_NELEM(kdfstrtab[0].synonyms);
-        } else if (kem != 0 && kdf != 0 && aead == 0) {
+        } else {
             synp = aeadstrtab;
             targ = &aead;
             outsize = OSSL_NELEM(aeadstrtab);
@@ -445,11 +445,14 @@ int ossl_hpke_str2suite(const char *suitestr, OSSL_HPKE_SUITE *suite)
                     *targ = synp[i].id;
             }
         }
+        if (*targ == 0) {
+            OPENSSL_free(instrcp);
+            return 0;
+        }
+
         st = strtok(NULL, ",");
     }
     OPENSSL_free(instrcp);
-    if ((st != NULL && labels > 3) || kem == 0 || kdf == 0 || aead == 0)
-        return 0;
     suite->kem_id = kem;
     suite->kdf_id = kdf;
     suite->aead_id = aead;
