@@ -51,18 +51,18 @@
 # define OSSL_HPKE_AEAD_ID_CHACHA_POLY1305 0x0003 /* Chacha20-Poly1305 */
 # define OSSL_HPKE_AEAD_ID_EXPORTONLY      0xFFFF /* export-only fake ID */
 
-/* strings for suite components - ideally these'd be defined elsewhere */
+/* strings for suite components */
 # define OSSL_HPKE_KEMSTR_P256        "P-256"              /* KEM id 0x10 */
 # define OSSL_HPKE_KEMSTR_P384        "P-384"              /* KEM id 0x11 */
 # define OSSL_HPKE_KEMSTR_P521        "P-521"              /* KEM id 0x12 */
-# define OSSL_HPKE_KEMSTR_X25519      SN_X25519            /* KEM id 0x20 */
-# define OSSL_HPKE_KEMSTR_X448        SN_X448              /* KEM id 0x21 */
+# define OSSL_HPKE_KEMSTR_X25519      "X25519"             /* KEM id 0x20 */
+# define OSSL_HPKE_KEMSTR_X448        "X448"               /* KEM id 0x21 */
 # define OSSL_HPKE_KDFSTR_256         "hkdf-sha256"        /* KDF id 1 */
 # define OSSL_HPKE_KDFSTR_384         "hkdf-sha384"        /* KDF id 2 */
 # define OSSL_HPKE_KDFSTR_512         "hkdf-sha512"        /* KDF id 3 */
-# define OSSL_HPKE_AEADSTR_AES128GCM  LN_aes_128_gcm       /* AEAD id 1 */
-# define OSSL_HPKE_AEADSTR_AES256GCM  LN_aes_256_gcm       /* AEAD id 2 */
-# define OSSL_HPKE_AEADSTR_CP         LN_chacha20_poly1305 /* AEAD id 3 */
+# define OSSL_HPKE_AEADSTR_AES128GCM  "aes-128-gcm"        /* AEAD id 1 */
+# define OSSL_HPKE_AEADSTR_AES256GCM  "aes-256-gcm"        /* AEAD id 2 */
+# define OSSL_HPKE_AEADSTR_CP         "chacha20-poly1305"  /* AEAD id 3 */
 # define OSSL_HPKE_AEADSTR_EXP        "exporter"           /* AEAD id 0xff */
 
 typedef struct {

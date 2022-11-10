@@ -55,9 +55,10 @@ static const OSSL_HPKE_KEM_INFO hpke_kem_tab[] = {
 #ifndef OPENSSL_NO_EC
     { OSSL_HPKE_KEM_ID_X25519, OSSL_HPKE_KEMSTR_X25519, NULL,
       LN_sha256, SHA256_DIGEST_LENGTH,
-      X25519_KEYLEN, X25519_KEYLEN, X25519_KEYLEN },
+      X25519_KEYLEN, X25519_KEYLEN, X25519_KEYLEN, 0x00 },
     { OSSL_HPKE_KEM_ID_X448, OSSL_HPKE_KEMSTR_X448, NULL,
-      LN_sha512, SHA512_DIGEST_LENGTH, X448_KEYLEN, X448_KEYLEN, X448_KEYLEN }
+      LN_sha512, SHA512_DIGEST_LENGTH,
+      X448_KEYLEN, X448_KEYLEN, X448_KEYLEN, 0x00 }
 #endif
 };
 
@@ -124,7 +125,9 @@ static synonymttab_t aeadstrtab[] = {
     {OSSL_HPKE_AEAD_ID_AES_GCM_256,
      {OSSL_HPKE_AEADSTR_AES256GCM, "0x2", "0x02", "2"}},
     {OSSL_HPKE_AEAD_ID_CHACHA_POLY1305,
-     {OSSL_HPKE_AEADSTR_CP, "0x3", "0x03", "3"}}
+     {OSSL_HPKE_AEADSTR_CP, "0x3", "0x03", "3"}},
+    {OSSL_HPKE_AEAD_ID_EXPORTONLY,
+     {OSSL_HPKE_AEADSTR_EXP, "ff", "0xff", "255"}}
 };
 
 /* Return an object containing KEM constants associated with a EC curve name */

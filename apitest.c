@@ -909,9 +909,11 @@ static char *kdf_str_list[] = {
     "1", "2", "3"
 };
 static char *aead_str_list[] = {
-    "aes-128-gcm", "aes-256-gcm", "chacha20-poly1305",
+    "aes-128-gcm", "aes-256-gcm", "chacha20-poly1305", "exporter",
     "0x1", "0x01", "0x2", "0x02", "0x3", "0x03",
-    "1", "2", "3"
+    "1", "2", "3",
+    "0xff", "255"
+    
 };
 /* table of bogus strings that better not work */
 static char *bogus_suite_strs[] = {
