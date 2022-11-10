@@ -1414,7 +1414,7 @@ static int hpke_encap(OSSL_HPKE_CTX *ctx, unsigned char *enc, size_t *enclen,
     if (EVP_PKEY_encapsulate(pctx, enc, enclen, ctx->shared_secret,
                              &ctx->shared_secretlen) != 1) {
         ctx->shared_secretlen = 0;
-        OPENSSL_clear_free(ctx->shared_secret,lsslen);
+        OPENSSL_free(ctx->shared_secret);
         ctx->shared_secret = NULL;
         ERR_raise(ERR_LIB_CRYPTO, ERR_R_INTERNAL_ERROR);
         goto err;
@@ -1618,8 +1618,8 @@ err:
 #endif
     EVP_PKEY_CTX_free(pctx);
     EVP_PKEY_free(spub);
-    if (erv == 0 && lsslen != 0 && ctx->shared_secret != NULL) {
-        OPENSSL_clear_free(ctx->shared_secret, lsslen);
+    if (erv == 0) {
+        OPENSSL_free(ctx->shared_secret);
         ctx->shared_secret = NULL;
         ctx->shared_secretlen = 0;
     }
