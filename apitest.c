@@ -1368,6 +1368,71 @@ static int test_hpke_grease(void)
 
     return overallresult;
 }
+
+/*
+ * Make a few calls with odd parameters
+ */
+static int test_hpke_oddcalls()
+{
+    EVP_PKEY *privp = NULL;
+    unsigned char pub[OSSL_HPKE_TSTSIZE];
+    size_t publen = sizeof(pub);
+    int hpke_mode = OSSL_HPKE_MODE_BASE;
+    OSSL_HPKE_SUITE hpke_suite = OSSL_HPKE_SUITE_DEFAULT;
+    OSSL_HPKE_CTX *ctx = NULL;
+    OSSL_HPKE_CTX *rctx = NULL;
+    unsigned char plain[] = "quick brown fox";
+    size_t plainlen = sizeof(plain);
+    unsigned char enc[OSSL_HPKE_TSTSIZE];
+    size_t enclen = sizeof(enc);
+    unsigned char cipher[OSSL_HPKE_TSTSIZE];
+    size_t cipherlen = sizeof(cipher);
+    unsigned char clear[OSSL_HPKE_TSTSIZE];
+    size_t clearlen = sizeof(clear);
+
+    if (!TEST_true(OSSL_HPKE_keygen(hpke_suite, pub, &publen, &privp,
+                                    NULL, 0, testctx, NULL)))
+        goto end;
+    if (!TEST_ptr(ctx = OSSL_HPKE_CTX_new(hpke_mode, hpke_suite,
+                                          testctx, NULL)))
+        goto end;
+    if (!TEST_true(OSSL_HPKE_encap(ctx, enc, &enclen, pub, publen, NULL, 0)))
+        goto end;
+    plainlen = 0;
+    /* should fail for no plaintext */
+    if (!TEST_false(OSSL_HPKE_seal(ctx, cipher, &cipherlen, NULL, 0,
+                                   plain, plainlen)))
+        goto end;
+    /* the sequence ought not have been incremented, so good to start over */
+    plainlen = sizeof(plain);
+    if (!TEST_true(OSSL_HPKE_seal(ctx, cipher, &cipherlen, NULL, 0,
+                                  plain, plainlen)))
+        goto end;
+    if (!TEST_ptr(rctx = OSSL_HPKE_CTX_new(hpke_mode, hpke_suite,
+                                           testctx, NULL)))
+        goto end;
+    if (!TEST_true(OSSL_HPKE_decap(rctx, enc, enclen, privp, NULL, 0)))
+        goto end;
+    clearlen = 0;
+    if (!TEST_false(OSSL_HPKE_open(rctx, clear, &clearlen, NULL, 0,
+                                  cipher, cipherlen)))
+        goto end;
+    clearlen = OSSL_HPKE_TSTSIZE;
+    if (!TEST_true(OSSL_HPKE_open(rctx, clear, &clearlen, NULL, 0,
+                                  cipher, cipherlen)))
+    if (!TEST_true(TEST_mem_eq(plain, plainlen, clear, clearlen)))
+        goto end;
+
+    OSSL_HPKE_CTX_free(ctx);
+    OSSL_HPKE_CTX_free(rctx);
+    EVP_PKEY_free(privp);
+    return 1;
+end:
+    OSSL_HPKE_CTX_free(ctx);
+    OSSL_HPKE_CTX_free(rctx);
+    EVP_PKEY_free(privp);
+    return 0;
+}
 #ifdef HAPPYKEY
 /**
  * @brief try some fuzzy-ish kg, enc & dec calls
@@ -1734,6 +1799,10 @@ static int test_hpke(void)
     if (res != 1)
         return res;
 
+    res = test_hpke_oddcalls();
+    if (res != 1)
+        return res;
+
     return res;
 }
 
@@ -1815,6 +1884,7 @@ int setup_tests(void)
     ADD_TEST(test_hpke_grease);
     ADD_TEST(test_hpke_ikms);
     ADD_TEST(test_hpke_random_suites);
+    ADD_TEST(test_hpke_oddcalls);
     return 1;
 }
 #endif
