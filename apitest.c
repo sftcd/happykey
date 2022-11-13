@@ -1372,7 +1372,7 @@ static int test_hpke_grease(void)
 /*
  * Make a few calls with odd parameters
  */
-static int test_hpke_oddcalls()
+static int test_hpke_oddcalls(void)
 {
     EVP_PKEY *privp = NULL;
     unsigned char pub[OSSL_HPKE_TSTSIZE];
