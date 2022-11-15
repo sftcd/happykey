@@ -847,6 +847,7 @@ static EVP_PKEY *EVP_PKEY_new_raw_nist_public_key(OSSL_LIB_CTX *libctx,
         printf("no EARLY public\n");
     }
 #endif
+    EVP_PKEY_CTX_free(cctx);
     return ret;
 }
 
