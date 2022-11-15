@@ -321,6 +321,11 @@ static int do_testhpke(const TEST_BASEDATA *base,
 
         if (len > sizeof(eval))
             goto end;
+        /* export with too long label should fail */
+        if (!TEST_false(OSSL_HPKE_export(sealctx, eval, len,
+                                        export[i].context, -1)))
+            goto end;
+        /* good export call */
         if (!TEST_true(OSSL_HPKE_export(sealctx, eval, len,
                                         export[i].context,
                                         export[i].contextlen)))
@@ -1414,7 +1419,7 @@ static int test_hpke_grease(void)
 }
 
 /*
- * Make a few calls with odd parameters
+ * Make a set of calls with odd parameters
  */
 static int test_hpke_oddcalls(void)
 {
@@ -1439,13 +1444,10 @@ static int test_hpke_oddcalls(void)
     OSSL_LIB_CTX *badctx = NULL;
     char *badpropq = "yeah, this won't work";
     uint64_t lseq = 0;
+    char giant_pskid[OSSL_HPKE_MAX_PARMLEN+10];
+    unsigned char info[OSSL_HPKE_TSTSIZE];
 
-    /* 
-     * a bunch of these generated specifically to get batter coverage 
-     * (according to lcov), so they're a bit all over the place
-     */
-
- 
+    /* many of the calls below are designed to get better test coverage */
 
     /* NULL ctx calls */
     OSSL_HPKE_CTX_free(NULL);
@@ -1462,7 +1464,7 @@ static int test_hpke_oddcalls(void)
     if (!TEST_false(OSSL_HPKE_CTX_set1_psk(NULL, NULL, NULL, 0)))
         goto end;
 
-    /* make/breack ctx */
+    /* make/break ctx */
     if (!TEST_ptr(ctx = OSSL_HPKE_CTX_new(hpke_mode, hpke_suite,
                                           testctx, "foo")))
         goto end;
@@ -1488,7 +1490,7 @@ static int test_hpke_oddcalls(void)
                                      NULL, 0, testctx, NULL)))
         goto end;
 
-    /* dodgy libctx/propq */
+    /* dodgy keygen calls */
     badctx = (OSSL_LIB_CTX *) 0xff;
     if (!TEST_false(OSSL_HPKE_keygen(bad_suite, pub, &publen, &privp,
                                      NULL, 0, badctx, NULL)))
@@ -1522,7 +1524,11 @@ static int test_hpke_oddcalls(void)
     if (!TEST_false(OSSL_HPKE_decap(NULL, NULL, 0, NULL, NULL, 0)))
         goto end;
 
-    /* make a good context for later fails */
+    /* 
+     * run through a sender/recipient set of calls but with
+     * failing calls interspersed whenever possible
+     */
+    /* good keygen */
     if (!TEST_true(OSSL_HPKE_keygen(hpke_suite, pub, &publen, &privp,
                                     NULL, 0, testctx, NULL)))
         goto end;
@@ -1531,6 +1537,17 @@ static int test_hpke_oddcalls(void)
     if (!TEST_ptr(ctx = OSSL_HPKE_CTX_new(OSSL_HPKE_MODE_PSK, hpke_suite,
                                           testctx, NULL)))
         goto end;
+    /* set bad length psk */
+    if (!TEST_false(OSSL_HPKE_CTX_set1_psk(ctx, "foo",
+                                           (unsigned char *)"bar", -1)))
+        goto end;
+    /* set bad length pskid */
+    memset(giant_pskid,'A',sizeof(giant_pskid) - 1);
+    giant_pskid[sizeof(giant_pskid) - 1] = '\0';
+    if (!TEST_false(OSSL_HPKE_CTX_set1_psk(ctx, giant_pskid,
+                                           (unsigned char *)"bar", 3)))
+        goto end;
+    /* still no psk really set so encap fails */
     if (!TEST_false(OSSL_HPKE_encap(ctx, enc, &enclen, pub, publen, NULL, 0)))
         goto end;
     OSSL_HPKE_CTX_free(ctx);
@@ -1543,14 +1560,17 @@ static int test_hpke_oddcalls(void)
     if (!TEST_ptr_null(ctx = OSSL_HPKE_CTX_new(bad_mode, hpke_suite,
                                                testctx, NULL)))
         goto end;
-    /* good one */
+    /* make good ctx */
     if (!TEST_ptr(ctx = OSSL_HPKE_CTX_new(hpke_mode, hpke_suite,
                                           testctx, NULL)))
         goto end;
-    /* NULL pub */
+    /* too long ikm */
+    if (!TEST_false(OSSL_HPKE_CTX_set1_ikme(ctx, fake_ikm, -1)))
+        goto end;
+    /* NULL authpub */
     if (!TEST_false(OSSL_HPKE_CTX_set1_authpub(ctx, NULL, 0)))
         goto end;
-    /* NULL priv */
+    /* NULL auth priv */
     if (!TEST_false(OSSL_HPKE_CTX_set1_authpriv(ctx, NULL)))
         goto end;
     /* priv good, but mode is bad */
@@ -1564,8 +1584,11 @@ static int test_hpke_oddcalls(void)
     if (!TEST_false(OSSL_HPKE_seal(ctx, cipher, &cipherlen, NULL, 0,
                                    plain, plainlen)))
         goto end;
-    /* encap with doddy public */
+    /* encap with dodgy public */
     if (!TEST_false(OSSL_HPKE_encap(ctx, enc, &enclen, pub, 1, NULL, 0)))
+        goto end;
+    /* encap with too big info */
+    if (!TEST_false(OSSL_HPKE_encap(ctx, enc, &enclen, pub, 1, info, -1)))
         goto end;
     /* good encap */
     if (!TEST_true(OSSL_HPKE_encap(ctx, enc, &enclen, pub, publen, NULL, 0)))
@@ -1586,16 +1609,15 @@ static int test_hpke_oddcalls(void)
     if (!TEST_false(OSSL_HPKE_seal(ctx, cipher, &cipherlen, NULL, 0,
                                    plain, plainlen)))
         goto end;
+    /* reset seq */
     if (!TEST_true(OSSL_HPKE_CTX_set_seq(ctx, 0)))
         goto end;
-
-    /* back to working */
+    /* working seal */
     if (!TEST_true(OSSL_HPKE_seal(ctx, cipher, &cipherlen, NULL, 0,
                                   plain, plainlen)))
         goto end;
 
     /* receiver side */
-
     /* decap fail with psk mode but no psk set */
     if (!TEST_ptr(rctx = OSSL_HPKE_CTX_new(OSSL_HPKE_MODE_PSK, hpke_suite,
                                            testctx, NULL)))
@@ -1613,6 +1635,10 @@ static int test_hpke_oddcalls(void)
     if (!TEST_false(OSSL_HPKE_open(rctx, clear, &clearlen, NULL, 0,
                                   cipher, cipherlen)))
         goto end;
+    /* decap with info too long */
+    if (!TEST_false(OSSL_HPKE_decap(rctx, enc, enclen, privp, info, -1)))
+        goto end;
+    /* good decap */
     if (!TEST_true(OSSL_HPKE_decap(rctx, enc, enclen, privp, NULL, 0)))
         goto end;
     /* second decap fail */

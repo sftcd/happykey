@@ -21,14 +21,20 @@
 # define OSSL_HPKE_MODE_AUTH              2 /* Authenticated mode */
 # define OSSL_HPKE_MODE_PSKAUTH           3 /* PSK+authenticated mode */
 
+/* 
+ * Max for ikm, psk, pskid, info and exporter contexts.
+ * RFC9180, section 7.2.1 RECOMMENDS 64 octets but we have test vectors from
+ * Appendix A.6.1 with a 66 octet IKM so we'll allow that.
+ */
+# define OSSL_HPKE_MAX_PARMLEN        66
+# define OSSL_HPKE_MAX_INFOLEN        1024
+
 #ifdef HAPPYKEY
 /* strings for modes */
 # define OSSL_HPKE_MODESTR_BASE       "base"    /* base mode (1) */
 # define OSSL_HPKE_MODESTR_PSK        "psk"     /* psk mode (2) */
 # define OSSL_HPKE_MODESTR_AUTH       "auth"    /* sender-key pair auth (3) */
 # define OSSL_HPKE_MODESTR_PSKAUTH    "pskauth" /* psk+sender-key pair (4) */
-/* max for IKM len */
-# define OSSL_HPKE_MAX_IKMLEN          0xffff
 #endif
 /*
  * The (16bit) HPKE algorithn ID IANA codepoints

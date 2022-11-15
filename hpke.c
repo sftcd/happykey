@@ -1829,12 +1829,19 @@ err:
 OSSL_HPKE_CTX *OSSL_HPKE_CTX_new(int mode, OSSL_HPKE_SUITE suite,
                                  OSSL_LIB_CTX *libctx, const char *propq)
 {
+#ifdef HAPPYKEY
+    int erv = 0;
+#endif
     OSSL_HPKE_CTX *ctx = NULL;
 
-    if (hpke_mode_check(mode) != 1)
+    if (hpke_mode_check(mode) != 1) {
+        ERR_raise(ERR_LIB_CRYPTO, ERR_R_PASSED_INVALID_ARGUMENT);
         return NULL;
-    if (hpke_suite_check(suite) != 1)
+    }
+    if (hpke_suite_check(suite) != 1) {
+        ERR_raise(ERR_LIB_CRYPTO, ERR_R_PASSED_INVALID_ARGUMENT);
         return NULL;
+    }
     ctx = OPENSSL_zalloc(sizeof(OSSL_HPKE_CTX));
     if (ctx == NULL)
         return NULL;
@@ -1853,8 +1860,13 @@ OSSL_HPKE_CTX *OSSL_HPKE_CTX_new(int mode, OSSL_HPKE_SUITE suite,
 
 void OSSL_HPKE_CTX_free(OSSL_HPKE_CTX *ctx)
 {
-    if (ctx == NULL)
+#ifdef HAPPYKEY
+    int erv = 0;
+#endif
+    if (ctx == NULL) {
+        ERR_raise(ERR_LIB_CRYPTO, ERR_R_PASSED_NULL_PARAMETER);
         return;
+    }
     OPENSSL_free(ctx->propq);
     OPENSSL_clear_free(ctx->exportersec, ctx->exporterseclen);
     OPENSSL_free(ctx->pskid);
@@ -1879,12 +1891,20 @@ int OSSL_HPKE_CTX_set1_psk(OSSL_HPKE_CTX *ctx,
 
 #endif
     if (ctx == NULL || pskid == NULL || psk == NULL || psklen == 0) {
-        ERR_raise(ERR_LIB_CRYPTO, ERR_R_INTERNAL_ERROR);
+        ERR_raise(ERR_LIB_CRYPTO, ERR_R_PASSED_NULL_PARAMETER);
+        return 0;
+    }
+    if (psklen > OSSL_HPKE_MAX_PARMLEN) {
+        ERR_raise(ERR_LIB_CRYPTO, ERR_R_PASSED_INVALID_ARGUMENT);
+        return 0;
+    }
+    if (strlen(pskid) > OSSL_HPKE_MAX_PARMLEN) {
+        ERR_raise(ERR_LIB_CRYPTO, ERR_R_PASSED_INVALID_ARGUMENT);
         return 0;
     }
     if (ctx->mode != OSSL_HPKE_MODE_PSK
         && ctx->mode != OSSL_HPKE_MODE_PSKAUTH) {
-        ERR_raise(ERR_LIB_CRYPTO, ERR_R_INTERNAL_ERROR);
+        ERR_raise(ERR_LIB_CRYPTO, ERR_R_PASSED_INVALID_ARGUMENT);
         return 0;
     }
     /* free previous values if any */
@@ -1913,7 +1933,11 @@ int OSSL_HPKE_CTX_set1_ikme(OSSL_HPKE_CTX *ctx,
 
 #endif
     if (ctx == NULL || ikme == NULL) {
-        ERR_raise(ERR_LIB_CRYPTO, ERR_R_INTERNAL_ERROR);
+        ERR_raise(ERR_LIB_CRYPTO, ERR_R_PASSED_NULL_PARAMETER);
+        return 0;
+    }
+    if (ikmelen > OSSL_HPKE_MAX_PARMLEN) {
+        ERR_raise(ERR_LIB_CRYPTO, ERR_R_PASSED_INVALID_ARGUMENT);
         return 0;
     }
     OPENSSL_clear_free(ctx->ikme, ctx->ikmelen);
@@ -1932,12 +1956,12 @@ int OSSL_HPKE_CTX_set1_authpriv(OSSL_HPKE_CTX *ctx, EVP_PKEY *priv)
 
 #endif
     if (ctx == NULL || priv == NULL) {
-        ERR_raise(ERR_LIB_CRYPTO, ERR_R_INTERNAL_ERROR);
+        ERR_raise(ERR_LIB_CRYPTO, ERR_R_PASSED_NULL_PARAMETER);
         return 0;
     }
     if (ctx->mode != OSSL_HPKE_MODE_AUTH
         && ctx->mode != OSSL_HPKE_MODE_PSKAUTH) {
-        ERR_raise(ERR_LIB_CRYPTO, ERR_R_INTERNAL_ERROR);
+        ERR_raise(ERR_LIB_CRYPTO, ERR_R_PASSED_INVALID_ARGUMENT);
         return 0;
     }
     EVP_PKEY_free(ctx->authpriv);
@@ -1950,8 +1974,13 @@ int OSSL_HPKE_CTX_set1_authpriv(OSSL_HPKE_CTX *ctx, EVP_PKEY *priv)
 int OSSL_HPKE_CTX_set1_authpub(OSSL_HPKE_CTX *ctx,
                                const unsigned char *pub, size_t publen)
 {
-    if (ctx == NULL)
+#ifdef HAPPYKEY
+    int erv = 0;
+#endif
+    if (ctx == NULL || pub == NULL || publen == 0) {
+        ERR_raise(ERR_LIB_CRYPTO, ERR_R_PASSED_NULL_PARAMETER);
         return 0;
+    }
     OPENSSL_free(ctx->authpub);
     ctx->authpub = OPENSSL_malloc(publen);
     if (ctx->authpub == NULL)
@@ -1963,16 +1992,26 @@ int OSSL_HPKE_CTX_set1_authpub(OSSL_HPKE_CTX *ctx,
 
 int OSSL_HPKE_CTX_get_seq(OSSL_HPKE_CTX *ctx, uint64_t *seq)
 {
-    if (ctx == NULL || seq == NULL)
+#ifdef HAPPYKEY
+    int erv = 0;
+#endif
+    if (ctx == NULL || seq == NULL) {
+        ERR_raise(ERR_LIB_CRYPTO, ERR_R_PASSED_NULL_PARAMETER);
         return 0;
+    }
     *seq = ctx->seq;
     return 1;
 }
 
 int OSSL_HPKE_CTX_set_seq(OSSL_HPKE_CTX *ctx, uint64_t seq)
 {
-    if (ctx == NULL)
+#ifdef HAPPYKEY
+    int erv = 0;
+#endif
+    if (ctx == NULL) {
+        ERR_raise(ERR_LIB_CRYPTO, ERR_R_PASSED_NULL_PARAMETER);
         return 0;
+    }
     ctx->seq = seq;
     return 1;
 }
@@ -1990,6 +2029,10 @@ int OSSL_HPKE_encap(OSSL_HPKE_CTX *ctx,
     if (ctx == NULL || enc == NULL || enclen == NULL || *enclen == 0
         || pub == NULL || publen == 0) {
         ERR_raise(ERR_LIB_CRYPTO, ERR_R_PASSED_NULL_PARAMETER);
+        return 0;
+    }
+    if (infolen > OSSL_HPKE_MAX_INFOLEN) {
+        ERR_raise(ERR_LIB_CRYPTO, ERR_R_PASSED_INVALID_ARGUMENT);
         return 0;
     }
     if (ctx->shared_secret != NULL) {
@@ -2030,6 +2073,10 @@ int OSSL_HPKE_decap(OSSL_HPKE_CTX *ctx,
         ERR_raise(ERR_LIB_CRYPTO, ERR_R_PASSED_NULL_PARAMETER);
         return 0;
     }
+    if (infolen > OSSL_HPKE_MAX_INFOLEN) {
+        ERR_raise(ERR_LIB_CRYPTO, ERR_R_PASSED_INVALID_ARGUMENT);
+        return 0;
+    }
     if (ctx->shared_secret != NULL) {
         /* only allow one encap per OSSL_HPKE_CTX */
         ERR_raise(ERR_LIB_CRYPTO, ERR_R_SHOULD_NOT_HAVE_BEEN_CALLED);
@@ -2068,7 +2115,7 @@ int OSSL_HPKE_seal(OSSL_HPKE_CTX *ctx,
 
     if (ctx == NULL || ct == NULL || ctlen == NULL || *ctlen == 0
         || pt == NULL || ptlen == 0) {
-        ERR_raise(ERR_LIB_CRYPTO, ERR_R_PASSED_INVALID_ARGUMENT);
+        ERR_raise(ERR_LIB_CRYPTO, ERR_R_PASSED_NULL_PARAMETER);
         return 0;
     }
     if ((ctx->seq + 1) == 0) { /* wrap around imminent !!! */
@@ -2121,7 +2168,7 @@ int OSSL_HPKE_open(OSSL_HPKE_CTX *ctx,
 
     if (ctx == NULL || pt == NULL || ptlen == NULL || *ptlen == 0
         || ct == NULL || ctlen == 0) {
-        ERR_raise(ERR_LIB_CRYPTO, ERR_R_PASSED_INVALID_ARGUMENT);
+        ERR_raise(ERR_LIB_CRYPTO, ERR_R_PASSED_NULL_PARAMETER);
         return 0;
     }
     if ((ctx->seq + 1) == 0) { /* wrap around imminent !!! */
@@ -2172,11 +2219,15 @@ int OSSL_HPKE_export(OSSL_HPKE_CTX *ctx,
     const OSSL_HPKE_KDF_INFO *kdf_info = NULL;
 
     if (ctx == NULL) {
-        ERR_raise(ERR_LIB_CRYPTO, ERR_R_INTERNAL_ERROR);
+        ERR_raise(ERR_LIB_CRYPTO, ERR_R_PASSED_NULL_PARAMETER);
+        return 0;
+    }
+    if (labellen > OSSL_HPKE_MAX_PARMLEN) {
+        ERR_raise(ERR_LIB_CRYPTO, ERR_R_PASSED_INVALID_ARGUMENT);
         return 0;
     }
     if (ctx->exportersec == NULL) {
-        ERR_raise(ERR_LIB_CRYPTO, ERR_R_INTERNAL_ERROR);
+        ERR_raise(ERR_LIB_CRYPTO, ERR_R_SHOULD_NOT_HAVE_BEEN_CALLED);
         return 0;
     }
     kdf_info = ossl_HPKE_KDF_INFO_find_id(ctx->suite.kdf_id);
@@ -2242,18 +2293,24 @@ int OSSL_HPKE_keygen(OSSL_HPKE_SUITE suite,
 #ifdef SUPERVERBOSE
     printf("Generating key for KEM %d\n",suite.kem_id);
 #endif
-    if (hpke_suite_check(suite) != 1)
+    if (pub == NULL || publen == NULL || *publen == 0 || priv == NULL) {
+        ERR_raise(ERR_LIB_CRYPTO, ERR_R_PASSED_NULL_PARAMETER);
         return 0;
-    if (pub == NULL || publen == NULL || *publen == 0 || priv == NULL)
+    }
+    if (hpke_suite_check(suite) != 1) {
+        ERR_raise(ERR_LIB_CRYPTO, ERR_R_PASSED_INVALID_ARGUMENT);
         return 0;
-    if (ikmlen > 0 && ikm == NULL)
+    }
+    if ((ikmlen > 0 && ikm == NULL)
+        || (ikmlen == 0 && ikm != NULL)
+        || ikmlen > OSSL_HPKE_MAX_PARMLEN) {
+        ERR_raise(ERR_LIB_CRYPTO, ERR_R_PASSED_INVALID_ARGUMENT);
         return 0;
-    if (ikmlen == 0 && ikm != NULL)
-        return 0;
+    }
+
     kem_info = ossl_HPKE_KEM_INFO_find_id(suite.kem_id);
     if (kem_info == NULL)
         return 0;
-
     if (hpke_kem_id_nist_curve(suite.kem_id) == 1) {
         *p++ = OSSL_PARAM_construct_utf8_string(OSSL_PKEY_PARAM_GROUP_NAME,
                                                 (char *)kem_info->groupname, 0);
@@ -3815,7 +3872,7 @@ static int local_hpke_kg_evp(OSSL_LIB_CTX *libctx, const char *propq,
         return 0;
     if (ikmlen == 0 && ikm != NULL)
         return 0;
-    if (ikmlen > OSSL_HPKE_MAX_IKMLEN)
+    if (ikmlen > OSSL_HPKE_MAX_PARMLEN)
         return 0;
     kem_info = ossl_HPKE_KEM_INFO_find_id(suite.kem_id);
     if (kem_info == NULL) {
