@@ -27,6 +27,8 @@
 # define OSSL_HPKE_MODESTR_PSK        "psk"     /* psk mode (2) */
 # define OSSL_HPKE_MODESTR_AUTH       "auth"    /* sender-key pair auth (3) */
 # define OSSL_HPKE_MODESTR_PSKAUTH    "pskauth" /* psk+sender-key pair (4) */
+/* max for IKM len */
+# define OSSL_HPKE_MAX_IKMLEN          0xffff
 #endif
 /*
  * The (16bit) HPKE algorithn ID IANA codepoints

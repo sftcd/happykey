@@ -816,8 +816,8 @@ static EVP_PKEY *EVP_PKEY_new_raw_nist_public_key(OSSL_LIB_CTX *libctx,
      * s3_lib.c:ssl_generate_param_group has similar code so
      * can be useful if the upstream code changes
      */
-#endif
     int erv = 0;
+#endif
     OSSL_PARAM params[2];
     EVP_PKEY *ret = NULL;
     EVP_PKEY_CTX *cctx = EVP_PKEY_CTX_new_from_name(libctx, "EC", propq);
@@ -830,12 +830,14 @@ static EVP_PKEY *EVP_PKEY_new_raw_nist_public_key(OSSL_LIB_CTX *libctx,
         || EVP_PKEY_CTX_set_params(cctx, params) <= 0
         || EVP_PKEY_paramgen(cctx, &ret) <= 0
         || EVP_PKEY_set1_encoded_public_key(ret, buf, buflen) != 1) {
+#if defined(SUPERVERBOSE)
+        printf("EARLY public fail\n");
+#endif
+        EVP_PKEY_CTX_free(cctx);
+        EVP_PKEY_free(ret);
         ERR_raise(ERR_LIB_CRYPTO, ERR_R_INTERNAL_ERROR);
-        goto err;
+        return NULL;
     }
-    erv = 1;
-
-err:
 #if defined(SUPERVERBOSE)
     if (ret != NULL) {
         pblen = EVP_PKEY_get1_encoded_public_key(ret, &pbuf);
@@ -845,13 +847,7 @@ err:
         printf("no EARLY public\n");
     }
 #endif
-    EVP_PKEY_CTX_free(cctx);
-    if (erv == 1) {
-        return ret;
-    } else {
-        EVP_PKEY_free(ret);
-        return NULL;
-    }
+    return ret;
 }
 
 /**
@@ -1841,20 +1837,18 @@ OSSL_HPKE_CTX *OSSL_HPKE_CTX_new(int mode, OSSL_HPKE_SUITE suite,
         return NULL;
     ctx = OPENSSL_zalloc(sizeof(OSSL_HPKE_CTX));
     if (ctx == NULL)
-        return ctx;
+        return NULL;
     ctx->libctx = libctx;
     if (propq != NULL) {
         ctx->propq = OPENSSL_strdup(propq);
-        if (ctx->propq == NULL)
-            goto err;
+        if (ctx->propq == NULL) {
+            OSSL_HPKE_CTX_free(ctx);
+            return NULL;
+        }
     }
     ctx->mode = mode;
     ctx->suite = suite;
     return ctx;
-
-err:
-    OSSL_HPKE_CTX_free(ctx);
-    return NULL;
 }
 
 void OSSL_HPKE_CTX_free(OSSL_HPKE_CTX *ctx)
@@ -2077,6 +2071,10 @@ int OSSL_HPKE_seal(OSSL_HPKE_CTX *ctx,
         ERR_raise(ERR_LIB_CRYPTO, ERR_R_PASSED_INVALID_ARGUMENT);
         return 0;
     }
+    if ((ctx->seq + 1) == 0) { /* wrap around imminent !!! */
+        ERR_raise(ERR_LIB_CRYPTO, ERR_R_SHOULD_NOT_HAVE_BEEN_CALLED);
+        return 0;
+    }
 #if defined(SUPERVERBOSE)
     printf("New Sealing:\n");
 #endif
@@ -2124,6 +2122,10 @@ int OSSL_HPKE_open(OSSL_HPKE_CTX *ctx,
     if (ctx == NULL || pt == NULL || ptlen == NULL || *ptlen == 0
         || ct == NULL || ctlen == 0) {
         ERR_raise(ERR_LIB_CRYPTO, ERR_R_PASSED_INVALID_ARGUMENT);
+        return 0;
+    }
+    if ((ctx->seq + 1) == 0) { /* wrap around imminent !!! */
+        ERR_raise(ERR_LIB_CRYPTO, ERR_R_SHOULD_NOT_HAVE_BEEN_CALLED);
         return 0;
     }
 #if defined(SUPERVERBOSE)
@@ -3812,6 +3814,8 @@ static int local_hpke_kg_evp(OSSL_LIB_CTX *libctx, const char *propq,
     if (ikmlen > 0 && ikm == NULL)
         return 0;
     if (ikmlen == 0 && ikm != NULL)
+        return 0;
+    if (ikmlen > OSSL_HPKE_MAX_IKMLEN)
         return 0;
     kem_info = ossl_HPKE_KEM_INFO_find_id(suite.kem_id);
     if (kem_info == NULL) {
