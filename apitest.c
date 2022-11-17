@@ -2175,8 +2175,8 @@ int setup_tests(void)
 }
 void cleanup_tests(void)
 {
-    OSSL_LIB_CTX_free(testctx);
-    OSSL_PROVIDER_unload(nullprov);
     OSSL_PROVIDER_unload(deflprov);
+    OSSL_PROVIDER_unload(nullprov);
+    OSSL_LIB_CTX_free(testctx);
 }
 #endif
