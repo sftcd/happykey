@@ -69,11 +69,14 @@ static const OSSL_HPKE_KEM_INFO hpke_kem_tab[] = {
  * See RFC9180 Section 7.2 "Table 3 KDF IDs"
  */
 static const OSSL_HPKE_AEAD_INFO hpke_aead_tab[] = {
-    { OSSL_HPKE_AEAD_ID_AES_GCM_128, LN_aes_128_gcm, 16, 16, 12 },
-    { OSSL_HPKE_AEAD_ID_AES_GCM_256, LN_aes_256_gcm, 16, 32, 12 },
+    { OSSL_HPKE_AEAD_ID_AES_GCM_128, LN_aes_128_gcm, 16, 16,
+      OSSL_HPKE_MAX_NONCELEN },
+    { OSSL_HPKE_AEAD_ID_AES_GCM_256, LN_aes_256_gcm, 16, 32,
+      OSSL_HPKE_MAX_NONCELEN },
 #ifndef OPENSSL_NO_CHACHA20
 # ifndef OPENSSL_NO_POLY1305
-    { OSSL_HPKE_AEAD_ID_CHACHA_POLY1305, LN_chacha20_poly1305, 16, 32, 12 },
+    { OSSL_HPKE_AEAD_ID_CHACHA_POLY1305, LN_chacha20_poly1305, 16, 32,
+      OSSL_HPKE_MAX_NONCELEN },
 # endif
     { OSSL_HPKE_AEAD_ID_EXPORTONLY, NULL, 0, 0, 0 }
 #endif
@@ -155,8 +158,8 @@ const OSSL_HPKE_KEM_INFO *ossl_HPKE_KEM_INFO_find_id(uint16_t kemid)
     int i;
     int sz = OSSL_NELEM(hpke_kem_tab);
 
-    /* 
-     * this check can happen if we're in a no-ec build and there are no 
+    /*
+     * this check can happen if we're in a no-ec build and there are no
      * KEMS available
      */
     if (kemid == OSSL_HPKE_KEM_ID_RESERVED)

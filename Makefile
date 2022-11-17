@@ -69,11 +69,26 @@ forlibclean:
 	- rm -f apitest.c-forlib
 
 # copy over the files to the openssl build
-copy2lib: forlib
+copy2lib: forlib \
+		  ${OSSL}/crypto/hpke/hpke.c \
+		  ${OSSL}/crypto/hpke/hpke_util.c \
+		  ${INCL}/openssl/hpke.h \
+		  ${INCL}/internal/hpke_util.h \
+		  ${OSSL}/test/hpke_test.c
+
+${OSSL}/crypto/hpke/hpke.c: hpke.c-forlib
 	- cp hpke.c-forlib ${OSSL}/crypto/hpke/hpke.c
+
+${OSSL}/crypto/hpke/hpke_util.c: hpke_util.c-forlib
 	- cp hpke_util.c-forlib ${OSSL}/crypto/hpke/hpke_util.c
+
+${INCL}/openssl/hpke.h: hpke.h-forlib
 	- cp hpke.h-forlib ${INCL}/openssl/hpke.h
+
+${INCL}/internal/hpke_util.h: hpke_util.h-forlib
 	- cp hpke_util.h-forlib ${INCL}/internal/hpke_util.h
+
+${OSSL}/test/hpke_test.c: apitest.c-forlib
 	- cp apitest.c-forlib ${OSSL}/test/hpke_test.c
 
 # main build targets

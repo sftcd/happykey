@@ -27,6 +27,8 @@ High level notes:
 
 ## Recent Changes
 
+- 20221117: a few more PR nits
+
 - 20221115: many more test and code coverage checking
 
 - 20221105: lots more tweaks based on more PR review

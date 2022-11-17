@@ -12,7 +12,6 @@
 # define OSSL_HPKE_H
 # pragma once
 
-# include <openssl/obj_mac.h>
 # include <openssl/types.h>
 
 /* HPKE modes */
@@ -21,7 +20,7 @@
 # define OSSL_HPKE_MODE_AUTH              2 /* Authenticated mode */
 # define OSSL_HPKE_MODE_PSKAUTH           3 /* PSK+authenticated mode */
 
-/* 
+/*
  * Max for ikm, psk, pskid, info and exporter contexts.
  * RFC9180, section 7.2.1 RECOMMENDS 64 octets but we have test vectors from
  * Appendix A.6.1 with a 66 octet IKM so we'll allow that.
@@ -37,7 +36,7 @@
 # define OSSL_HPKE_MODESTR_PSKAUTH    "pskauth" /* psk+sender-key pair (4) */
 #endif
 /*
- * The (16bit) HPKE algorithn ID IANA codepoints
+ * The (16bit) HPKE algorithm ID IANA codepoints
  * If/when new IANA codepoints are added there are tables in
  * crypto/hpke/hpke_util.c that must also be updated.
  */

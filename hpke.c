@@ -1865,7 +1865,6 @@ void OSSL_HPKE_CTX_free(OSSL_HPKE_CTX *ctx)
     int erv = 0;
 #endif
     if (ctx == NULL) {
-        ERR_raise(ERR_LIB_CRYPTO, ERR_R_PASSED_NULL_PARAMETER);
         return;
     }
     OPENSSL_free(ctx->propq);
