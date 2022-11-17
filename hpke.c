@@ -1864,9 +1864,8 @@ void OSSL_HPKE_CTX_free(OSSL_HPKE_CTX *ctx)
 #ifdef HAPPYKEY
     int erv = 0;
 #endif
-    if (ctx == NULL) {
+    if (ctx == NULL)
         return;
-    }
     OPENSSL_free(ctx->propq);
     OPENSSL_clear_free(ctx->exportersec, ctx->exporterseclen);
     OPENSSL_free(ctx->pskid);

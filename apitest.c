@@ -124,6 +124,9 @@ static OSSL_LIB_CTX *testctx = NULL;
 static OSSL_PROVIDER *nullprov = NULL;
 static OSSL_PROVIDER *deflprov = NULL;
 static char *testpropq = "provider=default";
+#ifndef HAPPYKEY
+static int verbose = 0;
+#endif
 
 typedef struct {
     int mode;
@@ -970,9 +973,6 @@ static int test_hpke_modes_suites(void)
     int aeadind = 0; /* index into hpke_aead_list */
 #ifdef HAPPYKEY
     int testcount = 0; /* count of tests done */
-    int verbose = verbose || (getenv("V") != NULL);
-#else
-    int verbose = (getenv("V") != NULL);
 #endif
 
     /* iterate over the different modes */
@@ -2156,8 +2156,39 @@ int main(int argc, char **argv)
     return apires;
 }
 #else
+typedef enum OPTION_choice {
+    OPT_ERR = -1,
+    OPT_EOF = 0,
+    OPT_VERBOSE,
+    OPT_TEST_ENUM
+} OPTION_CHOICE;
+
+const OPTIONS *test_get_options(void)
+{
+    static const OPTIONS test_options[] = {
+        OPT_TEST_OPTIONS_WITH_EXTRA_USAGE("conf_file\n"),
+        { "v", OPT_VERBOSE, '-', "Enables verbose mode" },
+        { OPT_HELP_STR, 1, '-',
+          "file\tFile to run tests on. Normal tests are not run\n" },
+        { NULL }
+    };
+    return test_options;
+}
+
 int setup_tests(void)
 {
+    OPTION_CHOICE o;
+
+    while ((o = opt_next()) != OPT_EOF) {
+        switch (o) {
+        case OPT_VERBOSE:
+            verbose = 1; /* Print progress dots */
+            break;
+        default:
+            return 0;
+        }
+    }
+
     if (!test_get_libctx(&testctx, &nullprov, NULL, &deflprov, "default"))
         return 0;
     ADD_TEST(x25519kdfsha256_hkdfsha256_aes128gcm_base_test);
