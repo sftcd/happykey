@@ -2166,10 +2166,9 @@ typedef enum OPTION_choice {
 const OPTIONS *test_get_options(void)
 {
     static const OPTIONS test_options[] = {
-        OPT_TEST_OPTIONS_WITH_EXTRA_USAGE("conf_file\n"),
-        { "v", OPT_VERBOSE, '-', "Enables verbose mode" },
-        { OPT_HELP_STR, 1, '-',
-          "file\tFile to run tests on. Normal tests are not run\n" },
+        OPT_TEST_OPTIONS_DEFAULT_USAGE,
+        { "v", OPT_VERBOSE, '-', "Enable verbose mode" },
+        { OPT_HELP_STR, 1, '-', "Run HPKE tests\n" },
         { NULL }
     };
     return test_options;
@@ -2183,6 +2182,8 @@ int setup_tests(void)
         switch (o) {
         case OPT_VERBOSE:
             verbose = 1; /* Print progress dots */
+            break;
+        case OPT_TEST_CASES:
             break;
         default:
             return 0;
