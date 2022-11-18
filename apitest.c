@@ -99,7 +99,7 @@ static void usage(char *prog, char *errmsg)
     test_true(__FILE__, __LINE__, ((__x__) != (NULL)))
 # define TEST_ptr_null(__x__) \
     test_true(__FILE__, __LINE__, ((__x__) == (NULL)))
-# define TEST_note(a,b,c,d,e,f,g,h,i,j)
+# define TEST_note(a, b, c, d, e, f, g, h, i, j)
 #else
 /*
  * Copyright 2022 The OpenSSL Project Authors. All Rights Reserved.
@@ -324,7 +324,7 @@ static int do_testhpke(const TEST_BASEDATA *base,
             goto end;
         /* export with too long label should fail */
         if (!TEST_false(OSSL_HPKE_export(sealctx, eval, len,
-                                        export[i].context, -1)))
+                                         export[i].context, -1)))
             goto end;
         /* good export call */
         if (!TEST_true(OSSL_HPKE_export(sealctx, eval, len,
@@ -881,8 +881,10 @@ static int export_only_test(void)
  * Randomly toss a coin
  */
 #ifdef HAPPYKEY
-static uint32_t test_random() {
+static uint32_t test_random()
+{
     unsigned char rb = 0;
+
     return RAND_bytes_ex(testctx, &rb, 1, 10);
 }
 #endif
@@ -913,7 +915,7 @@ static uint16_t hpke_aead_list[] = {
     OSSL_HPKE_AEAD_ID_CHACHA_POLY1305
 };
 
-/* 
+/*
  * Strings that can be used with names or IANA codepoints.
  * Note that the initial entries from these lists should
  * match the lists above, i.e. kem_str_list[0] and
@@ -940,7 +942,6 @@ static char *aead_str_list[] = {
     "0x1", "0x01", "0x2", "0x02", "0x3", "0x03",
     "1", "2", "3",
     "0xff", "255"
-    
 };
 /* table of bogus strings that better not work */
 static char *bogus_suite_strs[] = {
@@ -1077,7 +1078,8 @@ static int test_hpke_modes_suites(void)
 
                 hpke_suite.kdf_id = kdf_id;
                 for (aeadind = 0;
-                     overallresult == 1 && aeadind != OSSL_NELEM(hpke_aead_list);
+                     overallresult == 1
+                     && aeadind != OSSL_NELEM(hpke_aead_list);
                      aeadind++) {
                     uint16_t aead_id = hpke_aead_list[aeadind];
                     size_t publen = OSSL_HPKE_TSTSIZE;
@@ -1145,8 +1147,8 @@ static int test_hpke_modes_suites(void)
 #endif
                     cipherlen = 15;
                     if (!TEST_false(OSSL_HPKE_seal(ctx, cipher, &cipherlen,
-                                                  aadp, aadlen,
-                                                  plain, plainlen)))
+                                                   aadp, aadlen,
+                                                   plain, plainlen)))
                         overallresult = 0;
 #ifdef HAPPYKEY
                     if (verbose)
@@ -1172,17 +1174,19 @@ static int test_hpke_modes_suites(void)
                     }
                     if (hpke_mode == OSSL_HPKE_MODE_AUTH
                         || hpke_mode == OSSL_HPKE_MODE_PSKAUTH) {
-                         /* check a borked p256 key */
+                        /* check a borked p256 key */
                         if (hpke_suite.kem_id == OSSL_HPKE_KEM_ID_P256) {
                             /* set to fail decode of authpub this time */
                             authpub[0] = 0x05;
                             if (!TEST_true(OSSL_HPKE_CTX_set1_authpub(rctx,
                                                                       authpub,
-                                                                      authpublen)))
+                                                                      authpublen
+                                                                      )))
                                 overallresult = 0;
-                             if (!TEST_false(OSSL_HPKE_decap(rctx, senderpub,
-                                                             senderpublen, privp,
-                                                             infop, infolen)))
+                            if (!TEST_false(OSSL_HPKE_decap(rctx, senderpub,
+                                                            senderpublen,
+                                                            privp,
+                                                            infop, infolen)))
                                 overallresult = 0;
                             /* fix authpub for real go at it */
                             authpub[0] = 0x04;
@@ -1223,18 +1227,22 @@ static int test_hpke_modes_suites(void)
                         overallresult = 0;
                     }
 #ifdef HAPPYKEY
-                    if (verbose && overallresult == 1) { printf("test success\n"); }
+                    if (verbose && overallresult == 1) {
+                        printf("test success\n");
+                    }
 #endif
                     if (privp) {
                         EVP_PKEY_free(privp);
                         privp = NULL;
                     }
                     if (verbose || overallresult != 1) {
+                        const char *res = NULL;
+
+                        res = (overallresult == 1 ? "worked" : "failed");
                         TEST_note("HPKE %s for mode: %s/0x%02x, "\
                                   "kem: %s/0x%02x, kdf: %s/0x%02x, "\
                                   "aead: %s/0x%02x",
-                                  (overallresult == 1 ? "worked" : "failed"),
-                                  mode_str_list[mind], mind, 
+                                  res, mode_str_list[mind], mind,
                                   kem_str_list[kemind], kem_id,
                                   kdf_str_list[kdfind], kdf_id,
                                   aead_str_list[aeadind], aead_id);
@@ -1356,13 +1364,13 @@ static int test_hpke_suite_strs(void)
                 if (TEST_true(OSSL_HPKE_str2suite(sstr, &stirred)) != 1) {
 #ifdef HAPPYKEY
                     if (verbose)
-                        printf("Unexpected str2suite fail for %s\n",sstr);
+                        printf("Unexpected str2suite fail for %s\n", sstr);
 #endif
                     overallresult = 0;
                 }
 #ifdef HAPPYKEY
                 else
-                    if (verbose) { printf("str2suite ok for %s\n",sstr); }
+                    if (verbose) { printf("str2suite ok for %s\n", sstr); }
 #endif
             }
         }
@@ -1380,8 +1388,7 @@ static int test_hpke_suite_strs(void)
         overallresult = 0;
     if (!TEST_false(OSSL_HPKE_str2suite("", NULL)))
         overallresult = 0;
-    for (sind = 0; sind != sizeof(giant); sind++) 
-        giant[sind]='A';
+    memset(giant, 'A', sizeof(giant) - 1);
     giant[sizeof(giant) - 1] = '\0';
     if (!TEST_false(OSSL_HPKE_str2suite(giant, &stirred)))
         overallresult = 0;
@@ -1411,8 +1418,8 @@ static int test_hpke_grease(void)
     /* check too short for public value */
     g_pub_len = 10;
     if (TEST_false(OSSL_HPKE_get_grease_value(testctx, NULL, NULL, &g_suite,
-                                             g_pub, &g_pub_len,
-                                             g_cipher, g_cipher_len)) != 1) {
+                                              g_pub, &g_pub_len,
+                                              g_cipher, g_cipher_len)) != 1) {
         overallresult = 0;
     }
     /* reset to work */
@@ -1475,7 +1482,7 @@ static int test_hpke_oddcalls(void)
     OSSL_LIB_CTX *badctx = NULL;
     char *badpropq = "yeah, this won't work";
     uint64_t lseq = 0;
-    char giant_pskid[OSSL_HPKE_MAX_PARMLEN+10];
+    char giant_pskid[OSSL_HPKE_MAX_PARMLEN + 10];
     unsigned char info[OSSL_HPKE_TSTSIZE];
 
     /* many of the calls below are designed to get better test coverage */
@@ -1555,7 +1562,7 @@ static int test_hpke_oddcalls(void)
     if (!TEST_false(OSSL_HPKE_decap(NULL, NULL, 0, NULL, NULL, 0)))
         goto end;
 
-    /* 
+    /*
      * run through a sender/recipient set of calls but with
      * failing calls interspersed whenever possible
      */
@@ -1573,7 +1580,7 @@ static int test_hpke_oddcalls(void)
                                            (unsigned char *)"bar", -1)))
         goto end;
     /* set bad length pskid */
-    memset(giant_pskid,'A',sizeof(giant_pskid) - 1);
+    memset(giant_pskid, 'A', sizeof(giant_pskid) - 1);
     giant_pskid[sizeof(giant_pskid) - 1] = '\0';
     if (!TEST_false(OSSL_HPKE_CTX_set1_psk(ctx, giant_pskid,
                                            (unsigned char *)"bar", 3)))
@@ -1664,7 +1671,7 @@ static int test_hpke_oddcalls(void)
         goto end;
     /* open before decap */
     if (!TEST_false(OSSL_HPKE_open(rctx, clear, &clearlen, NULL, 0,
-                                  cipher, cipherlen)))
+                                   cipher, cipherlen)))
         goto end;
     /* decap with info too long */
     if (!TEST_false(OSSL_HPKE_decap(rctx, enc, enclen, privp, info, -1)))
@@ -1678,7 +1685,7 @@ static int test_hpke_oddcalls(void)
     /* no space for recovered clear */
     clearlen = 0;
     if (!TEST_false(OSSL_HPKE_open(rctx, clear, &clearlen, NULL, 0,
-                                  cipher, cipherlen)))
+                                   cipher, cipherlen)))
         goto end;
     clearlen = OSSL_HPKE_TSTSIZE;
     /* seq wrap around test */
@@ -1761,7 +1768,7 @@ static int test_hpke_badcalls(void)
     /* a good key to tee up bad calls below */
     hpke_suite.kem_id = 0x20;
     if (TEST_true(OSSL_HPKE_keygen(hpke_suite, pub, &publen, &privp,
-                                   NULL, 0, testctx, NULL )) != 1) {
+                                   NULL, 0, testctx, NULL)) != 1) {
         overallresult = 0;
     }
 

@@ -384,7 +384,17 @@ That gets the ``master`` branch up to date with upstream. Next is to rebase
 my own branch(es) with that, e.g. for HPKE-PR.
 
             $ git checkout HPKE-PR
-            $ git rebase master HPKE-PR
+            $ git rebase -i master HPKE-PR
+
+If squashing commits then replace all but first "pick" with an "f"
+
+Then fixup the commit comment via:
+
+            $ git commit --amend
+
+And when the time is right, then a force push is correct
+
+            $ git push --force 
 
 That last has needs some repetitive stuff but works in the end
 but don't forget to build/test/push to origin too.
