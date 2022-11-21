@@ -35,6 +35,10 @@ static int verbose = 0;
 /*
  * @brief mimic OpenSSL test_true function
  */
+#define TEST_size_t_gt(a, b) (a > b ? 1: 0)
+#define TEST_size_t_ne(a, b) (a != b ? 1: 0)
+#define TEST_size_t_eq(a, b) (a == b ? 1: 0)
+
 static int test_true(char *file, int line, int res)
 {
     if (res != 1) {
@@ -968,16 +972,16 @@ static char *bogus_suite_strs[] = {
 static int test_hpke_modes_suites(void)
 {
     int overallresult = 1;
-    int mind = 0; /* index into hpke_mode_list */
-    int kemind = 0; /* index into hpke_kem_list */
-    int kdfind = 0; /* index into hpke_kdf_list */
-    int aeadind = 0; /* index into hpke_aead_list */
+    size_t mind = 0; /* index into hpke_mode_list */
+    size_t kemind = 0; /* index into hpke_kem_list */
+    size_t kdfind = 0; /* index into hpke_kdf_list */
+    size_t aeadind = 0; /* index into hpke_aead_list */
 #ifdef HAPPYKEY
     int testcount = 0; /* count of tests done */
 #endif
 
     /* iterate over the different modes */
-    for (mind = 0; mind != OSSL_NELEM(hpke_mode_list); mind++) {
+    for (mind = 0; mind < OSSL_NELEM(hpke_mode_list); mind++) {
         int hpke_mode = hpke_mode_list[mind];
         size_t aadlen = OSSL_HPKE_TSTSIZE;
         unsigned char aad[OSSL_HPKE_TSTSIZE];
@@ -1051,7 +1055,7 @@ static int test_hpke_modes_suites(void)
             psklen = 0;
         }
         for (kemind = 0; /* iterate over the kems, kdfs and aeads */
-             overallresult == 1 && kemind != OSSL_NELEM(hpke_kem_list);
+             overallresult == 1 && kemind < OSSL_NELEM(hpke_kem_list);
              kemind++) {
             uint16_t kem_id = hpke_kem_list[kemind];
             size_t authpublen = OSSL_HPKE_TSTSIZE;
@@ -1060,8 +1064,8 @@ static int test_hpke_modes_suites(void)
             EVP_PKEY *authpriv = NULL;
 
             hpke_suite.kem_id = kem_id;
-            if ((hpke_mode == OSSL_HPKE_MODE_AUTH) ||
-                (hpke_mode == OSSL_HPKE_MODE_PSKAUTH)) {
+            if (hpke_mode == OSSL_HPKE_MODE_AUTH
+                || hpke_mode == OSSL_HPKE_MODE_PSKAUTH) {
                 if (TEST_true(OSSL_HPKE_keygen(hpke_suite, authpub, &authpublen,
                                                &authpriv, NULL, 0,
                                                testctx, NULL)) != 1) {
@@ -1072,14 +1076,14 @@ static int test_hpke_modes_suites(void)
                 authpublen = 0;
             }
             for (kdfind = 0;
-                 overallresult == 1 && kdfind != OSSL_NELEM(hpke_kdf_list);
+                 overallresult == 1 && kdfind < OSSL_NELEM(hpke_kdf_list);
                  kdfind++) {
                 uint16_t kdf_id = hpke_kdf_list[kdfind];
 
                 hpke_suite.kdf_id = kdf_id;
                 for (aeadind = 0;
                      overallresult == 1
-                     && aeadind != OSSL_NELEM(hpke_aead_list);
+                     && aeadind < OSSL_NELEM(hpke_aead_list);
                      aeadind++) {
                     uint16_t aead_id = hpke_aead_list[aeadind];
                     size_t publen = OSSL_HPKE_TSTSIZE;
@@ -1231,10 +1235,6 @@ static int test_hpke_modes_suites(void)
                         printf("test success\n");
                     }
 #endif
-                    if (privp) {
-                        EVP_PKEY_free(privp);
-                        privp = NULL;
-                    }
                     if (verbose || overallresult != 1) {
                         const char *res = NULL;
 
@@ -1242,7 +1242,7 @@ static int test_hpke_modes_suites(void)
                         TEST_note("HPKE %s for mode: %s/0x%02x, "\
                                   "kem: %s/0x%02x, kdf: %s/0x%02x, "\
                                   "aead: %s/0x%02x",
-                                  res, mode_str_list[mind], mind,
+                                  res, mode_str_list[mind], (int) mind,
                                   kem_str_list[kemind], kem_id,
                                   kdf_str_list[kdfind], kdf_id,
                                   aead_str_list[aeadind], aead_id);
@@ -1355,6 +1355,8 @@ static int test_hpke_suite_strs(void)
     char sstr[128];
     OSSL_HPKE_SUITE stirred;
     char giant[2048];
+    size_t suitesize;
+    size_t ptr_suitesize;
 
     for (kemind = 0; kemind != OSSL_NELEM(kem_str_list); kemind++) {
         for (kdfind = 0; kdfind != OSSL_NELEM(kdf_str_list); kdfind++) {
@@ -1392,6 +1394,20 @@ static int test_hpke_suite_strs(void)
     giant[sizeof(giant) - 1] = '\0';
     if (!TEST_false(OSSL_HPKE_str2suite(giant, &stirred)))
         overallresult = 0;
+
+    /* we'll check the size of a suite just to see what we get */
+    suitesize=sizeof(stirred);
+    ptr_suitesize=sizeof(&stirred);
+#ifdef HAPPYKEY
+    if (verbose)
+        printf("Size of OSSL_HPKE_SUITE is %lu, size of ptr is %lu\n",
+               suitesize, ptr_suitesize);
+#else
+    if (verbose) {
+        TEST_note("Size of OSSL_HPKE_SUITE is %lu, size of ptr is %lu",
+                  suitesize, ptr_suitesize);
+    }
+#endif
 
     return overallresult;
 }
@@ -1431,26 +1447,26 @@ static int test_hpke_grease(void)
     }
     /* expansion */
     expanded = OSSL_HPKE_get_ciphertext_size(g_suite, clearlen);
-    if (expanded <= clearlen) {
+    if (!TEST_size_t_gt(expanded,clearlen)) {
 #ifdef HAPPYKEY
         printf("expanded<=clearlen fail\n");
 #endif
         overallresult = 0;
     }
     enclen = OSSL_HPKE_get_public_encap_size(g_suite);
-    if (enclen == 0) {
 #ifdef HAPPYKEY
+    if (enclen == 0)
         printf("enclen fail\n");
 #endif
+    if (!TEST_size_t_ne(enclen,0))
         overallresult = 0;
-    }
     /* not really GREASE but we'll check ikmelen thing */
     ikmelen = OSSL_HPKE_get_recommended_ikmelen(g_suite);
 #ifdef HAPPYKEY
     if (ikmelen == 0)
         printf("ikmelen fail\n");
 #endif
-    if (ikmelen == 0)
+    if (!TEST_size_t_ne(ikmelen,0))
         overallresult = 0;
 
     return overallresult;
@@ -1461,6 +1477,7 @@ static int test_hpke_grease(void)
  */
 static int test_hpke_oddcalls(void)
 {
+    int erv = 0;
     EVP_PKEY *privp = NULL;
     unsigned char pub[OSSL_HPKE_TSTSIZE];
     size_t publen = sizeof(pub);
@@ -1701,16 +1718,12 @@ static int test_hpke_oddcalls(void)
         goto end;
     if (!TEST_true(TEST_mem_eq(plain, plainlen, clear, clearlen)))
         goto end;
-
-    OSSL_HPKE_CTX_free(ctx);
-    OSSL_HPKE_CTX_free(rctx);
-    EVP_PKEY_free(privp);
-    return 1;
+    erv = 1;
 end:
     OSSL_HPKE_CTX_free(ctx);
     OSSL_HPKE_CTX_free(rctx);
     EVP_PKEY_free(privp);
-    return 0;
+    return erv;
 }
 #ifdef HAPPYKEY
 /**
@@ -1841,13 +1854,13 @@ static int test_hpke_badcalls(void)
 #endif
 
 /* from RFC 9180 Appendix A.1.1 */
-static unsigned char ikm25519[] = {
+static const unsigned char ikm25519[] = {
     0x72, 0x68, 0x60, 0x0d, 0x40, 0x3f, 0xce, 0x43,
     0x15, 0x61, 0xae, 0xf5, 0x83, 0xee, 0x16, 0x13,
     0x52, 0x7c, 0xff, 0x65, 0x5c, 0x13, 0x43, 0xf2,
     0x98, 0x12, 0xe6, 0x67, 0x06, 0xdf, 0x32, 0x34
 };
-static unsigned char pub25519[] = {
+static const unsigned char pub25519[] = {
     0x37, 0xfd, 0xa3, 0x56, 0x7b, 0xdb, 0xd6, 0x28,
     0xe8, 0x86, 0x68, 0xc3, 0xc8, 0xd7, 0xe9, 0x7d,
     0x1d, 0x12, 0x53, 0xb6, 0xd4, 0xea, 0x6d, 0x44,
@@ -1855,13 +1868,13 @@ static unsigned char pub25519[] = {
 };
 
 /* from RFC9180 Appendix A.3.1 */
-static unsigned char ikmp256[] = {
+static const unsigned char ikmp256[] = {
     0x42, 0x70, 0xe5, 0x4f, 0xfd, 0x08, 0xd7, 0x9d,
     0x59, 0x28, 0x02, 0x0a, 0xf4, 0x68, 0x6d, 0x8f,
     0x6b, 0x7d, 0x35, 0xdb, 0xe4, 0x70, 0x26, 0x5f,
     0x1f, 0x5a, 0xa2, 0x28, 0x16, 0xce, 0x86, 0x0e
 };
-static unsigned char pubp256[] = {
+static const unsigned char pubp256[] = {
     0x04, 0xa9, 0x27, 0x19, 0xc6, 0x19, 0x5d, 0x50,
     0x85, 0x10, 0x4f, 0x46, 0x9a, 0x8b, 0x98, 0x14,
     0xd5, 0x83, 0x8f, 0xf7, 0x2b, 0x60, 0x50, 0x1e,
@@ -1879,13 +1892,13 @@ static unsigned char pubp256[] = {
  * CFRG list, see the mail archive:
  * https://mailarchive.ietf.org/arch/msg/cfrg/4zwl_y5YN6OU9oeWZOMHNOlOa2w/
  */
-static unsigned char ikmiter[] = {
+static const unsigned char ikmiter[] = {
     0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
     0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
     0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
     0x00, 0x00, 0x00, 0x03, 0x01, 0x38, 0xb5, 0xec
 };
-static unsigned char pubiter[] = {
+static const unsigned char pubiter[] = {
     0x04, 0x7d, 0x0c, 0x87, 0xff, 0xd5, 0xd1, 0x45,
     0x54, 0xa7, 0x51, 0xdf, 0xa3, 0x99, 0x26, 0xa9,
     0xe3, 0x0e, 0x7c, 0x3c, 0x65, 0x62, 0x4f, 0x4b,
@@ -1898,7 +1911,7 @@ static unsigned char pubiter[] = {
 };
 
 /* from RFC9180 Appendix A.6.1 */
-static unsigned char ikmp521[] = {
+static const unsigned char ikmp521[] = {
     0x7f, 0x06, 0xab, 0x82, 0x15, 0x10, 0x5f, 0xc4,
     0x6a, 0xce, 0xeb, 0x2e, 0x3d, 0xc5, 0x02, 0x8b,
     0x44, 0x36, 0x4f, 0x96, 0x04, 0x26, 0xeb, 0x0d,
@@ -1909,7 +1922,7 @@ static unsigned char ikmp521[] = {
     0x17, 0x77, 0x2a, 0xc9, 0x8d, 0x92, 0x39, 0xf7,
     0x09, 0x04
 };
-static unsigned char pubp521[] = {
+static const unsigned char pubp521[] = {
     0x04, 0x01, 0x38, 0xb3, 0x85, 0xca, 0x16, 0xbb,
     0x0d, 0x5f, 0xa0, 0xc0, 0x66, 0x5f, 0xbb, 0xd7,
     0xe6, 0x9e, 0x3e, 0xe2, 0x9f, 0x63, 0x99, 0x1d,
@@ -2007,8 +2020,8 @@ static int test_hpke_random_suites(void)
  * that were input.
  */
 static int test_hpke_one_ikm_gen(uint16_t kem_id,
-                                 unsigned char *ikm, size_t ikmlen,
-                                 unsigned char *pub, size_t publen)
+                                 const unsigned char *ikm, size_t ikmlen,
+                                 const unsigned char *pub, size_t publen)
 {
     OSSL_HPKE_SUITE hpke_suite = OSSL_HPKE_SUITE_DEFAULT;
     unsigned char lpub[OSSL_HPKE_TSTSIZE];

@@ -790,7 +790,7 @@ err:
  */
 static int hpke_kem_id_nist_curve(uint16_t kem_id)
 {
-    const OSSL_HPKE_KEM_INFO *kem_info = NULL;
+    const OSSL_HPKE_KEM_INFO *kem_info;
 
     kem_info = ossl_HPKE_KEM_INFO_find_id(kem_id);
     return kem_info != NULL && kem_info->groupname != NULL;
@@ -1526,7 +1526,7 @@ err:
  * @param ctx is the OSSL_HPKE_CTX
  * @param enc is a buffer for the sender's ephemeral public value
  * @param enclen is the length of enc
- * @param priv is the recipeient's private value
+ * @param priv is the recipient's private value
  * @return 1 for success, 0 for error
  */
 static int hpke_decap(OSSL_HPKE_CTX *ctx,
@@ -1851,6 +1851,7 @@ OSSL_HPKE_CTX *OSSL_HPKE_CTX_new(int mode, OSSL_HPKE_SUITE suite,
         ctx->propq = OPENSSL_strdup(propq);
         if (ctx->propq == NULL) {
             OSSL_HPKE_CTX_free(ctx);
+            OPENSSL_free(ctx);
             return NULL;
         }
     }
@@ -2193,9 +2194,8 @@ int OSSL_HPKE_open(OSSL_HPKE_CTX *ctx,
         ERR_raise(ERR_LIB_CRYPTO, ERR_R_INTERNAL_ERROR);
         OPENSSL_cleanse(seqbuf, sizeof(seqbuf));
         return 0;
-    } else {
-        ctx->seq++;
-    }
+    } 
+    ctx->seq++;
 #if defined(SUPERVERBOSE)
     hpke_pbuf(stdout, "\tctx->key", ctx->key, ctx->keylen);
     hpke_pbuf(stdout, "\tctx->nonce", ctx->nonce, ctx->noncelen);
@@ -2361,7 +2361,7 @@ int OSSL_HPKE_suite_check(OSSL_HPKE_SUITE suite)
 }
 
 int OSSL_HPKE_get_grease_value(OSSL_LIB_CTX *libctx, const char *propq,
-                               OSSL_HPKE_SUITE *suite_in,
+                               const OSSL_HPKE_SUITE *suite_in,
                                OSSL_HPKE_SUITE *suite,
                                unsigned char *enc,
                                size_t *enclen,

@@ -10,8 +10,8 @@
 /* just a thing to force a change */
 #endif
 
-#ifndef OSSL_CRYPTO_HPKE_H
-# define OSSL_CRYPTO_HPKE_H
+#ifndef OSSL_INTERNAL_HPKE_UTIL_H
+# define OSSL_INTERNAL_HPKE_UTIL_H
 # pragma once
 
 /* Constants from RFC 9180 Section 7.1 and 7.3 */
