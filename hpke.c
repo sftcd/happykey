@@ -1850,7 +1850,6 @@ OSSL_HPKE_CTX *OSSL_HPKE_CTX_new(int mode, OSSL_HPKE_SUITE suite,
     if (propq != NULL) {
         ctx->propq = OPENSSL_strdup(propq);
         if (ctx->propq == NULL) {
-            OSSL_HPKE_CTX_free(ctx);
             OPENSSL_free(ctx);
             return NULL;
         }

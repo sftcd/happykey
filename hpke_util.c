@@ -104,7 +104,7 @@ static const OSSL_HPKE_KDF_INFO hpke_kdf_tab[] = {
  * this file and shouln't need modification so long as the table
  * sizes (i.e. allow exactly 4 synonyms) don't change.
  */
-static synonymttab_t kemstrtab[] = {
+static const synonymttab_t kemstrtab[] = {
     {OSSL_HPKE_KEM_ID_P256,
      {OSSL_HPKE_KEMSTR_P256, "0x10", "0x10", "16" }},
     {OSSL_HPKE_KEM_ID_P384,
@@ -116,7 +116,7 @@ static synonymttab_t kemstrtab[] = {
     {OSSL_HPKE_KEM_ID_X448,
      {OSSL_HPKE_KEMSTR_X448, "0x21", "0x21", "33" }}
 };
-static synonymttab_t kdfstrtab[] = {
+static const synonymttab_t kdfstrtab[] = {
     {OSSL_HPKE_KDF_ID_HKDF_SHA256,
      {OSSL_HPKE_KDFSTR_256, "0x1", "0x01", "1"}},
     {OSSL_HPKE_KDF_ID_HKDF_SHA384,
@@ -124,7 +124,7 @@ static synonymttab_t kdfstrtab[] = {
     {OSSL_HPKE_KDF_ID_HKDF_SHA512,
      {OSSL_HPKE_KDFSTR_512, "0x3", "0x03", "3"}}
 };
-static synonymttab_t aeadstrtab[] = {
+static const synonymttab_t aeadstrtab[] = {
     {OSSL_HPKE_AEAD_ID_AES_GCM_128,
      {OSSL_HPKE_AEADSTR_AES128GCM, "0x1", "0x01", "1"}},
     {OSSL_HPKE_AEAD_ID_AES_GCM_256,
@@ -429,7 +429,7 @@ int ossl_hpke_str2suite(const char *suitestr, OSSL_HPKE_SUITE *suite)
     char *instrcp = NULL;
     size_t inplen = 0;
     int labels = 0;
-    synonymttab_t *synp = NULL;
+    const synonymttab_t *synp = NULL;
     uint16_t *targ = NULL;
     size_t i, j;
     size_t outsize = 0;

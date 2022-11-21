@@ -2176,6 +2176,7 @@ int main(int argc, char **argv)
     return apires;
 }
 #else
+
 typedef enum OPTION_choice {
     OPT_ERR = -1,
     OPT_EOF = 0,
