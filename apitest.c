@@ -1404,8 +1404,8 @@ static int test_hpke_suite_strs(void)
                suitesize, ptr_suitesize);
 #else
     if (verbose) {
-        TEST_note("Size of OSSL_HPKE_SUITE is %lu, size of ptr is %lu",
-                  suitesize, ptr_suitesize);
+        TEST_note("Size of OSSL_HPKE_SUITE is %d, size of ptr is %d",
+                  (int) suitesize, (int) ptr_suitesize);
     }
 #endif
 
