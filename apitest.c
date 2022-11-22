@@ -954,8 +954,22 @@ static char *bogus_suite_strs[] = {
     "bogus,33,3,1",
     "bogus,bogus",
     "bogus",
-    /* and one in the wrong order */
-    "aes-256-gcm,hkdf-sha512,x25519"
+    /* in reverse order */
+    "aes-256-gcm,hkdf-sha512,x25519",
+    /* good value followed by extra stuff */
+    "0x10,0x01,0x02,",
+    "0x10,0x01,0x02,,,",
+    "0x10,0x01,0x01,0x02",
+    "0x10,0x01,0x01,blah",
+    "0x10,0x01,0x01 0x02",
+    /* too few but good tokens */
+    "0x10,0x01",
+    "0x10",
+    /* empty things */
+    NULL,
+    "",
+    ",",
+    ",,"
 };
 
 /**
@@ -1240,8 +1254,8 @@ static int test_hpke_modes_suites(void)
                         res = (overallresult == 1 ? "worked" : "failed");
                         TEST_note("HPKE %s for mode: %s/0x%02x, "\
                                   "kem: %s/0x%02x, kdf: %s/0x%02x, "\
-                                  "aead: %s/0x%02x",
-                                  res, mode_str_list[mind], (int) mind,
+                                  "aead: %s/0x%02x", res,
+                                  mode_str_list[mind], (int) mind,
                                   kem_str_list[kemind], kem_id,
                                   kdf_str_list[kdfind], kdf_id,
                                   aead_str_list[aeadind], aead_id);
@@ -1364,6 +1378,10 @@ static int test_hpke_suite_strs(void)
 #ifdef HAPPYKEY
                     if (verbose)
                         printf("Unexpected str2suite fail for %s\n", sstr);
+#else
+                    if (verbose)
+                        TEST_note("Unexpected str2suite fail for :%s",
+                                  bogus_suite_strs[sind]);
 #endif
                     overallresult = 0;
                 }
@@ -1377,6 +1395,15 @@ static int test_hpke_suite_strs(void)
     for (sind = 0; sind != OSSL_NELEM(bogus_suite_strs); sind++) {
         if (TEST_false(OSSL_HPKE_str2suite(bogus_suite_strs[sind],
                                            &stirred)) != 1) {
+#ifdef HAPPYKEY
+            if (verbose)
+                printf("OSSL_HPKE_str2suite didn't fail for bogus[%d]:%s\n",
+                        sind, bogus_suite_strs[sind]);
+#else
+            if (verbose)
+                TEST_note("OSSL_HPKE_str2suite didn't fail for bogus[%d]:%s",
+                          sind, bogus_suite_strs[sind]);
+#endif
             overallresult = 0;
         }
     }
@@ -1389,18 +1416,6 @@ static int test_hpke_suite_strs(void)
         overallresult = 0;
     memset(giant, 'A', sizeof(giant) - 1);
     giant[sizeof(giant) - 1] = '\0';
-    if (!TEST_false(OSSL_HPKE_str2suite(giant, &stirred)))
-        overallresult = 0;
-    /*
-     * provide too many elements, preceeded by a good value
-     */
-    strcpy(giant, "0x10,0x01,0x01,0x02,0x03");
-    if (!TEST_false(OSSL_HPKE_str2suite(giant, &stirred)))
-        overallresult = 0;
-    strcpy(giant, "0x10,0x01,0x01,blah");
-    if (!TEST_false(OSSL_HPKE_str2suite(giant, &stirred)))
-        overallresult = 0;
-    strcpy(giant, "0x10,0x01,0x01-blah");
     if (!TEST_false(OSSL_HPKE_str2suite(giant, &stirred)))
         overallresult = 0;
 

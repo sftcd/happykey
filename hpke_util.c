@@ -321,7 +321,7 @@ int ossl_hpke_labeled_extract(EVP_KDF_CTX *kctx,
     protocol_labellen = strlen(protocol_label);
     labellen = strlen(label);
     labeled_ikmlen = label_hpkev1len + protocol_labellen
-                     + suiteidlen + labellen + ikmlen;
+        + suiteidlen + labellen + ikmlen;
     labeled_ikm = OPENSSL_malloc(labeled_ikmlen);
     if (labeled_ikm == NULL)
         return 0;
@@ -371,7 +371,7 @@ int ossl_hpke_labeled_expand(EVP_KDF_CTX *kctx,
     protocol_labellen = strlen(protocol_label);
     labellen = strlen(label);
     labeled_infolen = 2 + okmlen + prklen + label_hpkev1len
-                      + protocol_labellen + suiteidlen + labellen + infolen;
+        + protocol_labellen + suiteidlen + labellen + infolen;
     labeled_info = OPENSSL_malloc(labeled_infolen);
     if (labeled_info == NULL)
         return 0;
@@ -543,6 +543,13 @@ int ossl_hpke_str2suite(const char *suitestr, OSSL_HPKE_SUITE *suite)
     inplen = OPENSSL_strnlen(suitestr, OSSL_HPKE_MAX_SUITESTR);
     if (inplen >= OSSL_HPKE_MAX_SUITESTR)
         return 0;
+    /*
+     * we don't want a delimiter at the end of the string
+     * strtok() doesn't care about that, so we should
+     */
+    if (suitestr[inplen - 1] == ',')
+        return 0;
+
     /* Duplicate `suitestr` to allow its parsing  */
     instrcp = OPENSSL_memdup(suitestr, inplen + 1);
     if (instrcp == NULL)
@@ -571,7 +578,7 @@ int ossl_hpke_str2suite(const char *suitestr, OSSL_HPKE_SUITE *suite)
         st = strtok(NULL, ",");
         ++labels;
     }
-    if (st != NULL)
+    if (st != NULL || labels != 3)
         goto fail;
     suite->kem_id = kem;
     suite->kdf_id = kdf;
