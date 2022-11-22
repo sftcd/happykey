@@ -1391,6 +1391,18 @@ static int test_hpke_suite_strs(void)
     giant[sizeof(giant) - 1] = '\0';
     if (!TEST_false(OSSL_HPKE_str2suite(giant, &stirred)))
         overallresult = 0;
+    /*
+     * provide too many elements, preceeded by a good value
+     */
+    strcpy(giant, "0x10,0x01,0x01,0x02,0x03");
+    if (!TEST_false(OSSL_HPKE_str2suite(giant, &stirred)))
+        overallresult = 0;
+    strcpy(giant, "0x10,0x01,0x01,blah");
+    if (!TEST_false(OSSL_HPKE_str2suite(giant, &stirred)))
+        overallresult = 0;
+    strcpy(giant, "0x10,0x01,0x01-blah");
+    if (!TEST_false(OSSL_HPKE_str2suite(giant, &stirred)))
+        overallresult = 0;
 
     /* we'll check the size of a suite just to see what we get */
     suitesize = sizeof(stirred);

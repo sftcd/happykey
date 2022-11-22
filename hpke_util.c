@@ -24,6 +24,17 @@
 #include "internal/packet.h"
 #endif
 
+/*
+ * table with identifier and synonym strings
+ * right now, there are 4 synonyms for each - a name, a hex string
+ * a hex string with a leading zero and a decimal string - more
+ * could be added but that seems like enough
+ */
+typedef struct {
+    uint16_t id;
+    char *synonyms[4];
+} synonymttab_t;
+
 /* max length of string we'll try map to a suite */
 #define OSSL_HPKE_MAX_SUITESTR 38
 
@@ -138,10 +149,9 @@ static const synonymttab_t aeadstrtab[] = {
 /* Return an object containing KEM constants associated with a EC curve name */
 const OSSL_HPKE_KEM_INFO *ossl_HPKE_KEM_INFO_find_curve(const char *curve)
 {
-    int i;
-    int sz = OSSL_NELEM(hpke_kem_tab);
+    int i, sz = OSSL_NELEM(hpke_kem_tab);
 
-    for (i = 0; i != sz; ++i) {
+    for (i = 0; i < sz; ++i) {
         const char *group = hpke_kem_tab[i].groupname;
 
         if (group == NULL)
@@ -416,6 +426,8 @@ EVP_KDF_CTX *ossl_kdf_ctx_create(const char *kdfname, const char *mdname,
     return kctx;
 }
 
+#ifdef HAPPYKEY
+#if 0
 /*
  * @brief map a string to a HPKE suite based on synonym tables
  * @param str is the string value
@@ -479,8 +491,94 @@ int ossl_hpke_str2suite(const char *suitestr, OSSL_HPKE_SUITE *suite)
         st = strtok(NULL, ",");
     }
     OPENSSL_free(instrcp);
+    /* if given a good value followed by more stuff, we fail */
+    if (st != NULL)
+        return 0;
     suite->kem_id = kem;
     suite->kdf_id = kdf;
     suite->aead_id = aead;
     return 1;
+}
+#endif
+#endif
+/*
+ * @brief look for a label into the synonym tables, and return its id
+ * @param st is the string value
+ * @param synp is the synonyms labels array
+ * @param outsize is the previous array size
+ * @return 0 when not found, else the matching item id.
+ */
+static uint16_t synonyms_lookup(const char *st, const synonymttab_t *synp,
+                                size_t outsize)
+{
+    size_t i, j;
+
+    for (i = 0; i < outsize; ++i) {
+        for (j = 0; j < OSSL_NELEM(synp[i].synonyms); ++j) {
+            if (OPENSSL_strcasecmp(st, synp[i].synonyms[j]) == 0)
+                return synp[i].id;
+        }
+    }
+    return 0;
+}
+
+/*
+ * @brief map a string to a HPKE suite based on synonym tables
+ * @param str is the string value
+ * @param suite is the resulting suite
+ * @return 1 for success, otherwise failure
+ */
+int ossl_hpke_str2suite(const char *suitestr, OSSL_HPKE_SUITE *suite)
+{
+    uint16_t kem = 0, kdf = 0, aead = 0;
+    char *st, *instrcp;
+    size_t inplen;
+    int labels = 0, result = 0;
+
+    if (suitestr == NULL || suitestr[0] == 0x00 || suite == NULL) {
+        ERR_raise(ERR_LIB_CRYPTO, ERR_R_PASSED_NULL_PARAMETER);
+        return 0;
+    }
+
+    inplen = OPENSSL_strnlen(suitestr, OSSL_HPKE_MAX_SUITESTR);
+    if (inplen >= OSSL_HPKE_MAX_SUITESTR)
+        return 0;
+    /* Duplicate `suitestr` to allow its parsing  */
+    instrcp = OPENSSL_memdup(suitestr, inplen + 1);
+    if (instrcp == NULL)
+        goto fail;
+
+    /* See if it contains a mix of our strings and numbers */
+    st = strtok(instrcp, ",");
+    if (st == NULL)
+        goto fail;
+
+    while (st != NULL && labels < 3) {
+        /* check if string is known or number and if so handle appropriately */
+        if (labels == 0
+            && (kem = synonyms_lookup(st, kemstrtab,
+                                      OSSL_NELEM(kemstrtab))) == 0)
+            goto fail;
+        else if (labels == 1
+                 && (kdf = synonyms_lookup(st, kdfstrtab,
+                                           OSSL_NELEM(kdfstrtab))) == 0)
+            goto fail;
+        else if (labels == 2
+                 && (aead = synonyms_lookup(st, aeadstrtab,
+                                            OSSL_NELEM(aeadstrtab))) == 0)
+            goto fail;
+
+        st = strtok(NULL, ",");
+        ++labels;
+    }
+    if (st != NULL)
+        goto fail;
+    suite->kem_id = kem;
+    suite->kdf_id = kdf;
+    suite->aead_id = aead;
+    result = 1;
+
+fail:
+    OPENSSL_free(instrcp);
+    return result;
 }

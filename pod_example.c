@@ -3,13 +3,13 @@
 #include <openssl/hpke.h>
 #include <openssl/evp.h>
 
-/* 
- * this is big enough for this example, real code would need different 
+/*
+ * this is big enough for this example, real code would need different
  * handling
  */
 #define LBUFSIZE 48
 
-/* we'll do a round-trip, generating a key, encrypting and decrypting */
+/* Do a round-trip, generating a key, encrypting and decrypting */
 int main(int argc, char **argv)
 {
     int ok = 0;
@@ -25,7 +25,6 @@ int main(int argc, char **argv)
     size_t ctlen = sizeof(ct);
     unsigned char clear[LBUFSIZE];
     size_t clearlen = sizeof(clear);
-    
     const unsigned char *pt = "a message not in a bottle";
     size_t ptlen = strlen((char *)pt);
     const unsigned char *info = "Some info";
@@ -37,8 +36,8 @@ int main(int argc, char **argv)
      * Generate receiver's key pair.
      * The receiver gives this public key to the sender.
      */
-    if (OSSL_HPKE_keygen(NULL, NULL, hpke_suite, NULL, 0,
-                         pub, &publen, &priv) != 1)
+    if (OSSL_HPKE_keygen(hpke_suite, pub, &publen, &priv,
+                         NULL, 0, NULL, NULL) != 1)
         goto err;
 
     /* sender's actions - encrypt data using the receivers public key */
@@ -52,7 +51,7 @@ int main(int argc, char **argv)
     /* receiver's actions - decrypt data using the recievers private key */
     if ((rctx = OSSL_HPKE_CTX_new(hpke_mode, hpke_suite, NULL, NULL)) == NULL)
         goto err;
-    if (OSSL_HPKE_decap(rctx, enc, enclen, priv, info, infolen) != 1) 
+    if (OSSL_HPKE_decap(rctx, enc, enclen, priv, info, infolen) != 1)
         goto err;
     if (OSSL_HPKE_open(rctx, clear, &clearlen, aad, aadlen, ct, ctlen) != 1)
         goto err;
