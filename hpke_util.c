@@ -510,15 +510,15 @@ int ossl_hpke_str2suite(const char *suitestr, OSSL_HPKE_SUITE *suite)
  * @brief look for a label into the synonym tables, and return its id
  * @param st is the string value
  * @param synp is the synonyms labels array
- * @param outsize is the previous array size
+ * @param arrsize is the previous array size
  * @return 0 when not found, else the matching item id.
  */
-static uint16_t synonyms_lookup(const char *st, const synonymttab_t *synp,
-                                size_t outsize)
+static uint16_t synonyms_name2id(const char *st, const synonymttab_t *synp,
+                                size_t arrsize)
 {
     size_t i, j;
 
-    for (i = 0; i < outsize; ++i) {
+    for (i = 0; i < arrsize; ++i) {
         for (j = 0; j < OSSL_NELEM(synp[i].synonyms); ++j) {
             if (OPENSSL_strcasecmp(st, synp[i].synonyms[j]) == 0)
                 return synp[i].id;
@@ -536,7 +536,7 @@ static uint16_t synonyms_lookup(const char *st, const synonymttab_t *synp,
 int ossl_hpke_str2suite(const char *suitestr, OSSL_HPKE_SUITE *suite)
 {
     uint16_t kem = 0, kdf = 0, aead = 0;
-    char *st = NULL, *instrcp = NULL, *rval = NULL;
+    char *st = NULL, *instrcp = NULL;
     size_t inplen;
     int labels = 0, result = 0;
     int delim_count = 0;
@@ -557,7 +557,7 @@ int ossl_hpke_str2suite(const char *suitestr, OSSL_HPKE_SUITE *suite)
         return 0;
     /*
      * we don't want a delimiter at the end of the string;
-     * strtok_r() doesn't care about that, so we should
+     * strtok() doesn't care about that, so we should
      */
     if (suitestr[inplen - 1] == OSSL_HPKE_STR_DELIMCHAR)
         return 0;
@@ -575,26 +575,26 @@ int ossl_hpke_str2suite(const char *suitestr, OSSL_HPKE_SUITE *suite)
         goto fail;
 
     /* See if it contains a mix of our strings and numbers */
-    st = strtok_r(instrcp, OSSL_HPKE_STR_DELIMSTR, &rval);
+    st = strtok(instrcp, OSSL_HPKE_STR_DELIMSTR);
     if (st == NULL)
         goto fail;
 
     while (st != NULL && labels < 3) {
         /* check if string is known or number and if so handle appropriately */
         if (labels == 0
-            && (kem = synonyms_lookup(st, kemstrtab,
+            && (kem = synonyms_name2id(st, kemstrtab,
                                       OSSL_NELEM(kemstrtab))) == 0)
             goto fail;
         else if (labels == 1
-                 && (kdf = synonyms_lookup(st, kdfstrtab,
+                 && (kdf = synonyms_name2id(st, kdfstrtab,
                                            OSSL_NELEM(kdfstrtab))) == 0)
             goto fail;
         else if (labels == 2
-                 && (aead = synonyms_lookup(st, aeadstrtab,
+                 && (aead = synonyms_name2id(st, aeadstrtab,
                                             OSSL_NELEM(aeadstrtab))) == 0)
             goto fail;
 
-        st = strtok_r(NULL, OSSL_HPKE_STR_DELIMSTR, &rval);
+        st = strtok(NULL, OSSL_HPKE_STR_DELIMSTR);
         ++labels;
     }
     if (st != NULL || labels != 3)
