@@ -30,10 +30,14 @@
  */
 #define OSSL_HPKE_STR_DELIMCHAR ','
 
+#ifdef HAPPYKEY
+#if 0
 #if !defined(OPENSSL_SYS_WINDOWS)
 # define strtok_here strtok_r
 #else
 # define strtok_here strtok_s
+#endif
+#endif
 #endif
 /*
  * table with identifier and synonym strings
@@ -533,6 +537,8 @@ static uint16_t synonyms_name2id(const char *st, const synonymttab_t *synp,
     return 0;
 }
 
+#ifdef HAPPYKEY
+#if 0
 /*
  * @brief map a string to a HPKE suite based on synonym tables
  * @param str is the string value
@@ -542,7 +548,13 @@ static uint16_t synonyms_name2id(const char *st, const synonymttab_t *synp,
 int ossl_hpke_str2suite(const char *suitestr, OSSL_HPKE_SUITE *suite)
 {
     uint16_t kem = 0, kdf = 0, aead = 0;
-    char *st = NULL, *instrcp = NULL, *st_state = NULL;
+    char *st = NULL, *instrcp = NULL;
+#define NOSTRTOK
+#ifndef NOSTRTOK
+    char *st_state = NULL;
+#else
+    char *inpend = NULL;
+#endif
     size_t inplen;
     int labels = 0, result = 0;
     int delim_count = 0;
@@ -584,11 +596,24 @@ int ossl_hpke_str2suite(const char *suitestr, OSSL_HPKE_SUITE *suite)
         goto fail;
 
     /* See if it contains a mix of our strings and numbers */
+#ifdef NOSTRTOK
+    st = instrcp;
+    inpend = instrcp + inplen;
+#else
     st = strtok_here(instrcp, OSSL_HPKE_STR_DELIMSTR, &st_state);
     if (st == NULL)
         goto fail;
+#endif
 
     while (st != NULL && labels < 3) {
+        char *cp = st;
+
+#ifdef NOSTRTOK
+        while (*cp != '\0' && *cp != OSSL_HPKE_STR_DELIMCHAR)
+            cp++;
+        *cp = '\0';
+#endif
+
         /* check if string is known or number and if so handle appropriately */
         if (labels == 0
             && (kem = synonyms_name2id(st, kemstrtab,
@@ -603,7 +628,101 @@ int ossl_hpke_str2suite(const char *suitestr, OSSL_HPKE_SUITE *suite)
                                              OSSL_NELEM(aeadstrtab))) == 0)
             goto fail;
 
+#ifdef NOSTRTOK
+        if (cp == inpend)
+            st = NULL;
+        else
+            st = cp + 1;
+#else
         st = strtok_here(NULL, OSSL_HPKE_STR_DELIMSTR, &st_state);
+#endif
+        ++labels;
+    }
+    if (st != NULL || labels != 3)
+        goto fail;
+    suite->kem_id = kem;
+    suite->kdf_id = kdf;
+    suite->aead_id = aead;
+    result = 1;
+
+fail:
+    OPENSSL_free(instrcp);
+    return result;
+}
+#endif
+#endif
+/*
+ * @brief map a string to a HPKE suite based on synonym tables
+ * @param str is the string value
+ * @param suite is the resulting suite
+ * @return 1 for success, otherwise failure
+ */
+int ossl_hpke_str2suite(const char *suitestr, OSSL_HPKE_SUITE *suite)
+{
+    uint16_t kem = 0, kdf = 0, aead = 0;
+    char *st = NULL, *instrcp = NULL, *inpend = NULL;
+    size_t inplen;
+    int labels = 0, result = 0;
+    int delim_count = 0;
+
+    if (suitestr == NULL || suitestr[0] == 0x00 || suite == NULL) {
+        ERR_raise(ERR_LIB_CRYPTO, ERR_R_PASSED_NULL_PARAMETER);
+        return 0;
+    }
+    inplen = OPENSSL_strnlen(suitestr, OSSL_HPKE_MAX_SUITESTR);
+    if (inplen >= OSSL_HPKE_MAX_SUITESTR) {
+        ERR_raise(ERR_LIB_CRYPTO, ERR_R_PASSED_INVALID_ARGUMENT);
+        return 0;
+    }
+
+    /*
+     * we don't want a delimiter at the end of the string;
+     * strtok_r/s() doesn't care about that, so we should
+     */
+    if (suitestr[inplen - 1] == OSSL_HPKE_STR_DELIMCHAR)
+        return 0;
+    /* We want exactly two delimiters in the input string */
+    for (st = (char *)suitestr; *st != '\0'; st++) {
+        if (*st == OSSL_HPKE_STR_DELIMCHAR)
+            delim_count++;
+    }
+    if (delim_count != 2)
+        return 0;
+
+    /* Duplicate `suitestr` to allow its parsing  */
+    instrcp = OPENSSL_memdup(suitestr, inplen + 1);
+    if (instrcp == NULL)
+        goto fail;
+
+    /* See if it contains a mix of our strings and numbers */
+    st = instrcp;
+    inpend = instrcp + inplen;
+
+    while (st != NULL && labels < 3) {
+        char *cp = st;
+
+        while (*cp != '\0' && *cp != OSSL_HPKE_STR_DELIMCHAR)
+            cp++;
+        *cp = '\0';
+
+        /* check if string is known or number and if so handle appropriately */
+        if (labels == 0
+            && (kem = synonyms_name2id(st, kemstrtab,
+                                       OSSL_NELEM(kemstrtab))) == 0)
+            goto fail;
+        else if (labels == 1
+                 && (kdf = synonyms_name2id(st, kdfstrtab,
+                                            OSSL_NELEM(kdfstrtab))) == 0)
+            goto fail;
+        else if (labels == 2
+                 && (aead = synonyms_name2id(st, aeadstrtab,
+                                             OSSL_NELEM(aeadstrtab))) == 0)
+            goto fail;
+
+        if (cp == inpend)
+            st = NULL;
+        else
+            st = cp + 1;
         ++labels;
     }
     if (st != NULL || labels != 3)
