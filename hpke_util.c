@@ -576,10 +576,7 @@ int ossl_hpke_str2suite(const char *suitestr, OSSL_HPKE_SUITE *suite)
         return 0;
     }
 
-    /*
-     * we don't want a delimiter at the end of the string;
-     * strtok_r/s() doesn't care about that, so we should
-     */
+    /* we don't want a delimiter at the end of the string */
     if (suitestr[inplen - 1] == OSSL_HPKE_STR_DELIMCHAR)
         return 0;
     /* We want exactly two delimiters in the input string */
