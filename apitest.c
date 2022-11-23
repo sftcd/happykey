@@ -927,27 +927,27 @@ static uint16_t hpke_aead_list[] = {
  * Subsequent entries are only used for tests of
  * OSSL_HPKE_str2suite()
  */
-static char *mode_str_list[] = {
+static const char *mode_str_list[] = {
     "base", "psk", "auth", "pskauth"
 };
-static char *kem_str_list[] = {
+static const char *kem_str_list[] = {
     "P-256", "P-384", "P-521", "x25519", "x448",
     "0x10", "0x11", "0x12", "0x20", "0x21",
     "16", "17", "18", "32", "33"
 };
-static char *kdf_str_list[] = {
+static const char *kdf_str_list[] = {
     "hkdf-sha256", "hkdf-sha384", "hkdf-sha512",
     "0x1", "0x01", "0x2", "0x02", "0x3", "0x03",
     "1", "2", "3"
 };
-static char *aead_str_list[] = {
+static const char *aead_str_list[] = {
     "aes-128-gcm", "aes-256-gcm", "chacha20-poly1305", "exporter",
     "0x1", "0x01", "0x2", "0x02", "0x3", "0x03",
     "1", "2", "3",
     "0xff", "255"
 };
 /* table of bogus strings that better not work */
-static char *bogus_suite_strs[] = {
+static const char *bogus_suite_strs[] = {
     "3,33,3",
     "bogus,bogus,bogus",
     "bogus,33,3,1,bogus",
@@ -1215,19 +1215,11 @@ static int test_hpke_modes_suites(void)
                         /* check a borked p256 key */
                         if (hpke_suite.kem_id == OSSL_HPKE_KEM_ID_P256) {
                             /* set to fail decode of authpub this time */
-                            authpub[0] = 0x05;
-                            if (!TEST_true(OSSL_HPKE_CTX_set1_authpub(rctx,
-                                                                      authpub,
-                                                                      authpublen
-                                                                      )))
+                            if (!TEST_false(OSSL_HPKE_CTX_set1_authpub(rctx,
+                                                                       authpub,
+                                                                       10
+                                                                       )))
                                 overallresult = 0;
-                            if (!TEST_false(OSSL_HPKE_decap(rctx, senderpub,
-                                                            senderpublen,
-                                                            privp,
-                                                            infop, infolen)))
-                                overallresult = 0;
-                            /* fix authpub for real go at it */
-                            authpub[0] = 0x04;
                         }
                         if (!TEST_true(OSSL_HPKE_CTX_set1_authpub(rctx,
                                                                   authpubp,
@@ -1992,9 +1984,9 @@ static int test_hpke_random_suites(void)
     OSSL_HPKE_SUITE suite = OSSL_HPKE_SUITE_DEFAULT;
     OSSL_HPKE_SUITE suite2 = { 0xff01, 0xff02, 0xff03 };
     unsigned char enc[200];
-    size_t enclen = 200;
+    size_t enclen = sizeof(enc);
     unsigned char ct[500];
-    size_t ctlen = 500;
+    size_t ctlen = sizeof(ct);
 
     /* test with NULL/0 inputs */
     if (!TEST_false(OSSL_HPKE_get_grease_value(testctx, NULL, NULL, NULL,
@@ -2006,42 +1998,44 @@ static int test_hpke_random_suites(void)
                                                ct, ctlen)))
         return 0;
 
-    enclen = 200; /* reset, 'cause get_grease() will have set for suite2  */
+    enclen = sizeof(enc); /* reset, 'cause get_grease() will have set */
     /* test with a should-be-good suite */
     if (!TEST_true(OSSL_HPKE_get_grease_value(testctx, NULL, &def_suite,
                                               &suite2, enc, &enclen,
                                               ct, ctlen)))
         return 0;
     /* no suggested suite */
-    enclen = 200; /* reset, 'cause get_grease() will have set for suite2  */
+    enclen = sizeof(enc); /* reset, 'cause get_grease() will have set */
     if (!TEST_true(OSSL_HPKE_get_grease_value(testctx, NULL, NULL, &suite2,
                                               enc, &enclen, ct, ctlen)))
         return 0;
     /* suggested suite with P-521, just to be sure we hit long values */
-    enclen = 200; /* reset, 'cause get_grease() will have set for suite2  */
+    enclen = sizeof(enc); /* reset, 'cause get_grease() will have set */
     suite.kem_id = OSSL_HPKE_KEM_ID_P521;
     if (!TEST_true(OSSL_HPKE_get_grease_value(testctx, NULL, &suite, &suite2,
                                               enc, &enclen, ct, ctlen)))
         return 0;
-    enclen = 200;
+    enclen = sizeof(enc);
     ctlen = 2; /* too-short cttext (can't fit an aead tag) */
     if (!TEST_false(OSSL_HPKE_get_grease_value(testctx, NULL, NULL, &suite2,
                                                enc, &enclen, ct, ctlen)))
         return 0;
-    ctlen = 500;
-    enclen = 200;
+
+    ctlen = sizeof(ct);
+    enclen = sizeof(enc);
+
     suite.kem_id = OSSL_HPKE_KEM_ID_X25519; /* back to default */
     suite.aead_id = 0x1234; /* bad aead */
     if (!TEST_false(OSSL_HPKE_get_grease_value(testctx, NULL, &suite, &suite2,
                                                enc, &enclen, ct, ctlen)))
         return 0;
-    enclen = 200;
+    enclen = sizeof(enc);
     suite.aead_id = def_suite.aead_id; /* good aead */
     suite.kdf_id = 0x3451; /* bad kdf */
     if (!TEST_false(OSSL_HPKE_get_grease_value(testctx, NULL, &suite, &suite2,
                                                enc, &enclen, ct, ctlen)))
         return 0;
-    enclen = 200;
+    enclen = sizeof(enc);
     suite.kdf_id = def_suite.kdf_id; /* good kdf */
     suite.kem_id = 0x4517; /* bad kem */
     if (!TEST_false(OSSL_HPKE_get_grease_value(testctx, NULL, &suite, &suite2,
@@ -2084,6 +2078,9 @@ static int test_hpke_one_ikm_gen(uint16_t kem_id,
     return 1;
 }
 
+/*
+ * @brief test some uses of IKM produce the expected public keys
+ */
 static int test_hpke_ikms(void)
 {
     int res = 1;
@@ -2113,6 +2110,83 @@ static int test_hpke_ikms(void)
         return res;
 
     return res;
+}
+
+/*
+ * Test that use of a compressed format auth public key works
+ * We'll do a typical round-trip for auth mode but provide the
+ * auth public key in compressed form. That should work.
+ */
+static int test_hpke_compressed()
+{
+    int erv = 0;
+    EVP_PKEY *privp = NULL;
+    unsigned char pub[OSSL_HPKE_TSTSIZE];
+    size_t publen = sizeof(pub);
+    EVP_PKEY *authpriv = NULL;
+    unsigned char authpub[OSSL_HPKE_TSTSIZE];
+    size_t authpublen = sizeof(authpub);
+    int hpke_mode = OSSL_HPKE_MODE_AUTH;
+    OSSL_HPKE_SUITE hpke_suite = OSSL_HPKE_SUITE_DEFAULT;
+    OSSL_HPKE_CTX *ctx = NULL;
+    OSSL_HPKE_CTX *rctx = NULL;
+    unsigned char plain[] = "quick brown fox";
+    size_t plainlen = sizeof(plain);
+    unsigned char enc[OSSL_HPKE_TSTSIZE];
+    size_t enclen = sizeof(enc);
+    unsigned char cipher[OSSL_HPKE_TSTSIZE];
+    size_t cipherlen = sizeof(cipher);
+    unsigned char clear[OSSL_HPKE_TSTSIZE];
+    size_t clearlen = sizeof(clear);
+
+    hpke_suite.kem_id = OSSL_HPKE_KEM_ID_P256;
+
+    /* generate auth key pair */
+    if (!TEST_true(OSSL_HPKE_keygen(hpke_suite, authpub, &authpublen, &authpriv,
+                                    NULL, 0, testctx, NULL)))
+        goto end;
+    /* now get the compressed form public key */
+    if (!TEST_true(EVP_PKEY_get_octet_string_param(authpriv,
+                                                   OSSL_PKEY_PARAM_PUB_KEY,
+                                                   authpub,
+                                                   sizeof(authpub),
+                                                   &authpublen)))
+        goto end;
+
+    /* sender side as usual */
+    if (!TEST_true(OSSL_HPKE_keygen(hpke_suite, pub, &publen, &privp,
+                                    NULL, 0, testctx, NULL)))
+        goto end;
+    if (!TEST_ptr(ctx = OSSL_HPKE_CTX_new(hpke_mode, hpke_suite,
+                                          testctx, NULL)))
+        goto end;
+    if (!TEST_true(OSSL_HPKE_CTX_set1_authpriv(ctx, authpriv)))
+        goto end;
+    if (!TEST_true(OSSL_HPKE_encap(ctx, enc, &enclen, pub, publen, NULL, 0)))
+        goto end;
+    if (!TEST_true(OSSL_HPKE_seal(ctx, cipher, &cipherlen, NULL, 0,
+                                  plain, plainlen)))
+        goto end;
+
+    /* receiver side providing compressed form of auth public */
+    if (!TEST_ptr(rctx = OSSL_HPKE_CTX_new(hpke_mode, hpke_suite,
+                                           testctx, NULL)))
+        goto end;
+    if (!TEST_true(OSSL_HPKE_CTX_set1_authpub(rctx, authpub, authpublen)))
+        goto end;
+    if (!TEST_true(OSSL_HPKE_decap(rctx, enc, enclen, privp, NULL, 0)))
+        goto end;
+    if (!TEST_true(OSSL_HPKE_open(rctx, clear, &clearlen, NULL, 0,
+                                  cipher, cipherlen)))
+        goto end;
+    erv = 1;
+
+end:
+    EVP_PKEY_free(privp);
+    EVP_PKEY_free(authpriv);
+    OSSL_HPKE_CTX_free(ctx);
+    OSSL_HPKE_CTX_free(rctx);
+    return erv;
 }
 #ifdef HAPPYKEY
 static int test_hpke(void)
@@ -2148,6 +2222,10 @@ static int test_hpke(void)
         return res;
 
     res = test_hpke_oddcalls();
+    if (res != 1)
+        return res;
+
+    res = test_hpke_compressed();
     if (res != 1)
         return res;
 
@@ -2268,6 +2346,7 @@ int setup_tests(void)
     ADD_TEST(test_hpke_ikms);
     ADD_TEST(test_hpke_random_suites);
     ADD_TEST(test_hpke_oddcalls);
+    ADD_TEST(test_hpke_compressed);
     return 1;
 }
 void cleanup_tests(void)
