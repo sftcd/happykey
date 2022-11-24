@@ -1149,12 +1149,6 @@ static int test_hpke_modes_suites(void)
                                                               pskp, psklen)))
                             overallresult = 0;
                     }
-                    if (hpke_mode == OSSL_HPKE_MODE_AUTH
-                        || hpke_mode == OSSL_HPKE_MODE_PSKAUTH) {
-                        if (!TEST_true(OSSL_HPKE_CTX_set1_authpriv(ctx,
-                                                                   authpriv)))
-                            overallresult = 0;
-                    }
                     if (COIN_IS_HEADS) {
                         RAND_bytes_ex(testctx,
                                       (unsigned char *) &startseq,
@@ -1172,6 +1166,12 @@ static int test_hpke_modes_suites(void)
                         if (verbose)
                             printf("setting seq = 0x%lx\n", startseq);
 #endif
+                    }
+                    if (hpke_mode == OSSL_HPKE_MODE_AUTH
+                        || hpke_mode == OSSL_HPKE_MODE_PSKAUTH) {
+                        if (!TEST_true(OSSL_HPKE_CTX_set1_authpriv(ctx,
+                                                                   authpriv)))
+                            overallresult = 0;
                     }
                     if (!TEST_true(OSSL_HPKE_encap(ctx, senderpub,
                                                    &senderpublen,
@@ -1694,6 +1694,7 @@ static int test_hpke_oddcalls(void)
         goto end;
     /* the sequence ought not have been incremented, so good to start over */
     plainlen = sizeof(plain);
+#ifndef OSSL_HPKE_LIMIT_NONCE_REUSE
     /* seq wrap around test */
     if (!TEST_true(OSSL_HPKE_CTX_set_seq(ctx, -1)))
         goto end;
@@ -1703,6 +1704,7 @@ static int test_hpke_oddcalls(void)
     /* reset seq */
     if (!TEST_true(OSSL_HPKE_CTX_set_seq(ctx, 0)))
         goto end;
+#endif
     /* working seal */
     if (!TEST_true(OSSL_HPKE_seal(ctx, cipher, &cipherlen, NULL, 0,
                                   plain, plainlen)))
