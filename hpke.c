@@ -135,11 +135,13 @@ static const char *hpke_mode_strtab[] = {
                          (_c_ >= 'a' && _c_ <= 'f' ? (_c_ - 'a' + 10) : 0)))
 #endif
 
-#ifdef OSSL_HPKE_LIMIT_NONCE_REUSE
+/*
+ * Different roles for use in an OSSL_HPKE_CTX, we use
+ * these to control nonce re-use.
+ */
 #define OSSL_HPKE_ROLE_NOTSET 0
 #define OSSL_HPKE_ROLE_SENDER 1
 #define OSSL_HPKE_ROLE_RECEIVER 2
-#endif
 
 /**
  * @brief sender or receiver context
@@ -150,9 +152,7 @@ struct ossl_hpke_ctx_st
     char *propq; /* properties */
     int mode; /* HPKE mode */
     OSSL_HPKE_SUITE suite; /* suite */
-#ifdef OSSL_HPKE_LIMIT_NONCE_REUSE
-    int role;
-#endif
+    int role; /* not-set, sender, receiver */
     uint64_t seq; /* aead sequence number */
     unsigned char *shared_secret; /* KEM output, zz */
     size_t shared_secretlen;
@@ -1956,9 +1956,7 @@ int OSSL_HPKE_CTX_set1_ikme(OSSL_HPKE_CTX *ctx,
     if (ctx->ikme == NULL)
         return 0;
     ctx->ikmelen = ikmelen;
-#ifdef OSSL_HPKE_LIMIT_NONCE_REUSE
     ctx->role = OSSL_HPKE_ROLE_SENDER;
-#endif
     return 1;
 }
 
@@ -1981,9 +1979,7 @@ int OSSL_HPKE_CTX_set1_authpriv(OSSL_HPKE_CTX *ctx, EVP_PKEY *priv)
     ctx->authpriv = EVP_PKEY_dup(priv);
     if (ctx->authpriv == NULL)
         return 0;
-#ifdef OSSL_HPKE_LIMIT_NONCE_REUSE
     ctx->role = OSSL_HPKE_ROLE_SENDER;
-#endif
     return 1;
 }
 
@@ -2043,9 +2039,7 @@ int OSSL_HPKE_CTX_set1_authpub(OSSL_HPKE_CTX *ctx,
     OPENSSL_free(ctx->authpub);
     ctx->authpub = lpub;
     ctx->authpublen = lpublen;
-#ifdef OSSL_HPKE_LIMIT_NONCE_REUSE
     ctx->role = OSSL_HPKE_ROLE_RECEIVER;
-#endif
     erv = 1;
 
 err:
@@ -2075,20 +2069,22 @@ int OSSL_HPKE_CTX_set_seq(OSSL_HPKE_CTX *ctx, uint64_t seq)
         ERR_raise(ERR_LIB_CRYPTO, ERR_R_PASSED_NULL_PARAMETER);
         return 0;
     }
-#ifdef OSSL_HPKE_LIMIT_NONCE_REUSE
     /*
      * We disallow senders from doing this as it's dangerous
-     * EXCEPT before they've started doing crypto, i.e. we do
-     * allow setting an initial sequence, but not sure yet if
-     * that's a good plan.
+     * except perhpas before they've started doing crypto, i.e.
+     * we allow setting an initial sequence increment but not
+     * thereafter, for senders.
      * The sender role will only have been set if/when they've
-     * done some thing e.g. called _encap() or _set1_authpriv()
+     * done some cryptographically relevant thing that tells us
+     * whether we're a sender or receiver e.g. called _encap()
+     * or _set1_authpriv()
+     * Receivers are ok to play with this, as no harm should
+     * ensue if they go wrong.
      */
     if (ctx->role == OSSL_HPKE_ROLE_SENDER) {
         ERR_raise(ERR_LIB_CRYPTO, ERR_R_PASSED_INVALID_ARGUMENT);
         return 0;
     }
-#endif
     ctx->seq = seq;
     return 1;
 }
@@ -2108,12 +2104,10 @@ int OSSL_HPKE_encap(OSSL_HPKE_CTX *ctx,
         ERR_raise(ERR_LIB_CRYPTO, ERR_R_PASSED_NULL_PARAMETER);
         return 0;
     }
-#ifdef OSSL_HPKE_LIMIT_NONCE_REUSE
     if (ctx->role == OSSL_HPKE_ROLE_RECEIVER) {
         ERR_raise(ERR_LIB_CRYPTO, ERR_R_PASSED_INVALID_ARGUMENT);
         return 0;
     }
-#endif
     if (infolen > OSSL_HPKE_MAX_INFOLEN) {
         ERR_raise(ERR_LIB_CRYPTO, ERR_R_PASSED_INVALID_ARGUMENT);
         return 0;
@@ -2139,10 +2133,8 @@ int OSSL_HPKE_encap(OSSL_HPKE_CTX *ctx,
     hpke_pbuf(stdout, "\tkey", ctx->key, ctx->keylen);
     hpke_pbuf(stdout, "\tnonce", ctx->nonce, ctx->noncelen);
 #endif
-#ifdef OSSL_HPKE_LIMIT_NONCE_REUSE
     if (erv == 1)
         ctx->role = OSSL_HPKE_ROLE_SENDER;
-#endif
     return erv;
 }
 
@@ -2160,12 +2152,10 @@ int OSSL_HPKE_decap(OSSL_HPKE_CTX *ctx,
         ERR_raise(ERR_LIB_CRYPTO, ERR_R_PASSED_NULL_PARAMETER);
         return 0;
     }
-#ifdef OSSL_HPKE_LIMIT_NONCE_REUSE
     if (ctx->role == OSSL_HPKE_ROLE_SENDER) {
         ERR_raise(ERR_LIB_CRYPTO, ERR_R_PASSED_INVALID_ARGUMENT);
         return 0;
     }
-#endif
     if (infolen > OSSL_HPKE_MAX_INFOLEN) {
         ERR_raise(ERR_LIB_CRYPTO, ERR_R_PASSED_INVALID_ARGUMENT);
         return 0;
@@ -2192,10 +2182,8 @@ int OSSL_HPKE_decap(OSSL_HPKE_CTX *ctx,
     hpke_pbuf(stdout, "\tkey", ctx->key, ctx->keylen);
     hpke_pbuf(stdout, "\tnonce", ctx->nonce, ctx->noncelen);
 #endif
-#ifdef OSSL_HPKE_LIMIT_NONCE_REUSE
     if (erv == 1)
         ctx->role = OSSL_HPKE_ROLE_RECEIVER;
-#endif
     return erv;
 }
 
@@ -2214,12 +2202,10 @@ int OSSL_HPKE_seal(OSSL_HPKE_CTX *ctx,
         || pt == NULL || ptlen == 0) {
         ERR_raise(ERR_LIB_CRYPTO, ERR_R_PASSED_NULL_PARAMETER);
         return 0;
-#ifdef OSSL_HPKE_LIMIT_NONCE_REUSE
     if (ctx->role != OSSL_HPKE_ROLE_SENDER) {
         ERR_raise(ERR_LIB_CRYPTO, ERR_R_PASSED_INVALID_ARGUMENT);
         return 0;
     }
-#endif
     }
     if ((ctx->seq + 1) == 0) { /* wrap around imminent !!! */
         ERR_raise(ERR_LIB_CRYPTO, ERR_R_SHOULD_NOT_HAVE_BEEN_CALLED);
@@ -2274,12 +2260,10 @@ int OSSL_HPKE_open(OSSL_HPKE_CTX *ctx,
         ERR_raise(ERR_LIB_CRYPTO, ERR_R_PASSED_NULL_PARAMETER);
         return 0;
     }
-#ifdef OSSL_HPKE_LIMIT_NONCE_REUSE
     if (ctx->role != OSSL_HPKE_ROLE_RECEIVER) {
         ERR_raise(ERR_LIB_CRYPTO, ERR_R_PASSED_INVALID_ARGUMENT);
         return 0;
     }
-#endif
     if ((ctx->seq + 1) == 0) { /* wrap around imminent !!! */
         ERR_raise(ERR_LIB_CRYPTO, ERR_R_SHOULD_NOT_HAVE_BEEN_CALLED);
         return 0;

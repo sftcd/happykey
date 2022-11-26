@@ -14,9 +14,6 @@
 
 # include <openssl/types.h>
 
-/* restrict nonce re-use */
-#define OSSL_HPKE_LIMIT_NONCE_REUSE
-
 /* HPKE modes */
 # define OSSL_HPKE_MODE_BASE              0 /* Base mode  */
 # define OSSL_HPKE_MODE_PSK               1 /* Pre-shared key mode */

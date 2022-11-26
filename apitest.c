@@ -1692,19 +1692,7 @@ static int test_hpke_oddcalls(void)
     if (!TEST_false(OSSL_HPKE_seal(ctx, cipher, &cipherlen, NULL, 0,
                                    plain, plainlen)))
         goto end;
-    /* the sequence ought not have been incremented, so good to start over */
     plainlen = sizeof(plain);
-#ifndef OSSL_HPKE_LIMIT_NONCE_REUSE
-    /* seq wrap around test */
-    if (!TEST_true(OSSL_HPKE_CTX_set_seq(ctx, -1)))
-        goto end;
-    if (!TEST_false(OSSL_HPKE_seal(ctx, cipher, &cipherlen, NULL, 0,
-                                   plain, plainlen)))
-        goto end;
-    /* reset seq */
-    if (!TEST_true(OSSL_HPKE_CTX_set_seq(ctx, 0)))
-        goto end;
-#endif
     /* working seal */
     if (!TEST_true(OSSL_HPKE_seal(ctx, cipher, &cipherlen, NULL, 0,
                                   plain, plainlen)))
@@ -2190,6 +2178,84 @@ end:
     OSSL_HPKE_CTX_free(rctx);
     return erv;
 }
+
+/*
+ * Test that nonce reuse calls are prevented as we expect
+ */
+static int test_hpke_noncereuse(void)
+{
+    int erv = 0;
+    EVP_PKEY *privp = NULL;
+    unsigned char pub[OSSL_HPKE_TSTSIZE];
+    size_t publen = sizeof(pub);
+    int hpke_mode = OSSL_HPKE_MODE_BASE;
+    OSSL_HPKE_SUITE hpke_suite = OSSL_HPKE_SUITE_DEFAULT;
+    OSSL_HPKE_CTX *ctx = NULL;
+    OSSL_HPKE_CTX *rctx = NULL;
+    unsigned char plain[] = "quick brown fox";
+    size_t plainlen = sizeof(plain);
+    unsigned char enc[OSSL_HPKE_TSTSIZE];
+    size_t enclen = sizeof(enc);
+    unsigned char cipher[OSSL_HPKE_TSTSIZE];
+    size_t cipherlen = sizeof(cipher);
+    unsigned char clear[OSSL_HPKE_TSTSIZE];
+    size_t clearlen = sizeof(clear);
+    uint64_t seq = 0xbad1dea;
+
+    /* sender side is not allowed set seq once some crypto done */
+    if (!TEST_true(OSSL_HPKE_keygen(hpke_suite, pub, &publen, &privp,
+                                    NULL, 0, testctx, NULL)))
+        goto end;
+    if (!TEST_ptr(ctx = OSSL_HPKE_CTX_new(hpke_mode, hpke_suite,
+                                          testctx, NULL)))
+        goto end;
+    /* set seq will work before any crypto done */
+    if (!TEST_true(OSSL_HPKE_CTX_set_seq(ctx, seq)))
+        goto end;
+    if (!TEST_true(OSSL_HPKE_encap(ctx, enc, &enclen, pub, publen, NULL, 0)))
+        goto end;
+    /* set seq will fail after some crypto done */
+    if (!TEST_false(OSSL_HPKE_CTX_set_seq(ctx, seq + 1)))
+        goto end;
+    if (!TEST_true(OSSL_HPKE_seal(ctx, cipher, &cipherlen, NULL, 0,
+                                  plain, plainlen)))
+        goto end;
+
+    /* receiver side is allowed control seq */
+    if (!TEST_ptr(rctx = OSSL_HPKE_CTX_new(hpke_mode, hpke_suite,
+                                           testctx, NULL)))
+        goto end;
+    /* set seq will work before any crypto done */
+    if (!TEST_true(OSSL_HPKE_CTX_set_seq(rctx, seq)))
+        goto end;
+    if (!TEST_true(OSSL_HPKE_decap(rctx, enc, enclen, privp, NULL, 0)))
+        goto end;
+    /* set seq will work for receivers even after crypto done */
+    if (!TEST_true(OSSL_HPKE_CTX_set_seq(rctx, seq)))
+        goto end;
+    if (!TEST_true(OSSL_HPKE_open(rctx, clear, &clearlen, NULL, 0,
+                                  cipher, cipherlen)))
+        goto end;
+    /* we'll reset the seq and see the _open() call fail */
+    if (!TEST_true(OSSL_HPKE_CTX_set_seq(rctx, seq + 2)))
+        goto end;
+    if (!TEST_false(OSSL_HPKE_open(rctx, clear, &clearlen, NULL, 0,
+                                   cipher, cipherlen)))
+        goto end;
+    /* reset seq to correct value and _open() should work */
+    if (!TEST_true(OSSL_HPKE_CTX_set_seq(rctx, seq)))
+        goto end;
+    if (!TEST_true(OSSL_HPKE_open(rctx, clear, &clearlen, NULL, 0,
+                                  cipher, cipherlen)))
+        goto end;
+    erv = 1;
+
+end:
+    EVP_PKEY_free(privp);
+    OSSL_HPKE_CTX_free(ctx);
+    OSSL_HPKE_CTX_free(rctx);
+    return erv;
+}
 #ifdef HAPPYKEY
 static int test_hpke(void)
 {
@@ -2228,6 +2294,10 @@ static int test_hpke(void)
         return res;
 
     res = test_hpke_compressed();
+    if (res != 1)
+        return res;
+
+    res = test_hpke_noncereuse();
     if (res != 1)
         return res;
 
@@ -2349,6 +2419,7 @@ int setup_tests(void)
     ADD_TEST(test_hpke_random_suites);
     ADD_TEST(test_hpke_oddcalls);
     ADD_TEST(test_hpke_compressed);
+    ADD_TEST(test_hpke_noncereuse);
     return 1;
 }
 
