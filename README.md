@@ -27,6 +27,12 @@ High level notes:
 
 ## Recent Changes
 
+- 20221125: My [HPKE-PR](https://github.com/openssl/openssl/pull/17172) has now
+  been merged! That means that anyone with an OpenSSL 3 master build already
+  has HPKE APIs. So we now only need two build options 1) use the library build
+  that has HPKE, or 2) use the system (dev) library that hasn't. (Will do that
+  in a bit.)
+
 - 20221122: yet more PR changes
 
 - 20221117: a few more PR nits
