@@ -11,21 +11,6 @@
 OSSL?=../openssl
 INCL=${OSSL}/include
 
-# NSS 
-NSSL?=../dist/Debug/lib
-NINCL=  -I../nss/lib \
-		-I../nss/lib/nss \
-		-I../nss/lib/ssl \
-		-I../nss/lib/pk11wrap \
-		-I../nss/lib/freebl \
-		-I../nss/lib/freebl/ecl \
-		-I../nss/lib/util \
-		-I../nss/lib/cryptohi \
-		-I../nss/lib/certdb \
-		-I../nss/lib/pkcs7 \
-		-I../nss/lib/smime \
-		-I../dist/Debug/include/nspr
-
 CC=gcc
 CFLAGS=-D HAPPYKEY -g
 
@@ -38,12 +23,12 @@ all: hpkemain apitest
 # hpke.c, hpke.h and apitest.c include additional tracing and test vector
 # support that's not desirable in the version we'd like to see merged
 # with OpenSSL - we use the unifdef tool to generate files for using in
-# an openssl build from the ones here. 
+# an openssl build from the ones here.
 #
 # The "-x 1" below is just to get unifdef to return zero if the input
 # and output differ, which should be the case for us.
 # forlib: hpke.c-forlib hpke_util.c-forlib hpke.h-forlib hpke_util.h-forlib apitest.c-forlib
-# 
+#
 # hpke.c-forlib: hpke.c
 # 	- unifdef -x 1 -DHPKEAPI -UHAPPYKEY -USUPERVERBOSE -UTESTVECTORS hpke.c >hpke.c-forlib
 # copy over the files to the openssl build
@@ -85,77 +70,7 @@ pod_example.o: pod_example.c hpke.h
 pod_example: pod_example.o
 	${CC} ${CFLAGS} -o $@ pod_example.o hpke.o hpke_util.o packet.o -lssl -lcrypto
 
-clean: oddityclean
-	- rm -f hpkemain.o hpke.o hpke_util.o hpketv.o hpkemain 
+clean:
+	- rm -f hpkemain.o hpke.o hpke_util.o hpketv.o hpkemain
 	- rm -f apitest apitest.o packet.o
 	- rm -f pod_example pod_example.o
-
-# stuff below here are various odd tests done now and then
-# can probably be deleted soon
-
-oddityclean:
-	- rm -f neod neod.o neod_nss.o 
-	- rm -f oeod oeod.o
-	- rm -f osslplayground osslplayground.o
-	- rm -f test2evp test2evp.o
-	- rm -rf scratch/*
-	- rm -f kgikm kgikm.o
-	- rm -f os2evp os2evp.o
-	- rm -f deleak
-
-oddity: neod oeod test2evp osslplayground kgikm os2evp
-
-deleak.o: deleak.c
-	${CC} ${CFLAGS} -g -I ${INCL} -c $<
-
-deleak: deleak.o
-	LD_LIBRARY_PATH=${OSSL} ${CC} ${CFLAGS} -g -o $@ deleak.o -L ${OSSL} -lssl -lcrypto
-
-os2evp: os2evp.o hpke.o hpke_util.o packet.o
-	LD_LIBRARY_PATH=${OSSL} ${CC} ${CFLAGS} -g -o $@ os2evp.o hpke.o hpke_util.o packet.o -L ${OSSL} -lcrypto -L ${NSSL} -lnss3 -lnspr4
-
-os2evp.o: os2evp.c
-	${CC} ${CFLAGS} -g -I ${INCL} -c $<
-
-kgikm: kgikm.o hpke.o hpke_util.o packet.o
-	LD_LIBRARY_PATH=${OSSL} ${CC} ${CFLAGS} -g -o $@ kgikm.o hpke.o hpke_util.o packet.o -L ${OSSL} -lcrypto -L ${NSSL} -lnss3 -lnspr4
-
-kgikm.o: kgikm.c
-	${CC} ${CFLAGS} -g -I ${INCL} -c $<
-
-osslplayground: osslplayground.o
-	LD_LIBRARY_PATH=${OSSL} ${CC} ${CFLAGS} -g -o $@ osslplayground.o hpke.o hpke_util.o packet.o -L ${OSSL} -lcrypto -L ${NSSL} -lnss3 -lnspr4
-
-
-osslplayground.o: osslplayground.c
-	${CC} ${CFLAGS} -g -I ${INCL} -c $<
-
-# This is a round-trip test with NSS encrypting and my code decrypting
-# (no parameters for now)
-
-neod: neod.o hpke.o hpke_util.o neod_nss.o packet.o
-	if [ -d ${NSSL} ]; then LD_LIBRARY_PATH=${OSSL}:${NSSL} ${CC} ${CFLAGS}  -g -o $@ neod.o hpke.o hpke_util.o packet.o neod_nss.o -L ${OSSL} -lssl -lcrypto -L ${NSSL} -lnss3 -lnspr4 ; fi
-
-neod.o: neod.c
-	${CC} ${CFLAGS} -g -I ${INCL} -c $<
-
-neod_nss.o: neod_nss.c
-	if [ -d ${NSSL} ]; then ${CC} -g ${CFLAGS} ${NINCL} -c $< ; fi
-
-neodtest: neod
-	- if [ -d ${NSSL} ]; then LD_LIBRARY_PATH=${OSSL}:${NSSL} ./neod ; fi
-
-# A round-trip to test EVP mode for sender public
-#
-oeod: oeod.o hpke.o hpke_util.o packet.o 
-	${CC} ${CFLAGS} -g -o $@ oeod.o hpke.o hpke_util.o packet.o -L ${OSSL} -lssl -lcrypto 
-
-oeod.o: oeod.c
-	${CC} ${CFLAGS} -g -I ${INCL} -c $<
-
-# A test of a buffer->EVP_PKEY problem
-test2evp: test2evp.o hpke.o hpke_util.o packet.o
-	LD_LIBRARY_PATH=${OSSL} ${CC} ${CFLAGS} -g -o $@ test2evp.o hpke.o hpke_util.o packet.o -L ${OSSL} -lssl -lcrypto 
-
-test2evp.o: test2evp.c
-	${CC} ${CFLAGS} -g -I ${INCL} -c $<

@@ -188,23 +188,6 @@ size_t OSSL_HPKE_get_recommended_ikmelen(OSSL_HPKE_SUITE suite);
  * @param cipherlen is the length of the input buffer for ciphertext
  * @return 1 for success, other for error (error returns can be non-zero)
  */
-#  ifdef TESTVECTORS
-int OSSL_HPKE_enc(OSSL_LIB_CTX *libctx, const char *propq,
-                  unsigned int mode, OSSL_HPKE_SUITE suite,
-                  const char *pskid,
-                  const unsigned char *psk, size_t psklen,
-                  const unsigned char *pub, size_t publen,
-                  const unsigned char *authpriv, size_t authprivlen,
-                  EVP_PKEY *authpriv_evp,
-                  const unsigned char *clear, size_t clearlen,
-                  const unsigned char *aad, size_t aadlen,
-                  const unsigned char *info, size_t infolen,
-                  const unsigned char *seq, size_t seqlen,
-                  unsigned char *senderpub, size_t *senderpublen,
-                  EVP_PKEY *senderpriv,
-                  unsigned char *cipher, size_t *cipherlen,
-                  void *tv);
-#  else
 int OSSL_HPKE_enc(OSSL_LIB_CTX *libctx, const char *propq,
                   unsigned int mode, OSSL_HPKE_SUITE suite,
                   const char *pskid,
@@ -219,7 +202,6 @@ int OSSL_HPKE_enc(OSSL_LIB_CTX *libctx, const char *propq,
                   unsigned char *senderpub, size_t *senderpublen,
                   EVP_PKEY *senderpriv,
                   unsigned char *cipher, size_t *cipherlen);
-#  endif
 
 /**
  * @brief HPKE single-shot decryption function

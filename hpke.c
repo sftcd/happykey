@@ -2852,25 +2852,6 @@ err:
  * @param cipher is the input buffer for ciphertext
  * @return 1 for good (OpenSSL style), not 1 for error
  */
-#ifdef TESTVECTORS
-static int hpke_enc_int(OSSL_LIB_CTX *libctx, const char *propq,
-                        unsigned int mode, OSSL_HPKE_SUITE suite,
-                        const char *pskid,
-                        size_t psklen, const unsigned char *psk,
-                        size_t publen, const unsigned char *pub,
-                        size_t authprivlen, const unsigned char *authpriv,
-                        EVP_PKEY *authpriv_evp,
-                        size_t clearlen, const unsigned char *clear,
-                        size_t aadlen, const unsigned char *aad,
-                        size_t infolen, const unsigned char *info,
-                        size_t seqlen, const unsigned char *seq,
-                        EVP_PKEY *extsenderpriv,
-                        size_t rawsenderprivlen,
-                        const unsigned char *rawsenderpriv,
-                        size_t *expseclen, unsigned char *expsec,
-                        size_t *senderpublen, unsigned char *senderpub,
-                        size_t *cipherlen, unsigned char *cipher, void *tv)
-#else
 static int hpke_enc_int(OSSL_LIB_CTX *libctx, const char *propq,
                         unsigned int mode, OSSL_HPKE_SUITE suite,
                         const char *pskid,
@@ -2888,15 +2869,10 @@ static int hpke_enc_int(OSSL_LIB_CTX *libctx, const char *propq,
                         size_t *expseclen, unsigned char *expsec,
                         size_t *senderpublen, unsigned char *senderpub,
                         size_t *cipherlen, unsigned char *cipher)
-#endif
-
 {
     int erv = 1; /* Our error return value - 1 is success */
     int evpcaller = 0;
     int rawcaller = 0;
-#if defined(TESTVECTORS)
-    hpke_tv_t *ltv = (hpke_tv_t *)tv;
-#endif
     EVP_PKEY_CTX *pctx = NULL;
     EVP_PKEY *pkR = NULL;
     EVP_PKEY *pkE = NULL;
@@ -3036,56 +3012,11 @@ static int hpke_enc_int(OSSL_LIB_CTX *libctx, const char *propq,
             ERR_raise(ERR_LIB_CRYPTO, ERR_R_INTERNAL_ERROR);
             goto err;
         }
-#ifdef TESTVECTORS
-        if (ltv) {
-            /* Read encap DH private from tv, instead of new key pair */
-            unsigned char *bin_skE = NULL;
-            size_t bin_skElen = 0;
-            unsigned char *bin_pkE = NULL;
-            size_t bin_pkElen = 0;
-
-            if (hpke_kem_id_check(ltv->kem_id) != 1) {
-                erv = 0;
-                ERR_raise(ERR_LIB_CRYPTO, ERR_R_INTERNAL_ERROR);
-                goto err;
-            }
-            erv = hpke_ah_decode(strlen(ltv->skEm), ltv->skEm,
-                                 &bin_skElen, &bin_skE);
-            if (erv != 1) {
-                ERR_raise(ERR_LIB_CRYPTO, ERR_R_INTERNAL_ERROR);
-                goto err;
-            }
-            erv = hpke_ah_decode(strlen(ltv->pkEm), ltv->pkEm,
-                                 &bin_pkElen, &bin_pkE);
-            if (erv != 1) {
-                OPENSSL_clear_free(bin_skE, bin_skElen);
-                ERR_raise(ERR_LIB_CRYPTO, ERR_R_INTERNAL_ERROR);
-                goto err;
-            }
-            if (hpke_prbuf2evp(libctx, propq, ltv->kem_id, bin_skE, bin_skElen,
-                               bin_pkE, bin_pkElen, &pkE) != 1) {
-                OPENSSL_clear_free(bin_skE, bin_skElen);
-                OPENSSL_free(bin_pkE);
-                erv = 0;
-                ERR_raise(ERR_LIB_CRYPTO, ERR_R_INTERNAL_ERROR);
-                goto err;
-            }
-            OPENSSL_clear_free(bin_skE, bin_skElen);
-            OPENSSL_free(bin_pkE);
-        } else {
-            if (EVP_PKEY_keygen(pctx, &pkE) <= 0) {
-                erv = 0;
-                ERR_raise(ERR_LIB_CRYPTO, ERR_R_INTERNAL_ERROR);
-                goto err;
-            }
-        }
-#else
         if (EVP_PKEY_keygen(pctx, &pkE) <= 0) {
             erv = 0;
             ERR_raise(ERR_LIB_CRYPTO, ERR_R_INTERNAL_ERROR);
             goto err;
         }
-#endif
         EVP_PKEY_CTX_free(pctx);
         pctx = NULL;
     } else if (evpcaller) {
@@ -3132,27 +3063,6 @@ static int hpke_enc_int(OSSL_LIB_CTX *libctx, const char *propq,
     }
     /* load auth key pair if using an auth mode */
     if (mode == OSSL_HPKE_MODE_AUTH || mode == OSSL_HPKE_MODE_PSKAUTH) {
-#ifdef TESTVECTORS
-        if (ltv) {
-            unsigned char *bin_pkS = NULL;
-            size_t bin_pkSlen = 0;
-            erv = hpke_ah_decode(strlen(ltv->pkSm), ltv->pkSm,
-                                 &bin_pkSlen, &bin_pkS);
-            if (erv != 1) {
-                ERR_raise(ERR_LIB_CRYPTO, ERR_R_INTERNAL_ERROR);
-                goto err;
-            }
-            erv = hpke_prbuf2evp(libctx, propq, suite.kem_id, authpriv,
-                                 authprivlen, bin_pkS, bin_pkSlen, &skI);
-        } else {
-            erv = hpke_prbuf2evp(libctx, propq, suite.kem_id, authpriv,
-                                 authprivlen, pub, publen, &skI);
-        }
-        if (erv != 1) {
-            ERR_raise(ERR_LIB_CRYPTO, ERR_R_INTERNAL_ERROR);
-            goto err;
-        }
-#else
         if (authpriv_evp != NULL) {
             skI = authpriv_evp;
         } else {
@@ -3163,7 +3073,6 @@ static int hpke_enc_int(OSSL_LIB_CTX *libctx, const char *propq,
                 goto err;
             }
         }
-#endif
         if (skI == NULL) {
             erv = 0;
             ERR_raise(ERR_LIB_CRYPTO, ERR_R_INTERNAL_ERROR);
@@ -3215,9 +3124,6 @@ static int hpke_enc_int(OSSL_LIB_CTX *libctx, const char *propq,
     }
     ks_contextlen += 1 + halflen;
     /* step 4. extracts and expands as needed */
-#ifdef TESTVECTORS
-    hpke_test_expand_extract();
-#endif
     /* Extract secret and Expand variously...  */
     erv = hpke_extract(libctx, propq, suite, OSSL_HPKE_5869_MODE_FULL,
                        (const unsigned char *)"", 0,
@@ -4247,23 +4153,6 @@ int OSSL_HPKE_prbuf2evp(OSSL_LIB_CTX *libctx, const char *propq,
  * Oddity: we're passing an hpke_suit_t directly, but 48 bits is actually
  * smaller than a 64 bit pointer, so that's grand, if odd:-)
  */
-#ifdef TESTVECTORS
-int OSSL_HPKE_enc(OSSL_LIB_CTX *libctx, const char *propq,
-                  unsigned int mode, OSSL_HPKE_SUITE suite,
-                  const char *pskid,
-                  const unsigned char *psk, size_t psklen,
-                  const unsigned char *pub, size_t publen,
-                  const unsigned char *authpriv, size_t authprivlen,
-                  EVP_PKEY *authpriv_evp,
-                  const unsigned char *clear, size_t clearlen,
-                  const unsigned char *aad, size_t aadlen,
-                  const unsigned char *info, size_t infolen,
-                  const unsigned char *seq, size_t seqlen,
-                  unsigned char *senderpub, size_t *senderpublen,
-                  EVP_PKEY *senderpriv,
-                  unsigned char *cipher, size_t *cipherlen,
-                  void *tv)
-#else
 int OSSL_HPKE_enc(OSSL_LIB_CTX *libctx, const char *propq,
                   unsigned int mode, OSSL_HPKE_SUITE suite,
                   const char *pskid,
@@ -4278,26 +4167,7 @@ int OSSL_HPKE_enc(OSSL_LIB_CTX *libctx, const char *propq,
                   unsigned char *senderpub, size_t *senderpublen,
                   EVP_PKEY *senderpriv,
                   unsigned char *cipher, size_t *cipherlen)
-#endif
 {
-#ifdef TESTVECTORS
-    if (senderpublen == NULL)
-        return 0;
-    return hpke_enc_int(libctx, propq, mode, suite,
-                        pskid, psklen, psk,
-                        publen, pub,
-                        authprivlen, authpriv, authpriv_evp,
-                        clearlen, clear,
-                        aadlen, aad,
-                        infolen, info,
-                        seqlen, seq,
-                        senderpriv,
-                        0, NULL, /* raw sender priv */
-                        NULL, NULL, /* exporter */
-                        senderpublen, senderpub,
-                        cipherlen, cipher, tv);
-
-#else
     if (senderpublen == NULL)
         return 0;
     return hpke_enc_int(libctx, propq, mode, suite,
@@ -4313,7 +4183,6 @@ int OSSL_HPKE_enc(OSSL_LIB_CTX *libctx, const char *propq,
                         NULL, NULL, /* exporter sec */
                         senderpublen, senderpub,
                         cipherlen, cipher);
-#endif
 }
 
 /*
@@ -4352,22 +4221,6 @@ int OSSL_HPKE_enc(OSSL_LIB_CTX *libctx, const char *propq,
  * Oddity: we're passing an hpke_suit_t directly, but 48 bits is actually
  * smaller than a 64 bit pointer, so that's grand, if odd:-)
  */
-#ifdef TESTVECTORS
-int OSSL_HPKE_enc_evp(OSSL_LIB_CTX *libctx, const char *propq,
-                      unsigned int mode, OSSL_HPKE_SUITE suite,
-                      const char *pskid,
-                      const unsigned char *psk, size_t psklen,
-                      const unsigned char *pub, size_t publen,
-                      const unsigned char *authpriv, size_t authprivlen,
-                      EVP_PKEY *authpriv_evp,
-                      const unsigned char *clear, size_t clearlen,
-                      const unsigned char *aad, size_t aadlen,
-                      const unsigned char *info, size_t infolen,
-                      const unsigned char *seq, size_t seqlen,
-                      const unsigned char *senderpub, size_t senderpublen,
-                      EVP_PKEY *senderpriv,
-                      unsigned char *cipher, size_t *cipherlen, void *tv)
-#else
 int OSSL_HPKE_enc_evp(OSSL_LIB_CTX *libctx, const char *propq,
                       unsigned int mode, OSSL_HPKE_SUITE suite,
                       const char *pskid,
@@ -4382,23 +4235,7 @@ int OSSL_HPKE_enc_evp(OSSL_LIB_CTX *libctx, const char *propq,
                       const unsigned char *senderpub, size_t senderpublen,
                       EVP_PKEY *senderpriv,
                       unsigned char *cipher, size_t *cipherlen)
-#endif
 {
-#ifdef TESTVECTORS
-    return hpke_enc_int(libctx, propq, mode, suite,
-                        pskid, psklen, psk,
-                        publen, pub,
-                        authprivlen, authpriv, authpriv_evp,
-                        clearlen, clear,
-                        aadlen, aad,
-                        infolen, info,
-                        seqlen, seq,
-                        senderpriv,
-                        0, NULL,
-                        NULL, NULL, /* exporter sec */
-                        0, NULL,
-                        cipherlen, cipher, tv);
-#else
     return hpke_enc_int(libctx, propq, mode, suite,
                         pskid, psklen, psk,
                         publen, pub,
@@ -4412,7 +4249,6 @@ int OSSL_HPKE_enc_evp(OSSL_LIB_CTX *libctx, const char *propq,
                         NULL, NULL, /* exporter sec */
                         0, NULL,
                         cipherlen, cipher);
-#endif
 }
 
 /*

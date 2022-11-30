@@ -1,15 +1,7 @@
 .gitignore
 *.o
 *-forlib
-deleak
 apitest
-kgikm
-os2evp
 priv
 hpkemain
-neod
-oeod
-test2evp
-osslplayground
-doxy/
 scratch/
