@@ -24,10 +24,7 @@
 #include <openssl/ssl.h>
 
 #include "hpke.h"
-
-#ifdef TESTVECTORS
-#include "hpketv.h"
-#endif
+#include "hpke_oldapi.h"
 
 #ifndef HPKEMAIN_MAXSIZE
 #define HPKEMAIN_MAXSIZE 1024
@@ -52,10 +49,6 @@ static void usage(char *prog,char *errmsg)
     fprintf(stderr,"\tUsage: %s -d -p private [-P public] [-a aad] [-I info]\n",prog);
     fprintf(stderr,"\t\t\t[-i input] [-o output]\n");
     fprintf(stderr,"\t\t\t[-m mode] [-c suite] [-s psk] [-n pskid]\n");
-#ifdef TESTVECTORS
-    fprintf(stderr,"This version is built with TESTVECTORS\n");
-    fprintf(stderr,"\tUsage: %s -T <optional-tvfile> [-m mode] [-c suite]\n",prog);
-#endif
     fprintf(stderr,"Options:\n");
     fprintf(stderr,"\t-a additional authenticated data file name or actual value\n");
     fprintf(stderr,"\t-c specify ciphersuite\n");
@@ -73,9 +66,6 @@ static void usage(char *prog,char *errmsg)
     fprintf(stderr,"\t-n PSK id string\n");
     fprintf(stderr,"\t-o output file name (output to stdout if not specified) \n");
     fprintf(stderr,"\t-s psk file name or base64 or ascii-hex encoded value\n");
-#ifdef TESTVECTORS
-    fprintf(stderr,"\t-T <optional-tvfile> run a testvector for mode/suite\n");
-#endif
     fprintf(stderr,"\t-v verbose output\n");
     fprintf(stderr,"\n");
     fprintf(stderr,"Notes:\n");
@@ -582,10 +572,6 @@ int main(int argc, char **argv)
     char *info_in=NULL;
     char *inp_in=NULL;
     char *out_in=NULL;
-#ifdef TESTVECTORS
-    int dotv=0;
-    char *tvfname=NULL;
-#endif
     char *modestr=NULL;
     char *pskid=NULL;
     char *psk_in=NULL;
@@ -599,11 +585,7 @@ int main(int argc, char **argv)
 
     int opt;
 
-#ifdef TESTVECTORS
-    while((opt = getopt(argc, argv, "?c:ghkedvP:p:a:I:i:m:n:o:s:T::")) != -1) {
-#else
     while((opt = getopt(argc, argv, "?c:ghkedvP:p:a:I:i:m:n:o:s:")) != -1) {
-#endif
         switch(opt) {
             case '?': usage(argv[0],"Unexpected option"); break;
             case 'a': aad_in=optarg; break;
@@ -621,9 +603,6 @@ int main(int argc, char **argv)
             case 'P': pub_in=optarg; break;
             case 'p': priv_in=optarg; break;
             case 's': psk_in=optarg; break;
-#ifdef TESTVECTORS
-            case 'T': dotv=1; tvfname=optarg; break;
-#endif
             case 'v': verbose++; break;
             default:
                 usage(argv[0],"unknown arg");
@@ -691,12 +670,6 @@ int main(int argc, char **argv)
 
     }
 
-#ifdef TESTVECTORS
-    if (dotv==1) {
-        printf("Checking against a test vector\n");
-    } else {
-#endif
-
     /*
      * Map from command line args (or the lack thereof) to buffers
      */
@@ -717,10 +690,6 @@ int main(int argc, char **argv)
         if (psk_in && map_input(psk_in,&psklen,&psk,1)!=1) usage(argv[0],"bad -s value");
     }
 
-#ifdef TESTVECTORS
-    }
-#endif
-
     /*
      * Init OpenSSL stuff - copied from lighttpd
      */
@@ -729,63 +698,6 @@ int main(int argc, char **argv)
     OPENSSL_init_crypto(OPENSSL_INIT_ADD_ALL_CIPHERS
                        |OPENSSL_INIT_ADD_ALL_DIGESTS
                        |OPENSSL_INIT_LOAD_CONFIG, NULL);
-
-#ifdef TESTVECTORS
-    /*
-     * Load up and choose a testvector if asked to (and compiled
-     * that way)
-     * File name for this doesn't need to be parameterised yet.
-     */
-    char *def_tvfname="test-vectors.json";
-    if (tvfname==NULL) {
-        tvfname=def_tvfname;
-    } 
-    if (verbose) {
-        printf("Test vector file: %s\n",tvfname);
-    }
-    int nelems=0;
-    hpke_tv_t *tvarr=NULL;
-    hpke_tv_t *tv=NULL;
-    if (dotv==1) {
-        int trv=hpke_tv_load(tvfname,&nelems,&tvarr);
-        if (trv!=1) {
-            fprintf(stderr,"Can't load %s - exiting\n",tvfname);
-            exit(1);
-        }
-        trv=hpke_tv_pick(hpke_mode,hpke_suite,nelems,tvarr,&tv);
-        if (trv!=1) {
-            fprintf(stderr,"Failed selecting test vector - exiting\n");
-            exit(2);
-        }
-        hpke_tv_print(1,tv);
-        /*
-         * Assign inputs from tv - note that the strip/decode things here are not
-         * exactly the same as real command line args - plaintext in particular 
-         * needs to be decoded here but MUST NOT in the normal case.
-         */
-        if (map_input(tv->pkRm,&publen,&pub,1)!=1) usage(argv[0],"bad -P value");
-        if (hpke_mode==OSSL_HPKE_MODE_AUTH || hpke_mode==OSSL_HPKE_MODE_PSKAUTH) {
-            if (map_input(tv->skSm,&privlen,&priv,1)!=1) usage(argv[0],"bad -p value");
-        }
-        if (tv->encs && map_input(tv->encs[0].aad,&aadlen,&aad,1)!=1) usage(argv[0],"bad -a value");
-        if (tv->info && map_input(tv->info,&infolen,&info,1)!=1) usage(argv[0],"bad -I value");
-        if (tv->encs && map_input(tv->encs[0].plaintext,&plainlen,&plain,1)!=1) usage(argv[0],"bad -i value");
-
-        if (hpke_mode==OSSL_HPKE_MODE_PSK || hpke_mode==OSSL_HPKE_MODE_PSKAUTH) {
-            /*
-             * grab from tv 
-             */
-            unsigned char *dec_pskid=NULL;
-            size_t dec_pskidlen=0;
-            ah_decode(strlen(tv->psk_id),tv->psk_id,&dec_pskidlen,&dec_pskid);
-            pskid=OPENSSL_malloc(strlen(tv->psk_id)); /* too much but heh it's ok */
-            memset(pskid,0,strlen(tv->psk_id));
-            memcpy(pskid,dec_pskid,strlen(tv->psk_id)/2);
-            OPENSSL_free(dec_pskid);
-            ah_decode(strlen(tv->psk),tv->psk,&psklen,&psk);
-        }
-    }
-#endif
 
     /*
      * Call one of our functions
@@ -829,11 +741,7 @@ int main(int argc, char **argv)
                 info, infolen,
                 NULL,0, /* seq */
                 senderpub, &senderpublen, NULL,
-                cipher, &cipherlen
-#ifdef TESTVECTORS
-                ,tv
-#endif
-                );
+                cipher, &cipherlen);
         }
         if (pub!=NULL) OPENSSL_free(pub);
         if (priv!=NULL) OPENSSL_free(priv);
@@ -846,43 +754,12 @@ int main(int argc, char **argv)
             fprintf(stderr,"Error (%d) from hpke_enc\n",rv);
             overallreturn=100;
         } else {
-#ifdef TESTVECTORS
-            if (tv && tv->encs) {
-                unsigned char *bcipher=NULL;
-                size_t bcipherlen=0;
-                int goodres=1;
-                ah_decode( strlen(tv->encs[0].ciphertext),
-                            tv->encs[0].ciphertext,
-                            &bcipherlen,
-                            &bcipher);
-                if ((cipherlen==0 || cipherlen==HPKEMAIN_MAXSIZE) || cipher==NULL) { 
-                    printf("Re-generated ciphertext is NULL sorry. \n");
-                    goodres=0;
-                } else if (bcipherlen!=cipherlen) {
-                    printf("Ciphertext output lengths differ: %lu vs %lu\n",
-                            (unsigned long)bcipherlen,(unsigned long)cipherlen);
-                    goodres=0;
-                } else if (memcmp(cipher,bcipher,cipherlen)) {
-                    printf("Ciphertext outputs differ, sorry\n");
-                    goodres=0;
-                } else {
-                    printf("Ciphertext outputs the same! Yay!\n");
-                }
-                OPENSSL_free(bcipher);
-                if (goodres==0) {
-                    exit(5);
-                }
-            } else {
-#endif
                 int wrv=hpkemain_write_ct(out_in,senderpublen,senderpub,cipherlen,cipher);
                 if (wrv!=1) {
                     return(wrv);
                 }
                 free(cipher);
 
-#ifdef TESTVECTORS
-            }
-#endif
         }
     } else {
         /*
@@ -955,12 +832,6 @@ int main(int argc, char **argv)
         OPENSSL_free(clear);
     } 
 
-#ifdef TESTVECTORS
-    if (dotv==1) {
-        if (pskid) OPENSSL_free(pskid);
-    }
-    hpke_tv_free(nelems,tvarr);
-#endif
     return(overallreturn);
 }
 

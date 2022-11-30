@@ -46,6 +46,9 @@ all: hpkemain apitest
 hpke.o: hpke.c hpke.h
 	${CC} ${CFLAGS} -I ${INCL} -c $<
 
+hpke_oldapi.o: hpke_oldapi.c hpke_oldapi.h hpke.h
+	${CC} ${CFLAGS} -I ${INCL} -c $<
+
 hpke_util.o: hpke_util.c hpke.h
 	${CC} ${CFLAGS} -I ${INCL} -c $<
 
@@ -58,11 +61,11 @@ apitest.o: apitest.c hpke.h hpke.c
 packet.o: packet.c
 	${CC} ${CFLAGS} -g -I ${INCL} -c $<
 
-apitest: apitest.o hpke.o hpke_util.o packet.o
-	${CC} ${CFLAGS} -o $@ apitest.o hpke.o hpke_util.o packet.o -lssl -lcrypto
+apitest: apitest.o hpke.o hpke_oldapi.o hpke_util.o packet.o
+	${CC} ${CFLAGS} -o $@ apitest.o hpke.o hpke_oldapi.o hpke_util.o packet.o -lssl -lcrypto
 
-hpkemain: hpkemain.o hpke.o hpke_util.o packet.o
-	${CC} ${CFLAGS} -o $@ hpkemain.o hpke.o hpke_util.o packet.o -lssl -lcrypto
+hpkemain: hpkemain.o hpke.o hpke_oldapi.o hpke_util.o packet.o
+	${CC} ${CFLAGS} -o $@ hpkemain.o hpke.o hpke_oldapi.o hpke_util.o packet.o -lssl -lcrypto
 
 pod_example.o: pod_example.c hpke.h
 	${CC} ${CFLAGS} -I ${INCL} -c $<
