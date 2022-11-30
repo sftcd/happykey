@@ -29,67 +29,33 @@ NINCL=  -I../nss/lib \
 CC=gcc
 CFLAGS=-D HAPPYKEY -g
 
-# There are test vectors for this - see comments in hpketv.h.
-# If you want to compile in test vector checks then uncomment
-# the next line:
-# CFLAGS=-D HAPPYKEY -g -D TESTVECTORS -I ../json-c
-
 all: hpkemain apitest
 
+# This is how I used remove the polyfill code and copy over to the
+# OpenSSL build. We'll be doing the reverse here so will remove this
+# but handy to keep some for the moment.
+#
 # hpke.c, hpke.h and apitest.c include additional tracing and test vector
 # support that's not desirable in the version we'd like to see merged
 # with OpenSSL - we use the unifdef tool to generate files for using in
 # an openssl build from the ones here. 
-
 #
 # The "-x 1" below is just to get unifdef to return zero if the input
 # and output differ, which should be the case for us.
-forlib: hpke.c-forlib hpke_util.c-forlib hpke.h-forlib hpke_util.h-forlib apitest.c-forlib
-
-hpke.c-forlib: hpke.c
-	- unifdef -x 1 -DHPKEAPI -UHAPPYKEY -USUPERVERBOSE -UTESTVECTORS hpke.c >hpke.c-forlib
-
-hpke_util.c-forlib: hpke_util.c
-	- unifdef -x 1 -DHPKEAPI -UHAPPYKEY -USUPERVERBOSE -UTESTVECTORS hpke_util.c >hpke_util.c-forlib
-
-hpke.h-forlib: hpke.h
-	- unifdef -x 1 -DHPKEAPI -UHAPPYKEY -USUPERVERBOSE -UTESTVECTORS hpke.h >hpke.h-forlib
-
-hpke_util.h-forlib: hpke_util.h
-	- unifdef -x 1 -DHPKEAPI -UHAPPYKEY -USUPERVERBOSE -UTESTVECTORS hpke_util.h >hpke_util.h-forlib
-
-apitest.c-forlib: apitest.c
-	- unifdef -x 1 -DHPKEAPI -UHAPPYKEY -USUPERVERBOSE -UTESTVECTORS apitest.c >apitest.c-forlib
-
-forlibclean:
-	- rm -f hpke.h-forlib
-	- rm -f hpke_util.h-forlib
-	- rm -f hpke_util.c-forlib
-	- rm -f hpke.c-forlib
-	- rm -f apitest.c-forlib
-
+# forlib: hpke.c-forlib hpke_util.c-forlib hpke.h-forlib hpke_util.h-forlib apitest.c-forlib
+# 
+# hpke.c-forlib: hpke.c
+# 	- unifdef -x 1 -DHPKEAPI -UHAPPYKEY -USUPERVERBOSE -UTESTVECTORS hpke.c >hpke.c-forlib
 # copy over the files to the openssl build
-copy2lib: forlib \
-		  ${OSSL}/crypto/hpke/hpke.c \
-		  ${OSSL}/crypto/hpke/hpke_util.c \
-		  ${INCL}/openssl/hpke.h \
-		  ${INCL}/internal/hpke_util.h \
-		  ${OSSL}/test/hpke_test.c
-
-${OSSL}/crypto/hpke/hpke.c: hpke.c-forlib
-	- cp hpke.c-forlib ${OSSL}/crypto/hpke/hpke.c
-
-${OSSL}/crypto/hpke/hpke_util.c: hpke_util.c-forlib
-	- cp hpke_util.c-forlib ${OSSL}/crypto/hpke/hpke_util.c
-
-${INCL}/openssl/hpke.h: hpke.h-forlib
-	- cp hpke.h-forlib ${INCL}/openssl/hpke.h
-
-${INCL}/internal/hpke_util.h: hpke_util.h-forlib
-	- cp hpke_util.h-forlib ${INCL}/internal/hpke_util.h
-
-${OSSL}/test/hpke_test.c: apitest.c-forlib
-	- cp apitest.c-forlib ${OSSL}/test/hpke_test.c
+#copy2lib: forlib \
+#		  ${OSSL}/crypto/hpke/hpke.c \
+#		  ${OSSL}/crypto/hpke/hpke_util.c \
+#		  ${INCL}/openssl/hpke.h \
+#		  ${INCL}/internal/hpke_util.h \
+#		  ${OSSL}/test/hpke_test.c
+#
+#${OSSL}/crypto/hpke/hpke.c: hpke.c-forlib
+#	- cp hpke.c-forlib ${OSSL}/crypto/hpke/hpke.c
 
 # main build targets
 hpke.o: hpke.c hpke.h
@@ -107,14 +73,8 @@ apitest.o: apitest.c hpke.h hpke.c
 packet.o: packet.c
 	${CC} ${CFLAGS} -g -I ${INCL} -c $<
 
-hpketv.o: hpketv.c hpketv.h hpke.h
-	${CC} ${CFLAGS} -I ${INCL} -c $<
-
 apitest: apitest.o hpke.o hpke_util.o packet.o
 	${CC} ${CFLAGS} -o $@ apitest.o hpke.o hpke_util.o packet.o -lssl -lcrypto
-
-apitest-forlib: apitest.o hpke-forlib.o hpke_util.o packet.o
-	${CC} ${CFLAGS} -o $@ apitest.o hpke-forlib.o hpke_util.o packet.o -L ${OSSL} -lssl -lcrypto
 
 hpkemain: hpkemain.o hpke.o hpke_util.o packet.o
 	${CC} ${CFLAGS} -o $@ hpkemain.o hpke.o hpke_util.o packet.o -lssl -lcrypto
@@ -125,20 +85,13 @@ pod_example.o: pod_example.c hpke.h
 pod_example: pod_example.o
 	${CC} ${CFLAGS} -o $@ pod_example.o hpke.o hpke_util.o packet.o -lssl -lcrypto
 
-doc: hpke.c hpke.h hpketv.h hpketv.c apitest.c
-	doxygen hpke.doxy
-	(cd doxy/latex; make; mv refman.pdf ../../hpke-api.pdf )
-
-docclean:
-	- rm -rf doxy
-
-clean: forlibclean docclean oddityclean
+clean: oddityclean
 	- rm -f hpkemain.o hpke.o hpke_util.o hpketv.o hpkemain 
 	- rm -f apitest apitest.o packet.o
 	- rm -f pod_example pod_example.o
 
 # stuff below here are various odd tests done now and then
-# can probably be deleted now
+# can probably be deleted soon
 
 oddityclean:
 	- rm -f neod neod.o neod_nss.o 

@@ -6,26 +6,32 @@ using OpenSSL, as a precursor to using that for
 [ECH-enabled OpenSSL fork](https://github.com/sftcd/openssl).  This needs to be built
 against a master/tip version of OpenSSL such as my fork.
 
-I've submitted a [pull request](https://github.com/openssl/openssl/pull/17172)
-for inclusion of HPKE in OpenSSL, based on this code. Since that'll take a
-while to happen, and then turn up in an official OpenSSL release, the idea is
-that applications can use this as a sort of "polyfill" (borrowing the 
-[concept](https://en.wikipedia.org/wiki/Polyfill_(programming) used in web 
-development:-) in the meantime. I also plan to update this as newer
-HPKE ciphersuites are defined but that code won't (at least initially)
-be part of the OpenSSL PR.
+The HPKE [pull request](https://github.com/openssl/openssl/pull/17172) based on
+this code, has now been merged.  That'll eventually be part of an OpenSSL
+release, but not for a while.  If someone wants, they can use this code in the
+meantime as a sort of "polyfill" (borrowing the
+[concept](https://en.wikipedia.org/wiki/Polyfill_(programming) used in web
+development:-).
+
+I may also update this if/as newer HPKE ciphersuites are defined if that code
+won't (at least initially) be part of OpenSSL.
 
 High level notes:
 
 - All 480 local tests (``./alltest.sh``) are working - yes, you get to
   480 test combinations with the variations allowed. That's too many IMO.
-- For test vectors, see ``tvtest.sh`` output - 96 tests pass, 
-  and 84 don't match a test vector. 
 - The default ciphersuite is x25519/hkdf-sha256,hkdf-sha256,aes128gcm. 
 - (Almost) Only the single-shot APIs are supported.
 - Exporters are not supported.
 
 ## Recent Changes
+
+- 20221130: refactor to treat OpenSSL "master" branch version of HPKE
+  as the source of truth, with the polyfill stuff separated out as much
+  as possible.
+
+- 20221130: removed test vector stuff from here as the OpenSSL
+  code now has a bunch of those and many other tests too.
 
 - 20221125: My [HPKE-PR](https://github.com/openssl/openssl/pull/17172) has now
   been merged! That means that anyone with an OpenSSL 3 master build already
