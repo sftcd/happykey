@@ -3,6 +3,45 @@
  * OpenSSL PR, but preserved here in case that's useful
  */
 
+/* strings for modes */
+# define OSSL_HPKE_MODESTR_BASE       "base"    /* base mode (1) */
+# define OSSL_HPKE_MODESTR_PSK        "psk"     /* psk mode (2) */
+# define OSSL_HPKE_MODESTR_AUTH       "auth"    /* sender-key pair auth (3) */
+# define OSSL_HPKE_MODESTR_PSKAUTH    "pskauth" /* psk+sender-key pair (4) */
+
+/*
+ * new values for include/openssl/proverr.h
+ * require doing a ``make update`` in the openssl
+ * tree, if that's not done, we'll re-define it
+ * locally
+ */
+#ifndef PROV_R_INVALID_KDF
+# define PROV_R_INVALID_KDF 232
+#endif
+#ifndef PROV_R_INVALID_AEAD
+# define PROV_R_INVALID_AEAD 231
+#endif
+
+/* an error macro just to make things easier */
+#ifndef ERR_raise
+# define ERR_raise(__a__, __b__) \
+    { \
+        if (erv == 1) { erv = 0; } \
+    }
+#endif
+/* a macro used variously */
+#ifndef OSSL_NELEM
+# define OSSL_NELEM(x)    (sizeof(x)/sizeof((x)[0]))
+#endif
+
+
+/*
+ * @brief  Map ascii to binary - utility macro used in >1 place
+ */
+# define HPKE_A2B(_c_) (_c_ >= '0' && _c_ <= '9' ? (_c_ - '0') :\
+                        (_c_ >= 'A' && _c_ <= 'F' ? (_c_ - 'A' + 10) :\
+                         (_c_ >= 'a' && _c_ <= 'f' ? (_c_ - 'a' + 10) : 0)))
+
 /*
  * @brief for odd/occasional debugging
  * @param fout is a FILE * to use
@@ -148,3 +187,8 @@ int OSSL_HPKE_dec(OSSL_LIB_CTX *libctx, const char *propq,
  * clients.
  */
 int OSSL_HPKE_CTX_set1_senderpriv(OSSL_HPKE_CTX *ctx, EVP_PKEY *privp);
+
+const char *kem_info_str(const OSSL_HPKE_KEM_INFO *kem_info);
+const char *kdf_info_str(const OSSL_HPKE_KDF_INFO *kdf_info);
+const char *aead_info_str(const OSSL_HPKE_AEAD_INFO *aead_info);
+extern const char *hpke_mode_strtab[4];

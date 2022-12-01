@@ -27,6 +27,7 @@
  */
 #include "hpke.h"
 #include "hpke_util.h"
+#include "hpke_oldapi.h"
 /*
  * Define this for LOADS of printing of intermediate cryptographic values
  * Really only needed when new crypto added (hopefully)
@@ -140,7 +141,7 @@ const char *aead_info_str(const OSSL_HPKE_AEAD_INFO *aead_info)
 /*
  * @brief table of mode strings
  */
-const char *hpke_mode_strtab[] = {
+const char *hpke_mode_strtab[4] = {
     OSSL_HPKE_MODESTR_BASE,
     OSSL_HPKE_MODESTR_PSK,
     OSSL_HPKE_MODESTR_AUTH,

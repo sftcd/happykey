@@ -6,9 +6,6 @@
  * in the file LICENSE in the source distribution or at
  * https://www.openssl.org/source/license.html
  */
-#ifdef HAPPYKEY
-/* just a thing to force a change */
-#endif
 
 #ifndef OSSL_INTERNAL_HPKE_UTIL_H
 # define OSSL_INTERNAL_HPKE_UTIL_H

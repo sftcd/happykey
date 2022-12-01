@@ -28,13 +28,6 @@
 # define OSSL_HPKE_MAX_PARMLEN        66
 # define OSSL_HPKE_MAX_INFOLEN        1024
 
-#ifdef HAPPYKEY
-/* strings for modes */
-# define OSSL_HPKE_MODESTR_BASE       "base"    /* base mode (1) */
-# define OSSL_HPKE_MODESTR_PSK        "psk"     /* psk mode (2) */
-# define OSSL_HPKE_MODESTR_AUTH       "auth"    /* sender-key pair auth (3) */
-# define OSSL_HPKE_MODESTR_PSKAUTH    "pskauth" /* psk+sender-key pair (4) */
-#endif
 /*
  * The (16bit) HPKE algorithm ID IANA codepoints
  * If/when new IANA codepoints are added there are tables in
@@ -147,4 +140,5 @@ int OSSL_HPKE_str2suite(const char *str, OSSL_HPKE_SUITE *suite);
 size_t OSSL_HPKE_get_ciphertext_size(OSSL_HPKE_SUITE suite, size_t clearlen);
 size_t OSSL_HPKE_get_public_encap_size(OSSL_HPKE_SUITE suite);
 size_t OSSL_HPKE_get_recommended_ikmelen(OSSL_HPKE_SUITE suite);
+
 #endif

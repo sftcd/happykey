@@ -24,6 +24,7 @@
 #include <openssl/ssl.h>
 
 #include "hpke.h"
+#include "hpke_util.h"
 #include "hpke_oldapi.h"
 
 #ifndef HPKEMAIN_MAXSIZE

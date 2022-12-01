@@ -46,10 +46,10 @@ all: hpkemain apitest
 hpke.o: hpke.c hpke.h
 	${CC} ${CFLAGS} -I ${INCL} -c $<
 
-hpke_oldapi.o: hpke_oldapi.c hpke_oldapi.h hpke.h
+hpke_oldapi.o: hpke_oldapi.c hpke_oldapi.h hpke_util.h hpke.h
 	${CC} ${CFLAGS} -I ${INCL} -c $<
 
-hpke_util.o: hpke_util.c hpke.h
+hpke_util.o: hpke_util.c hpke_util.h hpke.h
 	${CC} ${CFLAGS} -I ${INCL} -c $<
 
 hpkemain.o: hpkemain.c hpke.h

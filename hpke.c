@@ -24,17 +24,15 @@
 #include <openssl/evp.h>
 #include <openssl/params.h>
 #include <openssl/param_build.h>
-#include <internal/packet.h>
-#include <internal/common.h>
-#endif
-#ifdef HAPPYKEY
+#include "packet.h"
+//#include <internal/common.h>
 /*
  * If we're building standalone (from github.com/sftcd/happykey) then
  * include the local headers.
  */
 # include "hpke.h"
-# include "hpke_oldapi.h"
 # include "hpke_util.h"
+# include "hpke_oldapi.h"
 /*
  * Define this for LOADS of printing of intermediate cryptographic values
  * Really only needed when new crypto added (hopefully)
@@ -71,67 +69,6 @@ static const char OSSL_HPKE_KEY_LABEL[] = "\x6b\x65\x79";
 static const char OSSL_HPKE_PSK_HASH_LABEL[] = "\x70\x73\x6b\x5f\x68\x61\x73\x68";
 /*  "secret" - for generating shared secret */
 static const char OSSL_HPKE_SECRET_LABEL[] = "\x73\x65\x63\x72\x65\x74";
-#ifdef HAPPYKEY
-/* an error macro just to make things easier */
-# define ERR_raise(__a__, __b__) \
-    { \
-        if (erv == 1) { erv = 0; } \
-    }
-#endif
-#if defined(SUPERVERBOSE)
-unsigned char *pbuf; /* global var for debug printing */
-size_t pblen = 1024; /* global var for debug printing */
-
-/**
- * @brief string for KEMs
- */
-static const char *kem_info_str(const OSSL_HPKE_KEM_INFO *kem_info)
-{
-    if (kem_info == NULL)
-        return "null";
-    if (kem_info->groupname != NULL)
-        return kem_info->groupname;
-    else
-        return kem_info->keytype;
-}
-
-/**
- * @brief string for KDFs
- */
-static const char *kdf_info_str(const OSSL_HPKE_KDF_INFO *kdf_info)
-{
-    if (kdf_info == NULL)
-        return "null";
-    return kdf_info->mdname;
-}
-
-/**
- * @brief string for AEADs
- */
-static const char *aead_info_str(const OSSL_HPKE_AEAD_INFO *aead_info)
-{
-    if (aead_info == NULL)
-        return "null";
-    return aead_info->name;
-}
-
-/*
- * @brief table of mode strings
- */
-static const char *hpke_mode_strtab[] = {
-    OSSL_HPKE_MODESTR_BASE,
-    OSSL_HPKE_MODESTR_PSK,
-    OSSL_HPKE_MODESTR_AUTH,
-    OSSL_HPKE_MODESTR_PSKAUTH};
-#endif
-#ifdef HAPPYKEY
-/*
- * @brief  Map ascii to binary - utility macro used in >1 place
- */
-# define HPKE_A2B(_c_) (_c_ >= '0' && _c_ <= '9' ? (_c_ - '0') :\
-                        (_c_ >= 'A' && _c_ <= 'F' ? (_c_ - 'A' + 10) :\
-                         (_c_ >= 'a' && _c_ <= 'f' ? (_c_ - 'a' + 10) : 0)))
-#endif
 
 /**
  * @brief sender or receiver context
@@ -221,6 +158,9 @@ static EVP_PKEY *evp_pkey_new_raw_nist_public_key(OSSL_LIB_CTX *libctx,
     }
 #if defined(SUPERVERBOSE)
     if (ret != NULL) {
+        unsigned char *pbuf = NULL;
+        size_t pblen = 1024;
+
         pblen = EVP_PKEY_get1_encoded_public_key(ret, &pbuf);
         hpke_pbuf(stdout, "\tEARLY public", pbuf, pblen);
         OPENSSL_free(pbuf);
@@ -462,30 +402,6 @@ static int hpke_mode_check(unsigned int mode)
     }
     return 1;
 }
-#ifdef HAPPYKEY
-/*
- * @brief check psk params are as per spec
- * @param mode is the mode in use
- * @param pskid PSK identifier
- * @param psklen length of PSK
- * @param psk the psk itself
- * @return 1 for success, 0 otherwise
- *
- * If a PSK mode is used both pskid and psk must be
- * non-default. Otherwise we ignore the PSK params.
- */
-static int hpke_psk_check(unsigned int mode,
-                          const char *pskid,
-                          size_t psklen,
-                          const unsigned char *psk)
-{
-    if (mode == OSSL_HPKE_MODE_BASE || mode == OSSL_HPKE_MODE_AUTH)
-        return 1;
-    if (pskid == NULL || psklen == 0 || psk == NULL)
-        return 0;
-    return 1;
-}
-#endif
 
 /**
  * @brief check if a suite is supported locally

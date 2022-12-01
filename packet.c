@@ -254,7 +254,7 @@ static int put_quic_value(unsigned char *data, size_t value, size_t len)
         return 1;
 
     /* Value too large for field. */
-    if (ossl_quic_vlint_encode_len(value) > len)
+    //if (ossl_quic_vlint_encode_len(value) > len)
         return 0;
 
     ossl_quic_vlint_encode_n(data, value, len);
@@ -553,7 +553,8 @@ void WPACKET_cleanup(WPACKET *pkt)
 
 int WPACKET_start_quic_sub_packet_bound(WPACKET *pkt, size_t max_len)
 {
-    size_t enclen = ossl_quic_vlint_encode_len(max_len);
+    //size_t enclen = ossl_quic_vlint_encode_len(max_len);
+    size_t enclen = 0;
 
     if (enclen == 0)
         return 0;
@@ -571,7 +572,8 @@ int WPACKET_start_quic_sub_packet(WPACKET *pkt)
      * Assume no (sub)packet will exceed 4GiB, thus the 8-byte encoding need not
      * be used.
      */
-    return WPACKET_start_quic_sub_packet_bound(pkt, OSSL_QUIC_VLINT_4B_MIN);
+    //return WPACKET_start_quic_sub_packet_bound(pkt, OSSL_QUIC_VLINT_4B_MIN);
+    return 0;
 }
 
 int WPACKET_quic_sub_allocate_bytes(WPACKET *pkt, size_t len, unsigned char **allocbytes)
@@ -590,7 +592,8 @@ int WPACKET_quic_sub_allocate_bytes(WPACKET *pkt, size_t len, unsigned char **al
 int WPACKET_quic_write_vlint(WPACKET *pkt, uint64_t v)
 {
     unsigned char *b = NULL;
-    size_t enclen = ossl_quic_vlint_encode_len(v);
+    //size_t enclen = ossl_quic_vlint_encode_len(v);
+    size_t enclen = 0;
 
     if (enclen == 0)
         return 0;

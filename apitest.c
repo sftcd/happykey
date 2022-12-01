@@ -29,6 +29,7 @@
 # include <openssl/params.h>
 # include <openssl/param_build.h>
 # include "hpke.h"
+# include "hpke_util.h"
 # include "hpke_oldapi.h"
 
 static int verbose = 0;

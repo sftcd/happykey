@@ -13,12 +13,22 @@
 #include <openssl/params.h>
 #include <openssl/err.h>
 #include <openssl/proverr.h>
+#ifdef HAPPYKEY
+#include "hpke.h"
+#else
 #include <openssl/hpke.h>
+#endif
 #include <openssl/sha.h>
 #include <openssl/rand.h>
+#ifdef HAPPYKEY
+#define X25519_KEYLEN 32
+#define X448_KEYLEN 56
+#else
 #include "crypto/ecx.h"
+#endif
 #ifdef HAPPYKEY
 #include "hpke_util.h"
+#include "hpke_oldapi.h"
 #include "packet.h"
 #else
 #include "internal/hpke_util.h"
@@ -31,15 +41,6 @@
  */
 #define OSSL_HPKE_STR_DELIMCHAR ','
 
-#ifdef HAPPYKEY
-#if 0
-#if !defined(OPENSSL_SYS_WINDOWS)
-# define strtok_here strtok_r
-#else
-# define strtok_here strtok_s
-#endif
-#endif
-#endif
 /*
  * table with identifier and synonym strings
  * right now, there are 4 synonyms for each - a name, a hex string
@@ -209,20 +210,6 @@ const OSSL_HPKE_KEM_INFO *ossl_HPKE_KEM_INFO_find_random(OSSL_LIB_CTX *ctx)
     return &hpke_kem_tab[rval % sz];
 }
 
-#ifdef HAPPYKEY
-/*
- * new values for include/openssl/proverr.h
- * require doing a ``make update`` in the openssl
- * tree, if that's not done, we'll re-define it
- * locally
- */
-#ifndef PROV_R_INVALID_KDF
-# define PROV_R_INVALID_KDF 232
-#endif
-#ifndef PROV_R_INVALID_AEAD
-# define PROV_R_INVALID_AEAD 231
-#endif
-#endif
 const OSSL_HPKE_KDF_INFO *ossl_HPKE_KDF_INFO_find_id(uint16_t kdfid)
 {
     int i, sz = OSSL_NELEM(hpke_kdf_tab);
@@ -441,81 +428,6 @@ EVP_KDF_CTX *ossl_kdf_ctx_create(const char *kdfname, const char *mdname,
     return kctx;
 }
 
-#ifdef HAPPYKEY
-#if 0
-/*
- * @brief map a string to a HPKE suite based on synonym tables
- * @param str is the string value
- * @param suite is the resulting suite
- * @return 1 for success, otherwise failure
- */
-int ossl_hpke_str2suite(const char *suitestr, OSSL_HPKE_SUITE *suite)
-{
-    uint16_t kem = 0, kdf = 0, aead = 0;
-    char *st = NULL;
-    char *instrcp = NULL;
-    size_t inplen = 0;
-    int labels = 0;
-    const synonymttab_t *synp = NULL;
-    uint16_t *targ = NULL;
-    size_t i, j;
-    size_t outsize = 0;
-    size_t insize = 0;
-
-    if (suitestr == NULL || suite == NULL)
-        return 0;
-    /* See if it contains a mix of our strings and numbers  */
-    inplen = OPENSSL_strnlen(suitestr, OSSL_HPKE_MAX_SUITESTR);
-    if (inplen >= OSSL_HPKE_MAX_SUITESTR)
-        return 0;
-    instrcp = OPENSSL_strndup(suitestr, inplen);
-    st = strtok_here(instrcp, ",");
-    if (st == NULL) {
-        OPENSSL_free(instrcp);
-        return 0;
-    }
-    while (st != NULL && ++labels <= 3) {
-        /* check if string is known or number and if so handle appropriately */
-        if (kem == 0) {
-            synp = kemstrtab;
-            targ = &kem;
-            outsize = OSSL_NELEM(kemstrtab);
-            insize = OSSL_NELEM(kemstrtab[0].synonyms);
-        } else if (kdf == 0) {
-            synp = kdfstrtab;
-            targ = &kdf;
-            outsize = OSSL_NELEM(kdfstrtab);
-            insize = OSSL_NELEM(kdfstrtab[0].synonyms);
-        } else {
-            synp = aeadstrtab;
-            targ = &aead;
-            outsize = OSSL_NELEM(aeadstrtab);
-            insize = OSSL_NELEM(aeadstrtab[0].synonyms);
-        }
-        for (i = 0; i != outsize && *targ == 0; i++) {
-            for (j = 0; j != insize && *targ == 0; j++) {
-                if (OPENSSL_strcasecmp(st, synp[i].synonyms[j]) == 0)
-                    *targ = synp[i].id;
-            }
-        }
-        if (*targ == 0) {
-            OPENSSL_free(instrcp);
-            return 0;
-        }
-
-        st = strtok_here(NULL, ",");
-    }
-    OPENSSL_free(instrcp);
-    /* if given a good value followed by more stuff, we fail */
-    if (st != NULL)
-        return 0;
-    suite->kem_id = kem;
-    suite->kdf_id = kdf;
-    suite->aead_id = aead;
-    return 1;
-}
-#endif
-#endif
 /*
  * @brief look for a label into the synonym tables, and return its id
  * @param st is the string value
@@ -537,117 +449,6 @@ static uint16_t synonyms_name2id(const char *st, const synonymttab_t *synp,
     return 0;
 }
 
-#ifdef HAPPYKEY
-#if 0
-/*
- * @brief map a string to a HPKE suite based on synonym tables
- * @param str is the string value
- * @param suite is the resulting suite
- * @return 1 for success, otherwise failure
- */
-int ossl_hpke_str2suite(const char *suitestr, OSSL_HPKE_SUITE *suite)
-{
-    uint16_t kem = 0, kdf = 0, aead = 0;
-    char *st = NULL, *instrcp = NULL;
-#define NOSTRTOK
-#ifndef NOSTRTOK
-    char *st_state = NULL;
-#else
-    char *inpend = NULL;
-#endif
-    size_t inplen;
-    int labels = 0, result = 0;
-    int delim_count = 0;
-    const char OSSL_HPKE_STR_DELIMSTR[] = { OSSL_HPKE_STR_DELIMCHAR, '\0' };
-
-    if (suitestr == NULL || suitestr[0] == 0x00 || suite == NULL) {
-        ERR_raise(ERR_LIB_CRYPTO, ERR_R_PASSED_NULL_PARAMETER);
-        return 0;
-    }
-    /* somebody might someday extend in an untested way... */
-    if (OPENSSL_strnlen(OSSL_HPKE_STR_DELIMSTR, 1) != 1) {
-        ERR_raise(ERR_LIB_CRYPTO, ERR_R_INTERNAL_ERROR);
-        return 0;
-    }
-
-    inplen = OPENSSL_strnlen(suitestr, OSSL_HPKE_MAX_SUITESTR);
-    if (inplen >= OSSL_HPKE_MAX_SUITESTR) {
-        ERR_raise(ERR_LIB_CRYPTO, ERR_R_PASSED_INVALID_ARGUMENT);
-        return 0;
-    }
-
-    /* we don't want a delimiter at the end of the string */
-    if (suitestr[inplen - 1] == OSSL_HPKE_STR_DELIMCHAR)
-        return 0;
-    /* We want exactly two delimiters in the input string */
-    for (st = (char *)suitestr; *st != '\0'; st++) {
-        if (*st == OSSL_HPKE_STR_DELIMCHAR)
-            delim_count++;
-    }
-    if (delim_count != 2)
-        return 0;
-
-    /* Duplicate `suitestr` to allow its parsing  */
-    instrcp = OPENSSL_memdup(suitestr, inplen + 1);
-    if (instrcp == NULL)
-        goto fail;
-
-    /* See if it contains a mix of our strings and numbers */
-#ifdef NOSTRTOK
-    st = instrcp;
-    inpend = instrcp + inplen;
-#else
-    st = strtok_here(instrcp, OSSL_HPKE_STR_DELIMSTR, &st_state);
-    if (st == NULL)
-        goto fail;
-#endif
-
-    while (st != NULL && labels < 3) {
-        char *cp = st;
-
-#ifdef NOSTRTOK
-        while (*cp != '\0' && *cp != OSSL_HPKE_STR_DELIMCHAR)
-            cp++;
-        *cp = '\0';
-#endif
-
-        /* check if string is known or number and if so handle appropriately */
-        if (labels == 0
-            && (kem = synonyms_name2id(st, kemstrtab,
-                                       OSSL_NELEM(kemstrtab))) == 0)
-            goto fail;
-        else if (labels == 1
-                 && (kdf = synonyms_name2id(st, kdfstrtab,
-                                            OSSL_NELEM(kdfstrtab))) == 0)
-            goto fail;
-        else if (labels == 2
-                 && (aead = synonyms_name2id(st, aeadstrtab,
-                                             OSSL_NELEM(aeadstrtab))) == 0)
-            goto fail;
-
-#ifdef NOSTRTOK
-        if (cp == inpend)
-            st = NULL;
-        else
-            st = cp + 1;
-#else
-        st = strtok_here(NULL, OSSL_HPKE_STR_DELIMSTR, &st_state);
-#endif
-        ++labels;
-    }
-    if (st != NULL || labels != 3)
-        goto fail;
-    suite->kem_id = kem;
-    suite->kdf_id = kdf;
-    suite->aead_id = aead;
-    result = 1;
-
-fail:
-    OPENSSL_free(instrcp);
-    return result;
-}
-#endif
-#endif
 /*
  * @brief map a string to a HPKE suite based on synonym tables
  * @param str is the string value

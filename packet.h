@@ -17,8 +17,8 @@
 # include <openssl/crypto.h>
 # include <openssl/e_os2.h>
 
-# include "internal/numbers.h"
-# include "internal/quic_vlint.h"
+//# include "internal/numbers.h"
+//# include "internal/quic_vlint.h"
 
 typedef struct {
     /* Pointer to where we are currently reading from */
@@ -241,12 +241,12 @@ __owur static ossl_inline int PACKET_get_quic_vlint(PACKET *pkt,
     if (PACKET_remaining(pkt) < 1)
         return 0;
 
-    enclen = ossl_quic_vlint_decode_len(*pkt->curr);
+    //enclen = ossl_quic_vlint_decode_len(*pkt->curr);
 
     if (PACKET_remaining(pkt) < enclen)
         return 0;
 
-    *data = ossl_quic_vlint_decode_unchecked(pkt->curr);
+    //*data = ossl_quic_vlint_decode_unchecked(pkt->curr);
     packet_forward(pkt, enclen);
     return 1;
 }
