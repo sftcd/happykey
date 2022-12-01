@@ -8,39 +8,20 @@
 # An OpenSSL-based HPKE implementation following draft-irtf-cfrg-hpke
 #
 
+# Typical (for me) place where an OpenSSL build may reside
+# (you can over-ride this from command line)
 OSSL?=../openssl
+
+# OpenSSL includes
 INCL=${OSSL}/include
 
+# basic settings
 CC=gcc
 CFLAGS=-D HAPPYKEY -g
 
+# build a command line tool and a test tool that use
+# the polyfill version of the API implementation
 all: hpkemain apitest
-
-# This is how I used remove the polyfill code and copy over to the
-# OpenSSL build. We'll be doing the reverse here so will remove this
-# but handy to keep some for the moment.
-#
-# hpke.c, hpke.h and apitest.c include additional tracing and test vector
-# support that's not desirable in the version we'd like to see merged
-# with OpenSSL - we use the unifdef tool to generate files for using in
-# an openssl build from the ones here.
-#
-# The "-x 1" below is just to get unifdef to return zero if the input
-# and output differ, which should be the case for us.
-# forlib: hpke.c-forlib hpke_util.c-forlib hpke.h-forlib hpke_util.h-forlib apitest.c-forlib
-#
-# hpke.c-forlib: hpke.c
-# 	- unifdef -x 1 -DHPKEAPI -UHAPPYKEY -USUPERVERBOSE -UTESTVECTORS hpke.c >hpke.c-forlib
-# copy over the files to the openssl build
-#copy2lib: forlib \
-#		  ${OSSL}/crypto/hpke/hpke.c \
-#		  ${OSSL}/crypto/hpke/hpke_util.c \
-#		  ${INCL}/openssl/hpke.h \
-#		  ${INCL}/internal/hpke_util.h \
-#		  ${OSSL}/test/hpke_test.c
-#
-#${OSSL}/crypto/hpke/hpke.c: hpke.c-forlib
-#	- cp hpke.c-forlib ${OSSL}/crypto/hpke/hpke.c
 
 # main build targets
 hpke.o: hpke.c hpke.h
@@ -67,11 +48,16 @@ apitest: apitest.o hpke.o hpke_oldapi.o hpke_util.o packet.o
 hpkemain: hpkemain.o hpke.o hpke_oldapi.o hpke_util.o packet.o
 	${CC} ${CFLAGS} -o $@ hpkemain.o hpke.o hpke_oldapi.o hpke_util.o packet.o -lssl -lcrypto
 
+# this is the example from the HPKE documentation, it requires
+# an OpenSSL build that includes HPKE
 pod_example.o: pod_example.c hpke.h
 	${CC} ${CFLAGS} -I ${INCL} -c $<
 
 pod_example: pod_example.o
-	${CC} ${CFLAGS} -o $@ pod_example.o hpke.o hpke_util.o packet.o -lssl -lcrypto
+	${CC} ${CFLAGS} -o $@ pod_example.o -L${OSSL} -lssl -lcrypto
+
+pod_example_test: pod_example
+	LD_LIBRARY_PATH=${OSSL} ./pod_example
 
 clean:
 	- rm -f hpkemain.o hpke.o hpke_util.o hpketv.o hpkemain
